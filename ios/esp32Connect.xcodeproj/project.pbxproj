@@ -14,6 +14,14 @@
 		8D87DD5133A7AB39F4848C73 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 412FB27218B7A33677308B8E /* PrivacyInfo.xcprivacy */; };
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
 		F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11748412D0307B40044C1D9 /* AppDelegate.swift */; };
+		9B895E183F64432DACD64FF7 /* ESP32ConnectApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = DED81A075010469DB082F55A /* ESP32ConnectApp.swift */; };
+		01991855E4104083A590229A /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 758F8F1F7DF04CB6A61B0A4C /* HomeView.swift */; };
+		FFB36F189C164112BCE87CB8 /* ConnectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9FEEAAA328741FA995EB0DD /* ConnectionView.swift */; };
+		6D3D595B22634CD087D94501 /* DataDisplayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7ECB5E1F2F66483F903563F1 /* DataDisplayView.swift */; };
+		B271A7FB8E5A41F8898E2211 /* BLEManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A144CA674894136A12BFFEB /* BLEManager.swift */; };
+		08984F0253984635A98176D8 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48250E82509B441EAE5B8F35 /* Models.swift */; };
+		22ACB2906AB542C8A898D61C /* AppConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = C164A321E5804A9DB011BB43 /* AppConfig.swift */; };
+		291F60BBC0E94D3C95B64DEF /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E1B15F53AEF4A5AACACA2B9 /* SceneDelegate.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -30,6 +38,14 @@
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		F11748412D0307B40044C1D9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = esp32Connect/AppDelegate.swift; sourceTree = "<group>"; };
 		F11748442D0722820044C1D9 /* esp32Connect-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "esp32Connect-Bridging-Header.h"; path = "esp32Connect/esp32Connect-Bridging-Header.h"; sourceTree = "<group>"; };
+		DED81A075010469DB082F55A /* ESP32ConnectApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ESP32ConnectApp.swift; path = esp32Connect/ESP32ConnectApp.swift; sourceTree = "<group>"; };
+		758F8F1F7DF04CB6A61B0A4C /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = HomeView.swift; path = esp32Connect/HomeView.swift; sourceTree = "<group>"; };
+		A9FEEAAA328741FA995EB0DD /* ConnectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ConnectionView.swift; path = esp32Connect/ConnectionView.swift; sourceTree = "<group>"; };
+		7ECB5E1F2F66483F903563F1 /* DataDisplayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = DataDisplayView.swift; path = esp32Connect/DataDisplayView.swift; sourceTree = "<group>"; };
+		5A144CA674894136A12BFFEB /* BLEManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = BLEManager.swift; path = esp32Connect/BLEManager.swift; sourceTree = "<group>"; };
+		48250E82509B441EAE5B8F35 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Models.swift; path = esp32Connect/Models.swift; sourceTree = "<group>"; };
+		C164A321E5804A9DB011BB43 /* AppConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppConfig.swift; path = esp32Connect/AppConfig.swift; sourceTree = "<group>"; };
+		6E1B15F53AEF4A5AACACA2B9 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SceneDelegate.swift; path = esp32Connect/SceneDelegate.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -48,6 +64,16 @@
 			isa = PBXGroup;
 			children = (
 				F11748412D0307B40044C1D9 /* AppDelegate.swift */,
+				6E1B15F53AEF4A5AACACA2B9 /* SceneDelegate.swift */,
+				
+				DED81A075010469DB082F55A /* ESP32ConnectApp.swift */,
+				758F8F1F7DF04CB6A61B0A4C /* HomeView.swift */,
+				A9FEEAAA328741FA995EB0DD /* ConnectionView.swift */,
+				7ECB5E1F2F66483F903563F1 /* DataDisplayView.swift */,
+				5A144CA674894136A12BFFEB /* BLEManager.swift */,
+				48250E82509B441EAE5B8F35 /* Models.swift */,
+				C164A321E5804A9DB011BB43 /* AppConfig.swift */,
+				
 				F11748442D0722820044C1D9 /* esp32Connect-Bridging-Header.h */,
 				BB2F792B24A3F905000567C9 /* Supporting */,
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
@@ -318,6 +344,16 @@
 			buildActionMask = 2147483647;
 			files = (
 				F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */,
+				291F60BBC0E94D3C95B64DEF /* SceneDelegate.swift in Sources */,
+				
+				9B895E183F64432DACD64FF7 /* ESP32ConnectApp.swift in Sources */,
+				01991855E4104083A590229A /* HomeView.swift in Sources */,
+				FFB36F189C164112BCE87CB8 /* ConnectionView.swift in Sources */,
+				6D3D595B22634CD087D94501 /* DataDisplayView.swift in Sources */,
+				B271A7FB8E5A41F8898E2211 /* BLEManager.swift in Sources */,
+				08984F0253984635A98176D8 /* Models.swift in Sources */,
+				22ACB2906AB542C8A898D61C /* AppConfig.swift in Sources */,
+				
 				03CACB5A6E07DC263788B384 /* ExpoModulesProvider.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
