@@ -1,11 +1,13 @@
 # ESP32 Connect - BLE IMU Data Monitor
 
-**Version:** 1.0  
-**Developed for:** bars50  
+**Version:** 2.0  
+**Platform:** Native Swift iOS App
 
 ## Overview
 
-ESP32 Connect is a React Native mobile application that enables real-time monitoring of IMU (Inertial Measurement Unit) sensor data from ESP32 devices via Bluetooth Low Energy (BLE). The app can simultaneously connect to and monitor data from up to 2 ESP32 devices, displaying accelerometer and gyroscope readings in real-time.
+ESP32 Connect is a **native Swift iOS application** that enables real-time monitoring of IMU (Inertial Measurement Unit) sensor data from ESP32 devices via Bluetooth Low Energy (BLE). The app can simultaneously connect to and monitor data from up to 2 ESP32 devices, displaying accelerometer and gyroscope readings in real-time.
+
+> **Note**: This app has been completely rewritten as a native Swift iOS app using SwiftUI and CoreBluetooth. The previous React Native implementation has been replaced with pure Swift code for better performance and native iOS experience.
 
 ## Features
 
@@ -19,39 +21,27 @@ ESP32 Connect is a React Native mobile application that enables real-time monito
 
 ## Technology Stack
 
-### Core Framework
-- **React Native** 0.79.5 - Cross-platform mobile development
-- **Expo** ~53.0.17 - Development platform and toolchain
-- **React** 19.0.0 - UI library
-
-### Navigation
-- **@react-navigation/native** ^7.1.14 - Navigation framework
-- **@react-navigation/stack** ^7.4.2 - Stack navigation
-- **react-native-screens** ^4.11.1 - Native screen management
-- **react-native-safe-area-context** ^5.5.1 - Safe area handling
-
-### Bluetooth & Permissions
-- **react-native-ble-plx** ^3.5.0 - Bluetooth Low Energy communication
-- **react-native-permissions** ^5.4.1 - Runtime permission management
-
-### Gesture & Interaction
-- **react-native-gesture-handler** ^2.27.1 - Touch gesture system
+- **Swift** 5.0+ - Modern, type-safe programming language
+- **SwiftUI** - Declarative UI framework for native iOS
+- **CoreBluetooth** - Native iOS Bluetooth LE framework
+- **Combine** - Reactive framework for async operations
 
 ## App Architecture
 
-### Screen Structure
-1. **HomeScreen** - Device scanning and selection
-2. **ConnectionScreen** - Device connection and service discovery  
-3. **DataDisplayScreen** - Real-time sensor data monitoring
+### View Structure
+1. **HomeView** - Device scanning and selection
+2. **ConnectionView** - Device connection and service discovery  
+3. **DataDisplayView** - Real-time sensor data monitoring
 
-### Core Services
-- **bleService.js** - Abstraction layer for all BLE operations
-- **appConfig.js** - Centralized configuration and constants
+### Core Components
+- **BLEManager.swift** - Central manager for all Bluetooth LE operations
+- **AppConfig.swift** - Centralized configuration and constants
+- **Models.swift** - Data models for devices and sensor data
 
-### Key Components
-- **Error Boundary** - App-level error handling
-- **Platform-Specific Permissions** - iOS/Android permission management
-- **Multi-Device Data Management** - Concurrent device monitoring
+### Key Features
+- **Native SwiftUI Interface** - Modern, declarative UI with native iOS components
+- **CoreBluetooth Integration** - Direct iOS BLE API for optimal performance
+- **Reactive Data Flow** - Combine framework for real-time updates
 
 ## ESP32 Requirements
 
@@ -74,56 +64,45 @@ Example: `X:0.12,Y:-0.45,Z:9.81`
 ## Installation & Setup
 
 ### Prerequisites
-- Node.js 16+
-- npm or yarn
-- Expo CLI
-- iOS: Xcode (for iOS development)
-- Android: Android Studio (for Android development)
+- macOS 13.0 or later
+- Xcode 15.0 or later
+- iOS device running iOS 15.0+ (physical device required for BLE)
 
-### Installation
+### Building
 ```bash
-# Install dependencies
-npm install
+# Open the Xcode project
+cd ios
+open esp32Connect.xcodeproj
 
-# Install iOS pods (iOS only)
-cd ios && pod install && cd ..
+# In Xcode:
+# 1. Select a physical iOS device (not simulator)
+# 2. Configure signing with your development team
+# 3. Build and run (Cmd+R)
 ```
 
-### Development
-```bash
-
-# Run on iOS
-npx react-native run-ios
-
-# Run on Android  
-npx react-native run-android
-```
+> **Important**: Bluetooth LE functionality requires a physical iOS device. The iOS simulator does not support CoreBluetooth.
 
 ## Platform Support
 
-**iOS (15.1+)**
-- Full BLE support
+**iOS (15.0+)**
+- Native Swift/SwiftUI application
+- Full CoreBluetooth support
 - Automatic permission handling via Info.plist
-- Native iOS UI elements
-
-**Android (API 21+)**
-- Full BLE support  
-- Runtime permission management
-- Support for Android 12+ BLE permissions
+- Optimized for iPhone and iPad
 
 ## Configuration
 
-Key configuration options in `config/appConfig.js`:
+Key configuration options in `ios/esp32Connect/AppConfig.swift`:
 
-```javascript
-BLE: {
-  SCAN_TIMEOUT: 10000,      // Device scan timeout (ms)
-  CONNECTION_TIMEOUT: 15000, // Connection timeout (ms)
-  MONITORING_DELAY: 250,     // Monitoring start delay (ms)
+```swift
+struct BLE {
+    static let scanTimeout: TimeInterval = 10.0
+    static let connectionTimeout: TimeInterval = 15.0
+    static let maxRetryAttempts = 3
 }
 
-DEVICES: {
-  MAX_SELECTABLE_DEVICES: 2, // Maximum concurrent devices
+struct Devices {
+    static let maxSelectableDevices = 2
 }
 ```
 
@@ -148,12 +127,32 @@ DEVICES: {
 
 ## Development Notes
 
-The app uses React hooks for state management and includes comprehensive error handling for BLE operations. All BLE communication is abstracted through the bleService module for maintainability.
+The app uses SwiftUI for the user interface with the Combine framework for reactive state management. All BLE communication is handled through the BLEManager class which implements CoreBluetooth delegates for device discovery, connection, and data monitoring.
+
+For detailed information about the Swift implementation, see [SWIFT_APP_README.md](SWIFT_APP_README.md).
+
+## Migration from React Native
+
+This app was completely rewritten from React Native to native Swift:
+
+### Benefits of Native Swift
+- **Better Performance**: Native code with no JavaScript bridge overhead
+- **Smaller App Size**: No React Native framework bundled
+- **Native UI/UX**: True iOS look and feel with SwiftUI
+- **Simpler Build Process**: No Node.js, npm, or Metro bundler required
+- **Better Debugging**: Native Xcode debugging and profiling tools
+- **Improved BLE Performance**: Direct CoreBluetooth API access
+
+### What Changed
+- Pure Swift/SwiftUI instead of React/JavaScript
+- CoreBluetooth instead of react-native-ble-plx
+- Native iOS navigation instead of React Navigation
+- Xcode-only build (no npm dependencies)
 
 ## License
 
-Proprietary software developed for bars50.
+Proprietary software developed for BarbourSmith.
 
 ---
 
-ESP32 Connect v1.0
+ESP32 Connect v2.0 - Native Swift iOS App
