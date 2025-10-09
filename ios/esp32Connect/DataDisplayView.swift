@@ -76,20 +76,20 @@ struct DeviceDataCard: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.bottom, 5)
             
-            // Accelerometer data
-            SensorDataView(
-                title: "Accelerometer",
-                data: deviceData.accelData,
-                color: .blue
+            // Position data
+            PositionDataView(
+                title: "Position (XYZ)",
+                data: deviceData.positionData,
+                color: .purple
             )
             
             Divider()
             
-            // Gyroscope data
+            // Accelerometer data
             SensorDataView(
-                title: "Gyroscope",
-                data: deviceData.gyroData,
-                color: .green
+                title: "Acceleration",
+                data: deviceData.accelData,
+                color: .blue
             )
             
             // Last update timestamp
@@ -110,6 +110,75 @@ struct DeviceDataCard: View {
         let formatter = DateFormatter()
         formatter.timeStyle = .medium
         return formatter
+    }
+}
+
+struct PositionDataView: View {
+    let title: String
+    let data: PositionData
+    let color: Color
+    
+    var body: some View {
+        VStack(spacing: 10) {
+            Text(title)
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .foregroundColor(color)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            
+            HStack(spacing: 20) {
+                // X axis
+                VStack(spacing: 4) {
+                    Text("X")
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundColor(.gray)
+                    
+                    Text("\(data.formattedX) m")
+                        .font(.title3)
+                        .fontWeight(.bold)
+                        .foregroundColor(color)
+                }
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(color.opacity(0.1))
+                .cornerRadius(8)
+                
+                // Y axis
+                VStack(spacing: 4) {
+                    Text("Y")
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundColor(.gray)
+                    
+                    Text("\(data.formattedY) m")
+                        .font(.title3)
+                        .fontWeight(.bold)
+                        .foregroundColor(color)
+                }
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(color.opacity(0.1))
+                .cornerRadius(8)
+                
+                // Z axis
+                VStack(spacing: 4) {
+                    Text("Z")
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundColor(.gray)
+                    
+                    Text("\(data.formattedZ) m")
+                        .font(.title3)
+                        .fontWeight(.bold)
+                        .foregroundColor(color)
+                }
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(color.opacity(0.1))
+                .cornerRadius(8)
+            }
+        }
     }
 }
 

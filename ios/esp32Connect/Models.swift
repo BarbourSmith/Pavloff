@@ -86,12 +86,38 @@ struct SensorData: Equatable {
     }
 }
 
+// MARK: - Position Data Model
+struct PositionData: Equatable {
+    var x: Double
+    var y: Double
+    var z: Double
+    
+    init(x: Double = 0.0, y: Double = 0.0, z: Double = 0.0) {
+        self.x = x
+        self.y = y
+        self.z = z
+    }
+    
+    var formattedX: String {
+        String(format: "%.3f", x)
+    }
+    
+    var formattedY: String {
+        String(format: "%.3f", y)
+    }
+    
+    var formattedZ: String {
+        String(format: "%.3f", z)
+    }
+}
+
 // MARK: - Device Data Container
 struct DeviceData: Identifiable {
     let id: UUID
     let name: String
     var accelData: SensorData
     var gyroData: SensorData
+    var positionData: PositionData
     var lastUpdate: Date
     
     init(id: UUID, name: String) {
@@ -99,6 +125,7 @@ struct DeviceData: Identifiable {
         self.name = name
         self.accelData = SensorData()
         self.gyroData = SensorData()
+        self.positionData = PositionData()
         self.lastUpdate = Date()
     }
 }

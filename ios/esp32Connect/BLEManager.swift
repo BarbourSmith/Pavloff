@@ -9,6 +9,66 @@ import Foundation
 import CoreBluetooth
 import Combine
 
+// MARK: - IMU Integrator
+class IMUIntegrator {
+    private var velocity: (x: Double, y: Double, z: Double) = (0, 0, 0)
+    private var position: (x: Double, y: Double, z: Double) = (0, 0, 0)
+    private var lastTimestamp: Date?
+    private var lastAccel: (x: Double, y: Double, z: Double) = (0, 0, 0)
+    
+    func reset() {
+        velocity = (0, 0, 0)
+        position = (0, 0, 0)
+        lastTimestamp = nil
+        lastAccel = (0, 0, 0)
+    }
+    
+    func integrate(accel: SensorData) -> PositionData {
+        let currentTime = accel.timestamp
+        
+        // Initialize on first call
+        guard let lastTime = lastTimestamp else {
+            lastTimestamp = currentTime
+            lastAccel = (accel.x, accel.y, accel.z)
+            return PositionData(x: position.x, y: position.y, z: position.z)
+        }
+        
+        // Calculate time delta
+        let dt = currentTime.timeIntervalSince(lastTime)
+        
+        // Prevent integration with unrealistic time deltas
+        guard dt > 0 && dt < 1.0 else {
+            lastTimestamp = currentTime
+            return PositionData(x: position.x, y: position.y, z: position.z)
+        }
+        
+        // Gravity compensation (assuming Z-axis is vertical)
+        let azCompensated = accel.z - 9.81
+        
+        // Trapezoidal integration for velocity
+        velocity.x += (lastAccel.x + accel.x) * dt / 2
+        velocity.y += (lastAccel.y + accel.y) * dt / 2
+        velocity.z += (lastAccel.z + azCompensated) * dt / 2
+        
+        // Apply velocity dampening to reduce drift
+        let damping = 0.98
+        velocity.x *= damping
+        velocity.y *= damping
+        velocity.z *= damping
+        
+        // Integrate velocity to get position
+        position.x += velocity.x * dt
+        position.y += velocity.y * dt
+        position.z += velocity.z * dt
+        
+        // Update last values
+        lastAccel = (accel.x, accel.y, azCompensated)
+        lastTimestamp = currentTime
+        
+        return PositionData(x: position.x, y: position.y, z: position.z)
+    }
+}
+
 class BLEManager: NSObject, ObservableObject {
     // MARK: - Published Properties
     @Published var discoveredDevices: [BLEDevice] = []
@@ -22,6 +82,7 @@ class BLEManager: NSObject, ObservableObject {
     private var connectedPeripherals: [UUID: CBPeripheral] = [:]
     private var characteristicMap: [UUID: DiscoveredCharacteristics] = [:]
     private var scanTimer: Timer?
+    private var integrators: [UUID: IMUIntegrator] = [:]
     
     // MARK: - UUIDs
     private let imuServiceUUID = CBUUID(string: AppConfig.UUIDs.imuService)
@@ -314,7 +375,19 @@ extension BLEManager: CBPeripheralDelegate {
                 // Update appropriate sensor data
                 if characteristic.uuid == chars.accelUUID {
                     deviceData.accelData = sensorData
+                    
+                    // Initialize integrator if needed
+                    if self.integrators[peripheral.identifier] == nil {
+                        self.integrators[peripheral.identifier] = IMUIntegrator()
+                    }
+                    
+                    // Integrate acceleration to get position
+                    if let integrator = self.integrators[peripheral.identifier] {
+                        deviceData.positionData = integrator.integrate(accel: sensorData)
+                    }
+                    
                     print("[BLE] Accel data from \(peripheral.name ?? "Unknown"): X:\(sensorData.formattedX), Y:\(sensorData.formattedY), Z:\(sensorData.formattedZ)")
+                    print("[BLE] Position from \(peripheral.name ?? "Unknown"): X:\(deviceData.positionData.formattedX)m, Y:\(deviceData.positionData.formattedY)m, Z:\(deviceData.positionData.formattedZ)m")
                 } else if characteristic.uuid == chars.gyroUUID {
                     deviceData.gyroData = sensorData
                     print("[BLE] Gyro data from \(peripheral.name ?? "Unknown"): X:\(sensorData.formattedX), Y:\(sensorData.formattedY), Z:\(sensorData.formattedZ)")

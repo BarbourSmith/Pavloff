@@ -1,14 +1,14 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, ScrollView, Button, Alert } from 'react-native';
 import bleService from '../services/bleService';
 import { APP_CONFIG } from '../config/appConfig';
+import IMUIntegrator from '../utils/imuIntegration';
 
 // The Service UUID is known, so we defined here to pass to monitor .
 const IMU_SERVICE_UUID = APP_CONFIG.UUIDS.IMU_SERVICE;
 
-const DataView = ({ deviceData, deviceId, deviceName }) => {
+const DataView = ({ deviceData, deviceId, deviceName, integrator }) => {
   const accelData = deviceData?.accel ?? null;
-  const gyroData = deviceData?.gyro ?? null;
   const lastUpdate = deviceData?.lastUpdate;
 
   const parseSensorData = (dataString, sensorType) => {
@@ -41,21 +41,26 @@ const DataView = ({ deviceData, deviceId, deviceName }) => {
   };
 
   const accel = parseSensorData(accelData, 'ACCEL');
-  const gyro = parseSensorData(gyroData, 'GYRO');
+  
+  // Calculate position from acceleration
+  let position = { x: 0, y: 0, z: 0 };
+  if (integrator && accel.x !== 'Error' && lastUpdate) {
+    position = integrator.integrate(accel, lastUpdate);
+  }
 
   return (
     <View style={styles.dataContainer}>
       <View style={styles.dataColumn}>
-        <Text style={styles.sensorTitle}>Accelerometer</Text>
+        <Text style={styles.sensorTitle}>Position (XYZ)</Text>
+        <Text style={styles.dataRow}><Text style={styles.axisLabel}>X:</Text> {position.x.toFixed(3)} m</Text>
+        <Text style={styles.dataRow}><Text style={styles.axisLabel}>Y:</Text> {position.y.toFixed(3)} m</Text>
+        <Text style={styles.dataRow}><Text style={styles.axisLabel}>Z:</Text> {position.z.toFixed(3)} m</Text>
+      </View>
+      <View style={styles.dataColumn}>
+        <Text style={styles.sensorTitle}>Acceleration</Text>
         <Text style={styles.dataRow}><Text style={styles.axisLabel}>X:</Text> {accel.x} m/s²</Text>
         <Text style={styles.dataRow}><Text style={styles.axisLabel}>Y:</Text> {accel.y} m/s²</Text>
         <Text style={styles.dataRow}><Text style={styles.axisLabel}>Z:</Text> {accel.z} m/s²</Text>
-      </View>
-      <View style={styles.dataColumn}>
-        <Text style={styles.sensorTitle}>Gyroscope</Text>
-        <Text style={styles.dataRow}><Text style={styles.axisLabel}>X:</Text> {gyro.x} rad/s</Text>
-        <Text style={styles.dataRow}><Text style={styles.axisLabel}>Y:</Text> {gyro.y} rad/s</Text>
-        <Text style={styles.dataRow}><Text style={styles.axisLabel}>Z:</Text> {gyro.z} rad/s</Text>
       </View>
     </View>
   );
@@ -68,6 +73,18 @@ const DataDisplayScreen = ({ route, navigation }) => {
   const [deviceData, setDeviceData] = useState({});
   const [isMonitoring, setIsMonitoring] = useState(true);
   const [connectionErrors, setConnectionErrors] = useState({});
+  
+  // Create IMU integrators for each device (using useRef to persist across renders)
+  const integrators = useRef({});
+  
+  // Initialize integrators for all devices
+  useEffect(() => {
+    devices.forEach(device => {
+      if (!integrators.current[device.id]) {
+        integrators.current[device.id] = new IMUIntegrator();
+      }
+    });
+  }, [devices]);
 
   // Use useCallback to prevent recreating functions on every render
   const updateDeviceData = useCallback((deviceId, dataType, data) => {
@@ -346,6 +363,7 @@ const DataDisplayScreen = ({ route, navigation }) => {
                 deviceData={deviceData[device.id]} 
                 deviceId={device.id}
                 deviceName={device.name}
+                integrator={integrators.current[device.id]}
               />
             </View>
           );
