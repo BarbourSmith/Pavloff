@@ -102,8 +102,17 @@ class BLEManager: NSObject, ObservableObject {
         
         var values: [String: Double] = [:]
         
+        // Check if data contains "Position:" prefix and extract the position part
+        var positionString = dataString
+        if dataString.contains("Position:") {
+            // Extract everything after "Position:"
+            if let range = dataString.range(of: "Position:") {
+                positionString = String(dataString[range.upperBound...]).trimmingCharacters(in: .whitespaces)
+            }
+        }
+        
         // Parse format: "X:value,Y:value,Z:value"
-        let components = dataString.split(separator: ",")
+        let components = positionString.split(separator: ",")
         for component in components {
             let keyValue = component.split(separator: ":")
             if keyValue.count == 2,
@@ -244,30 +253,27 @@ extension BLEManager: CBPeripheralDelegate {
         
         var discoveredChars = DiscoveredCharacteristics()
         
-        // Identify characteristics
+        // Identify characteristics - only looking for position characteristic
         for characteristic in characteristics {
             print("[BLE] Characteristic UUID: \(characteristic.uuid)")
             
             if characteristic.uuid == accelCharUUID {
                 discoveredChars.accelUUID = characteristic.uuid
-                print("[BLE] Found accelerometer characteristic")
-                peripheral.setNotifyValue(true, for: characteristic)
-            } else if characteristic.uuid == gyroCharUUID {
-                discoveredChars.gyroUUID = characteristic.uuid
-                print("[BLE] Found gyroscope characteristic")
+                print("[BLE] Found position characteristic")
                 peripheral.setNotifyValue(true, for: characteristic)
             }
         }
         
-        // Fallback: use position-based assignment if UUIDs don't match
-        if !discoveredChars.isComplete && characteristics.count >= 2 {
-            print("[BLE] Using position-based characteristic assignment")
+        // Fallback: use first characteristic for position if UUID doesn't match
+        if discoveredChars.accelUUID == nil && characteristics.count >= 1 {
+            print("[BLE] Using first characteristic for position data")
             discoveredChars.accelUUID = characteristics[0].uuid
-            discoveredChars.gyroUUID = characteristics[1].uuid
-            
-            for characteristic in characteristics {
-                peripheral.setNotifyValue(true, for: characteristic)
-            }
+            peripheral.setNotifyValue(true, for: characteristics[0])
+        }
+        
+        // Set gyroUUID to the same as accelUUID for compatibility (not used for display)
+        if discoveredChars.accelUUID != nil {
+            discoveredChars.gyroUUID = discoveredChars.accelUUID
         }
         
         DispatchQueue.main.async {
@@ -311,13 +317,10 @@ extension BLEManager: CBPeripheralDelegate {
         
         DispatchQueue.main.async {
             if var deviceData = self.deviceDataMap[peripheral.identifier] {
-                // Update appropriate sensor data
+                // Update position data (using accelData for position)
                 if characteristic.uuid == chars.accelUUID {
                     deviceData.accelData = sensorData
-                    print("[BLE] Accel data from \(peripheral.name ?? "Unknown"): X:\(sensorData.formattedX), Y:\(sensorData.formattedY), Z:\(sensorData.formattedZ)")
-                } else if characteristic.uuid == chars.gyroUUID {
-                    deviceData.gyroData = sensorData
-                    print("[BLE] Gyro data from \(peripheral.name ?? "Unknown"): X:\(sensorData.formattedX), Y:\(sensorData.formattedY), Z:\(sensorData.formattedZ)")
+                    print("[BLE] Position data from \(peripheral.name ?? "Unknown"): X:\(sensorData.formattedX), Y:\(sensorData.formattedY), Z:\(sensorData.formattedZ)")
                 }
                 
                 deviceData.lastUpdate = Date()

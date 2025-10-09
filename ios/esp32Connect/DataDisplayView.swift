@@ -76,20 +76,11 @@ struct DeviceDataCard: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.bottom, 5)
             
-            // Accelerometer data
+            // Position data
             SensorDataView(
-                title: "Accelerometer",
+                title: "Position",
                 data: deviceData.accelData,
                 color: .blue
-            )
-            
-            Divider()
-            
-            // Gyroscope data
-            SensorDataView(
-                title: "Gyroscope",
-                data: deviceData.gyroData,
-                color: .green
             )
             
             // Last update timestamp
