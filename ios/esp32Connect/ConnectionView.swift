@@ -80,7 +80,7 @@ struct ConnectionView: View {
         .onAppear {
             connectToDevices()
         }
-        .onReceive(bleManager.$connectionStatuses) { _ in
+        .onChange(of: bleManager.connectionStatuses) { _ in
             updateConnectedDevices()
         }
     }
