@@ -11,21 +11,29 @@ const DataView = ({ deviceData, deviceId, deviceName }) => {
   const gyroData = deviceData?.gyro ?? null;
   const lastUpdate = deviceData?.lastUpdate;
 
-  const parseSensorData = (dataString, sensorType) => {
+  const parsePositionData = (dataString) => {
     if (!dataString) {
       return { x: '0.00', y: '0.00', z: '0.00', raw: 'No data', timestamp: 'Never' };
     }
     
     const values = {};
     try {
-      dataString.split(',').forEach(part => {
+      // Check if data contains "Position:" prefix and extract the position part
+      let positionString = dataString;
+      if (dataString.includes('Position:')) {
+        // Extract everything after "Position:"
+        positionString = dataString.split('Position:')[1].trim();
+      }
+      
+      // Parse X:value,Y:value,Z:value format
+      positionString.split(',').forEach(part => {
         const [key, value] = part.split(':');
         if (key && value) {
           values[key.toLowerCase().trim()] = parseFloat(value).toFixed(2);
         }
       });
     } catch (error) {
-      console.error(`[PARSE ERROR] ${deviceName} ${sensorType}:`, error);
+      console.error(`[PARSE ERROR] ${deviceName} Position:`, error);
       return { x: 'Error', y: 'Error', z: 'Error', raw: dataString, timestamp: 'Error' };
     }
     
@@ -40,22 +48,16 @@ const DataView = ({ deviceData, deviceId, deviceName }) => {
     return result;
   };
 
-  const accel = parseSensorData(accelData, 'ACCEL');
-  const gyro = parseSensorData(gyroData, 'GYRO');
+  // Use accel data for position (assuming the characteristic is being reused)
+  const position = parsePositionData(accelData);
 
   return (
     <View style={styles.dataContainer}>
       <View style={styles.dataColumn}>
-        <Text style={styles.sensorTitle}>Accelerometer</Text>
-        <Text style={styles.dataRow}><Text style={styles.axisLabel}>X:</Text> {accel.x} m/s²</Text>
-        <Text style={styles.dataRow}><Text style={styles.axisLabel}>Y:</Text> {accel.y} m/s²</Text>
-        <Text style={styles.dataRow}><Text style={styles.axisLabel}>Z:</Text> {accel.z} m/s²</Text>
-      </View>
-      <View style={styles.dataColumn}>
-        <Text style={styles.sensorTitle}>Gyroscope</Text>
-        <Text style={styles.dataRow}><Text style={styles.axisLabel}>X:</Text> {gyro.x} rad/s</Text>
-        <Text style={styles.dataRow}><Text style={styles.axisLabel}>Y:</Text> {gyro.y} rad/s</Text>
-        <Text style={styles.dataRow}><Text style={styles.axisLabel}>Z:</Text> {gyro.z} rad/s</Text>
+        <Text style={styles.sensorTitle}>Position</Text>
+        <Text style={styles.dataRow}><Text style={styles.axisLabel}>X:</Text> {position.x} m</Text>
+        <Text style={styles.dataRow}><Text style={styles.axisLabel}>Y:</Text> {position.y} m</Text>
+        <Text style={styles.dataRow}><Text style={styles.axisLabel}>Z:</Text> {position.z} m</Text>
       </View>
     </View>
   );
@@ -131,10 +133,10 @@ const DataDisplayScreen = ({ route, navigation }) => {
               return;
             }
 
-            console.log(`[MONITORING] Setting up accel monitor for ${device.name}`);
-            console.log(`  - Accel UUID: ${deviceChars.accel}`);
+            console.log(`[MONITORING] Setting up position monitor for ${device.name}`);
+            console.log(`  - Position UUID: ${deviceChars.accel}`);
             
-            // Monitor accelerometer using UUIDs
+            // Monitor position data using the first characteristic (accel UUID)
             bleService.monitorCharacteristic(
               `${device.id}_accel`,
               device.id,
@@ -143,40 +145,15 @@ const DataDisplayScreen = ({ route, navigation }) => {
               (data) => {
                 // Only process data if monitoring is still active
                 if (isMonitoring) {
-                  console.log(`[ACCEL DATA] ${device.name}: "${data}"`);
+                  console.log(`[POSITION DATA] ${device.name}: "${data}"`);
                   updateDeviceData(device.id, 'accel', data);
                 }
               },
               (error) => {
                 // Only handle errors if monitoring is still active
                 if (isMonitoring) {
-                  console.error(`[ACCEL ERROR] ${device.name}:`, error);
+                  console.error(`[POSITION ERROR] ${device.name}:`, error);
                   handleMonitoringError(device.id, 'accel', error);
-                }
-              }
-            );
-            
-            console.log(`[MONITORING] Setting up gyro monitor for ${device.name}`);
-            console.log(`  - Gyro UUID: ${deviceChars.gyro}`);
-            
-            // Monitor gyroscope using the UUIDs
-            bleService.monitorCharacteristic(
-              `${device.id}_gyro`,
-              device.id,
-              IMU_SERVICE_UUID,
-              deviceChars.gyro,
-              (data) => {
-                // Only process data if monitoring is still active
-                if (isMonitoring) {
-                  console.log(`[GYRO DATA] ${device.name}: "${data}"`);
-                  updateDeviceData(device.id, 'gyro', data);
-                }
-              },
-              (error) => {
-                // Only handle errors if monitoring is still active
-                if (isMonitoring) {
-                  console.error(`[GYRO ERROR] ${device.name}:`, error);
-                  handleMonitoringError(device.id, 'gyro', error);
                 }
               }
             );
@@ -200,7 +177,6 @@ const DataDisplayScreen = ({ route, navigation }) => {
       devices.forEach(device => {
         console.log(`[MONITORING] Stopping monitoring for ${device.name}`);
         bleService.stopMonitoring(`${device.id}_accel`);
-        bleService.stopMonitoring(`${device.id}_gyro`);
       });
     }
   }, [devices, characteristics, isMonitoring, updateDeviceData, handleMonitoringError]);
@@ -222,7 +198,6 @@ const DataDisplayScreen = ({ route, navigation }) => {
         devices.forEach(device => {
           try {
             bleService.stopMonitoring(`${device.id}_accel`);
-            bleService.stopMonitoring(`${device.id}_gyro`);
           } catch (error) {
             console.error(`Error stopping monitoring for ${device.id}:`, error);
           }
@@ -265,8 +240,7 @@ const DataDisplayScreen = ({ route, navigation }) => {
         devices.forEach(device => {
           console.log(`[MONITORING] Ensuring monitoring stopped for ${device.name}`);
           stopPromises.push(
-            Promise.resolve(bleService.stopMonitoring(`${device.id}_accel`)),
-            Promise.resolve(bleService.stopMonitoring(`${device.id}_gyro`))
+            Promise.resolve(bleService.stopMonitoring(`${device.id}_accel`))
           );
         });
         
@@ -371,8 +345,8 @@ const styles = StyleSheet.create({
   errorText: { fontSize: 14, color: '#D32F2F', marginBottom: 4 },
   deviceSection: { padding: 25, borderBottomWidth: 1, borderBottomColor: '#EEEEEE' },
   deviceNameTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 20, color: '#333333', textAlign: 'center' },
-  dataContainer: { flexDirection: 'row', justifyContent: 'space-around', paddingVertical: 10 },
-  dataColumn: { alignItems: 'center', flex: 1 },
+  dataContainer: { flexDirection: 'row', justifyContent: 'center', paddingVertical: 10 },
+  dataColumn: { alignItems: 'center', minWidth: 200 },
   sensorTitle: { fontSize: 18, fontWeight: '600', color: '#007BFF', marginBottom: 15 },
   dataRow: { fontSize: 16, color: '#333333', marginBottom: 8 },
   axisLabel: { fontWeight: 'bold', color: '#555555' },
