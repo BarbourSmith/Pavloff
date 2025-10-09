@@ -21,7 +21,7 @@ struct BLEDevice: Identifiable, Equatable {
 }
 
 // MARK: - Device Connection Status
-enum ConnectionStatus {
+enum ConnectionStatus: Equatable {
     case pending
     case connecting
     case discovering
@@ -35,6 +35,20 @@ enum ConnectionStatus {
         case .discovering: return "Discovering..."
         case .connected: return "Connected"
         case .failed(let error): return "Failed: \(error)"
+        }
+    }
+    
+    static func == (lhs: ConnectionStatus, rhs: ConnectionStatus) -> Bool {
+        switch (lhs, rhs) {
+        case (.pending, .pending),
+             (.connecting, .connecting),
+             (.discovering, .discovering),
+             (.connected, .connected):
+            return true
+        case (.failed(let lhsError), .failed(let rhsError)):
+            return lhsError == rhsError
+        default:
+            return false
         }
     }
 }
