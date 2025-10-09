@@ -8,7 +8,6 @@ const IMU_SERVICE_UUID = APP_CONFIG.UUIDS.IMU_SERVICE;
 
 const DataView = ({ deviceData, deviceId, deviceName }) => {
   const accelData = deviceData?.accel ?? null;
-  const gyroData = deviceData?.gyro ?? null;
   const lastUpdate = deviceData?.lastUpdate;
 
   const parsePositionData = (dataString) => {
@@ -128,8 +127,8 @@ const DataDisplayScreen = ({ route, navigation }) => {
             }
 
             // Validate characteristics exist
-            if (!deviceChars.accel || !deviceChars.gyro) {
-              console.error(`[MONITORING ERROR] Missing characteristics for device ${device.name}:`, deviceChars);
+            if (!deviceChars.accel) {
+              console.error(`[MONITORING ERROR] Missing position characteristic for device ${device.name}:`, deviceChars);
               return;
             }
 
