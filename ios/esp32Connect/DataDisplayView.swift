@@ -1,3 +1,4 @@
+
 //
 //  DataDisplayView.swift
 //  esp32Connect
@@ -188,23 +189,8 @@ struct SensorDataView: View {
 }
 
 #Preview {
-    let bleManager = BLEManager()
-    let device = BLEDevice(
-        id: UUID(),
-        name: "Test Device",
-        peripheral: MockPeripheral(),
-        rssi: -50
+    DataDisplayView(
+        bleManager: BLEManager(),
+        connectedDevices: []
     )
-    
-    return DataDisplayView(
-        bleManager: bleManager,
-        connectedDevices: [device]
-    )
-}
-
-// Mock peripheral for preview
-import CoreBluetooth
-class MockPeripheral: CBPeripheral {
-    override var identifier: UUID { UUID() }
-    override var name: String? { "Mock Device" }
 }

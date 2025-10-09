@@ -1,11 +1,5 @@
-//
-//  ConnectionView.swift
-//  esp32Connect
-//
-//  Connection screen showing device connection status
-//
-
 import SwiftUI
+import Combine
 
 struct ConnectionView: View {
     @ObservedObject var bleManager: BLEManager
@@ -14,7 +8,8 @@ struct ConnectionView: View {
     @State private var showingDataView = false
     @State private var connectedDevices: [BLEDevice] = []
     
-    var body: some View {
+    @ViewBuilder
+    private var content: some View {
         VStack(spacing: 0) {
             Text("Device Connection Status")
                 .font(.title2)
@@ -82,17 +77,35 @@ struct ConnectionView: View {
         .background(Color(red: 0.97, green: 0.98, blue: 0.98))
         .navigationTitle("Connecting...")
         .navigationBarTitleDisplayMode(.inline)
-        .navigationDestination(isPresented: $showingDataView) {
-            DataDisplayView(
-                bleManager: bleManager,
-                connectedDevices: connectedDevices
-            )
-        }
         .onAppear {
             connectToDevices()
         }
-        .onChange(of: bleManager.connectionStatuses) { _, _ in
+        .onReceive(bleManager.$connectionStatuses) { _ in
             updateConnectedDevices()
+        }
+    }
+    
+    var body: some View {
+        if #available(iOS 16.0, *) {
+            content
+                .navigationDestination(isPresented: $showingDataView) {
+                    DataDisplayView(
+                        bleManager: bleManager,
+                        connectedDevices: connectedDevices
+                    )
+                }
+        } else {
+            ZStack {
+                content
+                NavigationLink(
+                    destination: DataDisplayView(
+                        bleManager: bleManager,
+                        connectedDevices: connectedDevices
+                    ),
+                    isActive: $showingDataView
+                ) { EmptyView() }
+                .hidden()
+            }
         }
     }
     
