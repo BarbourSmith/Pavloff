@@ -11,7 +11,11 @@ const DataView = ({ deviceData, deviceId, deviceName }) => {
   const lastUpdate = deviceData?.lastUpdate;
 
   const parseRepData = (dataString) => {
+    // Log raw BLE data received
+    console.log(`[BLE DATA RECEIVED] ${deviceName}: "${dataString}"`);
+    
     if (!dataString) {
+      console.log(`[BLE DATA] ${deviceName}: No data received`);
       return { count: '0', state: 'IDLE', raw: 'No data', timestamp: 'Never' };
     }
     
@@ -25,6 +29,8 @@ const DataView = ({ deviceData, deviceId, deviceName }) => {
           values[key.toLowerCase().trim()] = value.trim();
         }
       });
+      
+      console.log(`[BLE DATA PARSED] ${deviceName}:`, values);
     } catch (error) {
       console.error(`[PARSE ERROR] ${deviceName} Rep Data:`, error);
       return { count: 'Error', state: 'Error', raw: dataString, timestamp: 'Error' };
@@ -36,6 +42,8 @@ const DataView = ({ deviceData, deviceId, deviceName }) => {
         raw: dataString,
         timestamp: lastUpdate ? new Date(lastUpdate).toLocaleTimeString() : 'Unknown'
     };
+    
+    console.log(`[BLE DATA RESULT] ${deviceName}: Count=${result.count}, State=${result.state}`);
     
     return result;
   };
@@ -133,14 +141,14 @@ const DataDisplayScreen = ({ route, navigation }) => {
 
             // Validate characteristics exist
             if (!deviceChars.accel) {
-              console.error(`[MONITORING ERROR] Missing position characteristic for device ${device.name}:`, deviceChars);
+              console.error(`[MONITORING ERROR] Missing rep counter characteristic for device ${device.name}:`, deviceChars);
               return;
             }
 
-            console.log(`[MONITORING] Setting up position monitor for ${device.name}`);
-            console.log(`  - Position UUID: ${deviceChars.accel}`);
+            console.log(`[MONITORING] Setting up rep counter monitor for ${device.name}`);
+            console.log(`  - Rep Counter Characteristic UUID: ${deviceChars.accel}`);
             
-            // Monitor position data using the first characteristic (accel UUID)
+            // Monitor rep count data using the first characteristic (accel UUID)
             bleService.monitorCharacteristic(
               `${device.id}_accel`,
               device.id,
@@ -149,14 +157,14 @@ const DataDisplayScreen = ({ route, navigation }) => {
               (data) => {
                 // Only process data if monitoring is still active
                 if (isMonitoring) {
-                  console.log(`[POSITION DATA] ${device.name}: "${data}"`);
+                  console.log(`[REP DATA RECEIVED] ${device.name}: "${data}" (type: ${typeof data}, length: ${data?.length})`);
                   updateDeviceData(device.id, 'accel', data);
                 }
               },
               (error) => {
                 // Only handle errors if monitoring is still active
                 if (isMonitoring) {
-                  console.error(`[POSITION ERROR] ${device.name}:`, error);
+                  console.error(`[REP DATA ERROR] ${device.name}:`, error);
                   handleMonitoringError(device.id, 'accel', error);
                 }
               }

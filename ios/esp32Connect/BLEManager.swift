@@ -97,8 +97,12 @@ class BLEManager: NSObject, ObservableObject {
     /// Parse sensor data from characteristic value
     private func parseSensorData(from data: Data) -> SensorData? {
         guard let dataString = String(data: data, encoding: .utf8) else {
+            print("[BLE DATA] Failed to decode data as UTF-8 string")
             return nil
         }
+        
+        // Log raw BLE data received
+        print("[BLE DATA RECEIVED] Raw: \"\(dataString)\"")
         
         var count: Int = 0
         var state: String = "IDLE"
@@ -106,19 +110,27 @@ class BLEManager: NSObject, ObservableObject {
         // Parse format: "Count:value,State:value"
         // Example: "Count:5,State:UP" or "Count:12,State:DOWN"
         let components = dataString.split(separator: ",")
+        print("[BLE DATA] Split into \(components.count) components: \(components)")
+        
         for component in components {
             let keyValue = component.split(separator: ":")
             if keyValue.count == 2 {
                 let key = keyValue.first?.trimmingCharacters(in: .whitespaces).lowercased() ?? ""
                 let valueStr = keyValue.last?.trimmingCharacters(in: .whitespaces) ?? ""
                 
+                print("[BLE DATA] Parsing: key=\"\(key)\", value=\"\(valueStr)\"")
+                
                 if key == "count", let countValue = Int(valueStr) {
                     count = countValue
+                    print("[BLE DATA] Set count to: \(count)")
                 } else if key == "state" {
                     state = valueStr
+                    print("[BLE DATA] Set state to: \(state)")
                 }
             }
         }
+        
+        print("[BLE DATA RESULT] Final: Count=\(count), State=\(state)")
         
         return SensorData(
             count: count,
