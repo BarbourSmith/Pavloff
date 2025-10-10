@@ -19,7 +19,7 @@ struct DataDisplayView: View {
         ScrollView {
             VStack(spacing: 20) {
                 // Header
-                Text("Live IMU Data")
+                Text("Workout Tracker")
                     .font(.title)
                     .fontWeight(.bold)
                     .padding(.top)
@@ -48,7 +48,7 @@ struct DataDisplayView: View {
             }
         }
         .background(Color(red: 0.97, green: 0.98, blue: 0.98))
-        .navigationTitle("Live IMU Data")
+        .navigationTitle("Workout Tracker")
         .navigationBarTitleDisplayMode(.inline)
         .onDisappear {
             if isMonitoring {
@@ -76,12 +76,8 @@ struct DeviceDataCard: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.bottom, 5)
             
-            // Position data
-            SensorDataView(
-                title: "Position",
-                data: deviceData.accelData,
-                color: .blue
-            )
+            // Rep count data
+            RepCountView(data: deviceData.accelData)
             
             // Last update timestamp
             Text("Last Update: \(deviceData.lastUpdate, formatter: timeFormatter)")
@@ -104,78 +100,52 @@ struct DeviceDataCard: View {
     }
 }
 
-struct SensorDataView: View {
-    let title: String
+struct RepCountView: View {
     let data: SensorData
-    let color: Color
+    
+    private var stateColor: Color {
+        switch data.state.uppercased() {
+        case "UP":
+            return .green
+        case "DOWN":
+            return .blue
+        case "IDLE":
+            return .gray
+        default:
+            return .orange
+        }
+    }
     
     var body: some View {
-        VStack(spacing: 10) {
-            Text(title)
-                .font(.subheadline)
-                .fontWeight(.semibold)
-                .foregroundColor(color)
-                .frame(maxWidth: .infinity, alignment: .leading)
+        VStack(spacing: 20) {
+            // "REPS" label
+            Text("REPS")
+                .font(.system(size: 18, weight: .semibold, design: .default))
+                .foregroundColor(.gray)
+                .tracking(2)
             
-            HStack(spacing: 20) {
-                // X axis
-                VStack(spacing: 4) {
-                    Text("X")
-                        .font(.caption)
-                        .fontWeight(.medium)
-                        .foregroundColor(.gray)
-                    
-                    Text(data.formattedX)
-                        .font(.title3)
-                        .fontWeight(.bold)
-                        .foregroundColor(color)
-                }
-                .frame(maxWidth: .infinity)
-                .padding()
-                .background(color.opacity(0.1))
-                .cornerRadius(8)
-                
-                // Y axis
-                VStack(spacing: 4) {
-                    Text("Y")
-                        .font(.caption)
-                        .fontWeight(.medium)
-                        .foregroundColor(.gray)
-                    
-                    Text(data.formattedY)
-                        .font(.title3)
-                        .fontWeight(.bold)
-                        .foregroundColor(color)
-                }
-                .frame(maxWidth: .infinity)
-                .padding()
-                .background(color.opacity(0.1))
-                .cornerRadius(8)
-                
-                // Z axis
-                VStack(spacing: 4) {
-                    Text("Z")
-                        .font(.caption)
-                        .fontWeight(.medium)
-                        .foregroundColor(.gray)
-                    
-                    Text(data.formattedZ)
-                        .font(.title3)
-                        .fontWeight(.bold)
-                        .foregroundColor(color)
-                }
-                .frame(maxWidth: .infinity)
-                .padding()
-                .background(color.opacity(0.1))
-                .cornerRadius(8)
-            }
+            // Large rep count
+            Text(data.formattedCount)
+                .font(.system(size: 100, weight: .bold, design: .rounded))
+                .foregroundColor(.blue)
+                .shadow(color: Color.blue.opacity(0.3), radius: 10, x: 0, y: 5)
+            
+            // State indicator
+            Text(data.formattedState)
+                .font(.system(size: 20, weight: .bold, design: .default))
+                .foregroundColor(.white)
+                .tracking(1)
+                .padding(.horizontal, 30)
+                .padding(.vertical, 12)
+                .background(stateColor)
+                .cornerRadius(25)
             
             // Timestamp
             Text("Updated: \(data.formattedTimestamp)")
                 .font(.caption2)
                 .foregroundColor(.gray)
-                .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .padding(.vertical, 20)
     }
 }
 

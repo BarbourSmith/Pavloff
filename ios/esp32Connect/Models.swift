@@ -55,34 +55,41 @@ enum ConnectionStatus: Equatable {
 
 // MARK: - Sensor Data Model
 struct SensorData: Equatable {
-    var x: Double
-    var y: Double
-    var z: Double
+    var count: Int
+    var state: String
     var timestamp: Date
     
-    init(x: Double = 0.0, y: Double = 0.0, z: Double = 0.0, timestamp: Date = Date()) {
-        self.x = x
-        self.y = y
-        self.z = z
+    init(count: Int = 0, state: String = "IDLE", timestamp: Date = Date()) {
+        self.count = count
+        self.state = state
         self.timestamp = timestamp
     }
     
-    var formattedX: String {
-        String(format: "%.2f", x)
+    var formattedCount: String {
+        String(count)
     }
     
-    var formattedY: String {
-        String(format: "%.2f", y)
-    }
-    
-    var formattedZ: String {
-        String(format: "%.2f", z)
+    var formattedState: String {
+        state.uppercased()
     }
     
     var formattedTimestamp: String {
         let formatter = DateFormatter()
         formatter.timeStyle = .medium
         return formatter.string(from: timestamp)
+    }
+    
+    var stateColor: String {
+        switch state.uppercased() {
+        case "UP":
+            return "green"
+        case "DOWN":
+            return "blue"
+        case "IDLE":
+            return "gray"
+        default:
+            return "orange"
+        }
     }
 }
 
