@@ -261,21 +261,24 @@ extension BLEManager: CBPeripheralDelegate {
         
         var discoveredChars = DiscoveredCharacteristics()
         
-        // Identify characteristics - only looking for position characteristic
+        // Identify characteristics - looking for rep count characteristic
         for characteristic in characteristics {
             print("[BLE] Characteristic UUID: \(characteristic.uuid)")
             
             if characteristic.uuid == accelCharUUID {
                 discoveredChars.accelUUID = characteristic.uuid
-                print("[BLE] Found position characteristic")
+                print("[BLE] Found rep count characteristic (UUID: \(accelCharUUID))")
+                print("[BLE] Enabling notifications on rep count characteristic...")
                 peripheral.setNotifyValue(true, for: characteristic)
             }
         }
         
-        // Fallback: use first characteristic for position if UUID doesn't match
+        // Fallback: use first characteristic for rep count if UUID doesn't match
         if discoveredChars.accelUUID == nil && characteristics.count >= 1 {
-            print("[BLE] Using first characteristic for position data")
+            print("[BLE] Rep count characteristic not found by UUID, using first available characteristic")
+            print("[BLE] First characteristic UUID: \(characteristics[0].uuid)")
             discoveredChars.accelUUID = characteristics[0].uuid
+            print("[BLE] Enabling notifications on first characteristic...")
             peripheral.setNotifyValue(true, for: characteristics[0])
         }
         

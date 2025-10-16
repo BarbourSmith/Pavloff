@@ -26,8 +26,8 @@ struct AppConfig {
     // Service and Characteristic UUIDs
     struct UUIDs {
         static let imuService = "4fafc201-1fb5-459e-8fcc-c5c9c331914b"
-        static let accelCharacteristic = "beb5483e-36e1-4688-b7f5-ea07361b26a8"
-        static let gyroCharacteristic = "beb5483e-36e1-4688-b7f5-ea07361b26a9"
+        static let accelCharacteristic = "8d3f7a9e-4b2c-11ef-9f27-0242ac120002"  // Rep count characteristic
+        static let gyroCharacteristic = "8d3f7a9e-4b2c-11ef-9f27-0242ac120002"  // Using same for compatibility
     }
     
     // UI Configuration
