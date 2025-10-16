@@ -18,8 +18,8 @@ export const APP_CONFIG = {
   // Service and Characteristic UUIDs
   UUIDS: {
     IMU_SERVICE: '4fafc201-1fb5-459e-8fcc-c5c9c331914b',
-    ACCEL_CHARACTERISTIC: 'beb5483e-36e1-4688-b7f5-ea07361b26a8',
-    GYRO_CHARACTERISTIC: 'beb5483e-36e1-4688-b7f5-ea07361b26a9',
+    ACCEL_CHARACTERISTIC: '8d3f7a9e-4b2c-11ef-9f27-0242ac120002',  // Rep count characteristic
+    GYRO_CHARACTERISTIC: '8d3f7a9e-4b2c-11ef-9f27-0242ac120002',  // Using same for compatibility
   },
   
   // UI Configuration

@@ -10,36 +10,29 @@ const DataView = ({ deviceData, deviceId, deviceName }) => {
   const accelData = deviceData?.accel ?? null;
   const lastUpdate = deviceData?.lastUpdate;
 
-  const parsePositionData = (dataString) => {
+  const parseRepData = (dataString) => {
     if (!dataString) {
-      return { x: '0.00', y: '0.00', z: '0.00', raw: 'No data', timestamp: 'Never' };
+      return { count: '0', state: 'IDLE', raw: 'No data', timestamp: 'Never' };
     }
     
     const values = {};
     try {
-      // Check if data contains "Position:" prefix and extract the position part
-      let positionString = dataString;
-      if (dataString.includes('Position:')) {
-        // Extract everything after "Position:"
-        positionString = dataString.split('Position:')[1].trim();
-      }
-      
-      // Parse X:value,Y:value,Z:value format
-      positionString.split(',').forEach(part => {
+      // Parse Count:value,State:value format
+      // Example: "Count:5,State:UP" or "Count:12,State:DOWN"
+      dataString.split(',').forEach(part => {
         const [key, value] = part.split(':');
         if (key && value) {
-          values[key.toLowerCase().trim()] = parseFloat(value).toFixed(2);
+          values[key.toLowerCase().trim()] = value.trim();
         }
       });
     } catch (error) {
-      console.error(`[PARSE ERROR] ${deviceName} Position:`, error);
-      return { x: 'Error', y: 'Error', z: 'Error', raw: dataString, timestamp: 'Error' };
+      console.error(`[PARSE ERROR] ${deviceName} Rep Data:`, error);
+      return { count: 'Error', state: 'Error', raw: dataString, timestamp: 'Error' };
     }
     
     const result = {
-        x: values.x || '0.00',
-        y: values.y || '0.00',
-        z: values.z || '0.00',
+        count: values.count || '0',
+        state: values.state || 'IDLE',
         raw: dataString,
         timestamp: lastUpdate ? new Date(lastUpdate).toLocaleTimeString() : 'Unknown'
     };
@@ -47,16 +40,28 @@ const DataView = ({ deviceData, deviceId, deviceName }) => {
     return result;
   };
 
-  // Use accel data for position (assuming the characteristic is being reused)
-  const position = parsePositionData(accelData);
+  // Parse rep count data
+  const repData = parseRepData(accelData);
+
+  // Determine state color
+  const getStateColor = (state) => {
+    switch(state.toUpperCase()) {
+      case 'UP': return '#4CAF50';    // Green
+      case 'DOWN': return '#2196F3';  // Blue
+      case 'IDLE': return '#9E9E9E';  // Gray
+      default: return '#FF9800';      // Orange for unknown
+    }
+  };
 
   return (
     <View style={styles.dataContainer}>
-      <View style={styles.dataColumn}>
-        <Text style={styles.sensorTitle}>Position</Text>
-        <Text style={styles.dataRow}><Text style={styles.axisLabel}>X:</Text> {position.x} m</Text>
-        <Text style={styles.dataRow}><Text style={styles.axisLabel}>Y:</Text> {position.y} m</Text>
-        <Text style={styles.dataRow}><Text style={styles.axisLabel}>Z:</Text> {position.z} m</Text>
+      <View style={styles.repDisplayContainer}>
+        <Text style={styles.repCountLabel}>REPS</Text>
+        <Text style={styles.repCountValue}>{repData.count}</Text>
+        <View style={[styles.stateIndicator, { backgroundColor: getStateColor(repData.state) }]}>
+          <Text style={styles.stateText}>{repData.state}</Text>
+        </View>
+        <Text style={styles.timestampText}>Last Update: {repData.timestamp}</Text>
       </View>
     </View>
   );
@@ -128,14 +133,11 @@ const DataDisplayScreen = ({ route, navigation }) => {
 
             // Validate characteristics exist
             if (!deviceChars.accel) {
-              console.error(`[MONITORING ERROR] Missing position characteristic for device ${device.name}:`, deviceChars);
+              console.error(`[MONITORING ERROR] Missing rep counter characteristic for device ${device.name}:`, deviceChars);
               return;
             }
 
-            console.log(`[MONITORING] Setting up position monitor for ${device.name}`);
-            console.log(`  - Position UUID: ${deviceChars.accel}`);
-            
-            // Monitor position data using the first characteristic (accel UUID)
+            // Monitor rep count data using the first characteristic (accel UUID)
             bleService.monitorCharacteristic(
               `${device.id}_accel`,
               device.id,
@@ -144,14 +146,13 @@ const DataDisplayScreen = ({ route, navigation }) => {
               (data) => {
                 // Only process data if monitoring is still active
                 if (isMonitoring) {
-                  console.log(`[POSITION DATA] ${device.name}: "${data}"`);
                   updateDeviceData(device.id, 'accel', data);
                 }
               },
               (error) => {
                 // Only handle errors if monitoring is still active
                 if (isMonitoring) {
-                  console.error(`[POSITION ERROR] ${device.name}:`, error);
+                  console.error(`[ERROR] ${device.name}:`, error);
                   handleMonitoringError(device.id, 'accel', error);
                 }
               }
@@ -344,11 +345,56 @@ const styles = StyleSheet.create({
   errorText: { fontSize: 14, color: '#D32F2F', marginBottom: 4 },
   deviceSection: { padding: 25, borderBottomWidth: 1, borderBottomColor: '#EEEEEE' },
   deviceNameTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 20, color: '#333333', textAlign: 'center' },
-  dataContainer: { flexDirection: 'row', justifyContent: 'center', paddingVertical: 10 },
-  dataColumn: { alignItems: 'center', minWidth: 200 },
-  sensorTitle: { fontSize: 18, fontWeight: '600', color: '#007BFF', marginBottom: 15 },
-  dataRow: { fontSize: 16, color: '#333333', marginBottom: 8 },
-  axisLabel: { fontWeight: 'bold', color: '#555555' },
+  dataContainer: { flexDirection: 'row', justifyContent: 'center', paddingVertical: 20 },
+  repDisplayContainer: {
+    alignItems: 'center',
+    backgroundColor: '#F8F9FA',
+    borderRadius: 20,
+    padding: 30,
+    minWidth: 280,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  repCountLabel: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#666',
+    letterSpacing: 2,
+    marginBottom: 10,
+  },
+  repCountValue: {
+    fontSize: 120,
+    fontWeight: 'bold',
+    color: '#007BFF',
+    marginVertical: 20,
+    textShadowColor: 'rgba(0, 123, 255, 0.2)',
+    textShadowOffset: { width: 0, height: 4 },
+    textShadowRadius: 10,
+  },
+  stateIndicator: {
+    paddingHorizontal: 30,
+    paddingVertical: 12,
+    borderRadius: 25,
+    marginTop: 15,
+    marginBottom: 10,
+    minWidth: 150,
+  },
+  stateText: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    textAlign: 'center',
+    letterSpacing: 1,
+  },
+  timestampText: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 15,
+    fontStyle: 'italic',
+  },
 });
 
 export default DataDisplayScreen;

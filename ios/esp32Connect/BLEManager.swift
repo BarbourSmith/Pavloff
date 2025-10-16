@@ -100,33 +100,30 @@ class BLEManager: NSObject, ObservableObject {
             return nil
         }
         
-        var values: [String: Double] = [:]
+        var count: Int = 0
+        var state: String = "IDLE"
         
-        // Check if data contains "Position:" prefix and extract the position part
-        var positionString = dataString
-        if dataString.contains("Position:") {
-            // Extract everything after "Position:"
-            if let range = dataString.range(of: "Position:") {
-                positionString = String(dataString[range.upperBound...]).trimmingCharacters(in: .whitespaces)
-            }
-        }
+        // Parse format: "Count:value,State:value"
+        // Example: "Count:5,State:UP" or "Count:12,State:DOWN"
+        let components = dataString.split(separator: ",")
         
-        // Parse format: "X:value,Y:value,Z:value"
-        let components = positionString.split(separator: ",")
         for component in components {
             let keyValue = component.split(separator: ":")
-            if keyValue.count == 2,
-               let key = keyValue.first?.trimmingCharacters(in: .whitespaces).lowercased(),
-               let valueStr = keyValue.last?.trimmingCharacters(in: .whitespaces),
-               let value = Double(valueStr) {
-                values[key] = value
+            if keyValue.count == 2 {
+                let key = keyValue.first?.trimmingCharacters(in: .whitespaces).lowercased() ?? ""
+                let valueStr = keyValue.last?.trimmingCharacters(in: .whitespaces) ?? ""
+                
+                if key == "count", let countValue = Int(valueStr) {
+                    count = countValue
+                } else if key == "state" {
+                    state = valueStr
+                }
             }
         }
         
         return SensorData(
-            x: values["x"] ?? 0.0,
-            y: values["y"] ?? 0.0,
-            z: values["z"] ?? 0.0,
+            count: count,
+            state: state,
             timestamp: Date()
         )
     }
@@ -253,20 +250,18 @@ extension BLEManager: CBPeripheralDelegate {
         
         var discoveredChars = DiscoveredCharacteristics()
         
-        // Identify characteristics - only looking for position characteristic
+        // Identify characteristics - looking for rep count characteristic
         for characteristic in characteristics {
-            print("[BLE] Characteristic UUID: \(characteristic.uuid)")
-            
             if characteristic.uuid == accelCharUUID {
                 discoveredChars.accelUUID = characteristic.uuid
-                print("[BLE] Found position characteristic")
+                print("[BLE] Found rep count characteristic")
                 peripheral.setNotifyValue(true, for: characteristic)
             }
         }
         
-        // Fallback: use first characteristic for position if UUID doesn't match
+        // Fallback: use first characteristic for rep count if UUID doesn't match
         if discoveredChars.accelUUID == nil && characteristics.count >= 1 {
-            print("[BLE] Using first characteristic for position data")
+            print("[BLE] Using first available characteristic")
             discoveredChars.accelUUID = characteristics[0].uuid
             peripheral.setNotifyValue(true, for: characteristics[0])
         }
@@ -316,11 +311,18 @@ extension BLEManager: CBPeripheralDelegate {
         }
         
         DispatchQueue.main.async {
+            // Ensure device data exists
+            if self.deviceDataMap[peripheral.identifier] == nil {
+                self.deviceDataMap[peripheral.identifier] = DeviceData(
+                    id: peripheral.identifier,
+                    name: peripheral.name ?? "Unknown Device"
+                )
+            }
+            
             if var deviceData = self.deviceDataMap[peripheral.identifier] {
-                // Update position data (using accelData for position)
+                // Update rep count data (using accelData for rep counting)
                 if characteristic.uuid == chars.accelUUID {
                     deviceData.accelData = sensorData
-                    print("[BLE] Position data from \(peripheral.name ?? "Unknown"): X:\(sensorData.formattedX), Y:\(sensorData.formattedY), Z:\(sensorData.formattedZ)")
                 }
                 
                 deviceData.lastUpdate = Date()
