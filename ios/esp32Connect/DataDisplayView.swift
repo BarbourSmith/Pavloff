@@ -28,19 +28,6 @@ struct DataDisplayView: View {
                 ForEach(connectedDevices) { device in
                     if let deviceData = bleManager.deviceDataMap[device.id] {
                         DeviceDataCard(deviceData: deviceData)
-                    } else {
-                        // Debug view when no data is available
-                        VStack {
-                            Text("Waiting for data from \(device.name)")
-                                .font(.headline)
-                            Text("Device ID: \(device.id.uuidString)")
-                                .font(.caption)
-                                .foregroundColor(.gray)
-                        }
-                        .padding()
-                        .background(Color.yellow.opacity(0.2))
-                        .cornerRadius(12)
-                        .padding(.horizontal)
                     }
                 }
                 

@@ -97,12 +97,8 @@ class BLEManager: NSObject, ObservableObject {
     /// Parse sensor data from characteristic value
     private func parseSensorData(from data: Data) -> SensorData? {
         guard let dataString = String(data: data, encoding: .utf8) else {
-            print("[BLE DATA] Failed to decode data as UTF-8 string")
             return nil
         }
-        
-        // Log raw BLE data received
-        print("[BLE DATA RECEIVED] Raw: \"\(dataString)\"")
         
         var count: Int = 0
         var state: String = "IDLE"
@@ -110,7 +106,6 @@ class BLEManager: NSObject, ObservableObject {
         // Parse format: "Count:value,State:value"
         // Example: "Count:5,State:UP" or "Count:12,State:DOWN"
         let components = dataString.split(separator: ",")
-        print("[BLE DATA] Split into \(components.count) components: \(components)")
         
         for component in components {
             let keyValue = component.split(separator: ":")
@@ -118,19 +113,13 @@ class BLEManager: NSObject, ObservableObject {
                 let key = keyValue.first?.trimmingCharacters(in: .whitespaces).lowercased() ?? ""
                 let valueStr = keyValue.last?.trimmingCharacters(in: .whitespaces) ?? ""
                 
-                print("[BLE DATA] Parsing: key=\"\(key)\", value=\"\(valueStr)\"")
-                
                 if key == "count", let countValue = Int(valueStr) {
                     count = countValue
-                    print("[BLE DATA] Set count to: \(count)")
                 } else if key == "state" {
                     state = valueStr
-                    print("[BLE DATA] Set state to: \(state)")
                 }
             }
         }
-        
-        print("[BLE DATA RESULT] Final: Count=\(count), State=\(state)")
         
         return SensorData(
             count: count,
@@ -263,22 +252,17 @@ extension BLEManager: CBPeripheralDelegate {
         
         // Identify characteristics - looking for rep count characteristic
         for characteristic in characteristics {
-            print("[BLE] Characteristic UUID: \(characteristic.uuid)")
-            
             if characteristic.uuid == accelCharUUID {
                 discoveredChars.accelUUID = characteristic.uuid
-                print("[BLE] Found rep count characteristic (UUID: \(accelCharUUID))")
-                print("[BLE] Enabling notifications on rep count characteristic...")
+                print("[BLE] Found rep count characteristic")
                 peripheral.setNotifyValue(true, for: characteristic)
             }
         }
         
         // Fallback: use first characteristic for rep count if UUID doesn't match
         if discoveredChars.accelUUID == nil && characteristics.count >= 1 {
-            print("[BLE] Rep count characteristic not found by UUID, using first available characteristic")
-            print("[BLE] First characteristic UUID: \(characteristics[0].uuid)")
+            print("[BLE] Using first available characteristic")
             discoveredChars.accelUUID = characteristics[0].uuid
-            print("[BLE] Enabling notifications on first characteristic...")
             peripheral.setNotifyValue(true, for: characteristics[0])
         }
         
@@ -320,29 +304,15 @@ extension BLEManager: CBPeripheralDelegate {
             return
         }
         
-        print("[BLE] didUpdateValueFor called for peripheral: \(peripheral.name ?? "Unknown"), characteristic: \(characteristic.uuid)")
-        
-        guard let data = characteristic.value else {
-            print("[BLE] ERROR: No data in characteristic value")
-            return
-        }
-        
-        print("[BLE] Data received, length: \(data.count) bytes")
-        
-        guard let sensorData = parseSensorData(from: data) else {
-            print("[BLE] ERROR: Failed to parse sensor data")
-            return
-        }
-        
-        guard let chars = characteristicMap[peripheral.identifier] else {
-            print("[BLE] ERROR: No characteristics found for peripheral \(peripheral.identifier)")
+        guard let data = characteristic.value,
+              let sensorData = parseSensorData(from: data),
+              let chars = characteristicMap[peripheral.identifier] else {
             return
         }
         
         DispatchQueue.main.async {
             // Ensure device data exists
             if self.deviceDataMap[peripheral.identifier] == nil {
-                print("[BLE] WARNING: DeviceData not initialized, creating now for \(peripheral.name ?? "Unknown")")
                 self.deviceDataMap[peripheral.identifier] = DeviceData(
                     id: peripheral.identifier,
                     name: peripheral.name ?? "Unknown Device"
@@ -353,14 +323,10 @@ extension BLEManager: CBPeripheralDelegate {
                 // Update rep count data (using accelData for rep counting)
                 if characteristic.uuid == chars.accelUUID {
                     deviceData.accelData = sensorData
-                    print("[BLE] Rep data from \(peripheral.name ?? "Unknown"): Count:\(sensorData.formattedCount), State:\(sensorData.formattedState)")
                 }
                 
                 deviceData.lastUpdate = Date()
                 self.deviceDataMap[peripheral.identifier] = deviceData
-                print("[BLE] Updated deviceDataMap - Count is now: \(deviceData.accelData.count)")
-            } else {
-                print("[BLE] ERROR: Still unable to update deviceData after initialization attempt")
             }
         }
     }
