@@ -317,13 +317,35 @@ extension BLEManager: CBPeripheralDelegate {
             return
         }
         
-        guard let data = characteristic.value,
-              let sensorData = parseSensorData(from: data),
-              let chars = characteristicMap[peripheral.identifier] else {
+        print("[BLE] didUpdateValueFor called for peripheral: \(peripheral.name ?? "Unknown"), characteristic: \(characteristic.uuid)")
+        
+        guard let data = characteristic.value else {
+            print("[BLE] ERROR: No data in characteristic value")
+            return
+        }
+        
+        print("[BLE] Data received, length: \(data.count) bytes")
+        
+        guard let sensorData = parseSensorData(from: data) else {
+            print("[BLE] ERROR: Failed to parse sensor data")
+            return
+        }
+        
+        guard let chars = characteristicMap[peripheral.identifier] else {
+            print("[BLE] ERROR: No characteristics found for peripheral \(peripheral.identifier)")
             return
         }
         
         DispatchQueue.main.async {
+            // Ensure device data exists
+            if self.deviceDataMap[peripheral.identifier] == nil {
+                print("[BLE] WARNING: DeviceData not initialized, creating now for \(peripheral.name ?? "Unknown")")
+                self.deviceDataMap[peripheral.identifier] = DeviceData(
+                    id: peripheral.identifier,
+                    name: peripheral.name ?? "Unknown Device"
+                )
+            }
+            
             if var deviceData = self.deviceDataMap[peripheral.identifier] {
                 // Update rep count data (using accelData for rep counting)
                 if characteristic.uuid == chars.accelUUID {
@@ -333,6 +355,9 @@ extension BLEManager: CBPeripheralDelegate {
                 
                 deviceData.lastUpdate = Date()
                 self.deviceDataMap[peripheral.identifier] = deviceData
+                print("[BLE] Updated deviceDataMap - Count is now: \(deviceData.accelData.count)")
+            } else {
+                print("[BLE] ERROR: Still unable to update deviceData after initialization attempt")
             }
         }
     }
