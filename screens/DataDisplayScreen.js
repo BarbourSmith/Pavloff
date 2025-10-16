@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, Button, Alert } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import bleService from '../services/bleService';
 import { APP_CONFIG } from '../config/appConfig';
 
-// The Service UUID is known, so we defined here to pass to monitor .
+// The Service UUID is known, so we define it here
 const IMU_SERVICE_UUID = APP_CONFIG.UUIDS.IMU_SERVICE;
+const TARGET_DEVICE_NAME = 'ESP32_IMU_Stream';
+const SCAN_INTERVAL = 5000; // Scan every 5 seconds when not connected
 
-const DataView = ({ deviceData, deviceId, deviceName }) => {
+const DataView = ({ deviceData, deviceName }) => {
   const accelData = deviceData?.accel ?? null;
   const lastUpdate = deviceData?.lastUpdate;
 
@@ -67,15 +69,15 @@ const DataView = ({ deviceData, deviceId, deviceName }) => {
   );
 };
 
-const DataDisplayScreen = ({ route, navigation }) => {
-  // Receive devices with characteristics
-  const { devices, characteristics } = route.params;
-  
+const DataDisplayScreen = () => {
+  const [connectionStatus, setConnectionStatus] = useState('Scanning for device...');
+  const [isConnected, setIsConnected] = useState(false);
+  const [connectedDevice, setConnectedDevice] = useState(null);
+  const [deviceCharacteristics, setDeviceCharacteristics] = useState(null);
   const [deviceData, setDeviceData] = useState({});
-  const [isMonitoring, setIsMonitoring] = useState(true);
-  const [connectionErrors, setConnectionErrors] = useState({});
+  const [scanInterval, setScanInterval] = useState(null);
 
-  // Use useCallback to prevent recreating functions on every render
+  // Update device data callback
   const updateDeviceData = useCallback((deviceId, dataType, data) => {
     setDeviceData(prevData => {
       const currentDeviceData = prevData[deviceId] || {};
@@ -84,246 +86,259 @@ const DataDisplayScreen = ({ route, navigation }) => {
         [deviceId]: {
           ...currentDeviceData,
           [dataType]: data,
-          lastUpdate: Date.now() // Add timestamp for debugging // remove in PROD
+          lastUpdate: Date.now()
         }
       };
     });
   }, []);
 
   const handleMonitoringError = useCallback((deviceId, dataType, error) => {
-    // Don't handle errors if monitoring has been stopped
-    if (!isMonitoring) {
-      console.log(`[ERROR IGNORED] Monitoring stopped, ignoring error for ${deviceId} ${dataType}:`, error.message);
+    console.error(`[MONITORING ERROR] ${deviceId} ${dataType}:`, error);
+    // If monitoring error, disconnect and retry
+    setConnectionStatus('Connection lost. Retrying...');
+    setIsConnected(false);
+    if (connectedDevice) {
+      bleService.disconnectFromDevice(connectedDevice.id).catch(err => {
+        console.error('Error disconnecting:', err);
+      });
+    }
+    setConnectedDevice(null);
+  }, [connectedDevice]);
+
+  // Function to identify characteristics
+  const identifyCharacteristics = (characteristics) => {
+    const result = { accel: null, gyro: null };
+    
+    console.log(`Found ${characteristics.length} characteristics:`);
+    characteristics.forEach((char, index) => {
+      console.log(`  [${index}] UUID: ${char.uuid}`);
+    });
+    
+    // Use the first characteristic for rep counting
+    if (characteristics.length >= 1) {
+      result.accel = characteristics[0].uuid;
+      console.log(`Using characteristic [0] for rep counter: ${characteristics[0].uuid}`);
+    }
+    
+    if (characteristics.length >= 2) {
+      result.gyro = characteristics[1].uuid;
+      console.log(`Using characteristic [1] for gyro: ${characteristics[1].uuid}`);
+    }
+    
+    console.log(`Final assignment: accel=${result.accel}, gyro=${result.gyro}`);
+    return result;
+  };
+
+  // Function to connect to a device
+  const connectToTargetDevice = async (device) => {
+    try {
+      console.log(`[AUTO-CONNECT] Attempting to connect to ${device.name}...`);
+      setConnectionStatus(`Connecting to ${device.name}...`);
+
+      // Stop scanning while connecting
+      bleService.stopScanning();
+
+      const connectedDevice = await bleService.connectToDevice(device.id);
+      console.log(`[AUTO-CONNECT] Connected, discovering services...`);
+      setConnectionStatus('Discovering services...');
+
+      const services = await connectedDevice.services();
+      const imuService = services.find(s => s.uuid.toLowerCase() === IMU_SERVICE_UUID.toLowerCase());
+
+      if (!imuService) {
+        throw new Error("IMU Service not found on this device.");
+      }
+
+      const characteristics = await imuService.characteristics();
+      if (!characteristics || characteristics.length < 1) {
+        throw new Error("Expected at least 1 characteristic for IMU service.");
+      }
+
+      const characteristicMapping = identifyCharacteristics(characteristics);
+      
+      if (!characteristicMapping.accel) {
+        throw new Error("Could not identify rep counter characteristic.");
+      }
+
+      setDeviceCharacteristics(characteristicMapping);
+      setConnectedDevice(device);
+      setIsConnected(true);
+      setConnectionStatus(`Connected to ${device.name}`);
+
+      console.log(`[AUTO-CONNECT] Successfully connected and configured`);
+
+      // Start monitoring
+      setTimeout(() => {
+        console.log(`[MONITORING] Starting monitoring for ${device.name}`);
+        bleService.monitorCharacteristic(
+          `${device.id}_accel`,
+          device.id,
+          IMU_SERVICE_UUID,
+          characteristicMapping.accel,
+          (data) => {
+            updateDeviceData(device.id, 'accel', data);
+          },
+          (error) => {
+            console.error(`[ERROR] ${device.name}:`, error);
+            handleMonitoringError(device.id, 'accel', error);
+          }
+        );
+      }, bleService.CONFIG.MONITORING_DELAY);
+
+    } catch (error) {
+      console.error(`[AUTO-CONNECT] Failed to connect:`, error);
+      setConnectionStatus(`Connection failed: ${error.message}`);
+      setIsConnected(false);
+      setConnectedDevice(null);
+      
+      // Disconnect if partially connected
+      try {
+        await bleService.disconnectFromDevice(device.id);
+      } catch (disconnectError) {
+        console.error('Error during cleanup disconnect:', disconnectError);
+      }
+    }
+  };
+
+  // Function to scan for target device
+  const scanForTargetDevice = useCallback(async () => {
+    if (isConnected) {
+      console.log('[AUTO-SCAN] Already connected, skipping scan');
       return;
     }
-    
-    console.error(`[MONITORING ERROR] ${deviceId} ${dataType}:`, error);
-    setConnectionErrors(prev => ({
-      ...prev,
-      [`${deviceId}_${dataType}`]: error.message
-    }));
-    
-    // Optionally try to reconnect after a delay, but only if still monitoring
-    setTimeout(() => {
-      setConnectionErrors(prev => {
-        // Check if monitoring is still active before clearing errors
-        if (isMonitoring) {
-          const newErrors = { ...prev };
-          delete newErrors[`${deviceId}_${dataType}`];
-          return newErrors;
+
+    try {
+      // Check BLE state before scanning
+      const bleState = await bleService.getBleState();
+      if (bleState !== 'PoweredOn') {
+        console.log(`[AUTO-SCAN] Bluetooth is ${bleState}`);
+        setConnectionStatus(`Bluetooth is ${bleState}. Please enable Bluetooth.`);
+        return;
+      }
+
+      console.log(`[AUTO-SCAN] Scanning for ${TARGET_DEVICE_NAME}...`);
+      setConnectionStatus(`Scanning for ${TARGET_DEVICE_NAME}...`);
+
+      let foundDevice = null;
+
+      bleService.scanForDevices(
+        (device) => {
+          console.log(`[AUTO-SCAN] Found device: ${device.name} (${device.id})`);
+          if (device.name === TARGET_DEVICE_NAME && !foundDevice) {
+            console.log(`[AUTO-SCAN] Target device found!`);
+            foundDevice = device;
+            bleService.stopScanning();
+            // Connect to the device
+            connectToTargetDevice(device);
+          }
+        },
+        (error) => {
+          console.error('[AUTO-SCAN] Scan error:', error);
+          setConnectionStatus(`Scan error: ${error.message}`);
         }
-        return prev;
-      });
-    }, 5000);
-  }, [isMonitoring]);
-
-  useEffect(() => {
-    const startMonitoringWithDelay = () => {
-        console.log(`[MONITORING] Starting monitoring for ${devices.length} devices`);
-        
-        devices.forEach((device, deviceIndex) => {
-            const deviceChars = characteristics[device.id];
-            
-            console.log(`[MONITORING] Device ${deviceIndex + 1}: ${device.name} (${device.id})`);
-            
-            if (!deviceChars) {
-              console.error(`[MONITORING ERROR] No characteristics found for device ${device.name}`);
-              return;
-            }
-
-            // Validate characteristics exist
-            if (!deviceChars.accel) {
-              console.error(`[MONITORING ERROR] Missing rep counter characteristic for device ${device.name}:`, deviceChars);
-              return;
-            }
-
-            // Monitor rep count data using the first characteristic (accel UUID)
-            bleService.monitorCharacteristic(
-              `${device.id}_accel`,
-              device.id,
-              IMU_SERVICE_UUID,
-              deviceChars.accel,
-              (data) => {
-                // Only process data if monitoring is still active
-                if (isMonitoring) {
-                  updateDeviceData(device.id, 'accel', data);
-                }
-              },
-              (error) => {
-                // Only handle errors if monitoring is still active
-                if (isMonitoring) {
-                  console.error(`[ERROR] ${device.name}:`, error);
-                  handleMonitoringError(device.id, 'accel', error);
-                }
-              }
-            );
-            
-            console.log(`[MONITORING] Completed setup for ${device.name}`);
-        });
-        
-        console.log(`[MONITORING] All devices configured for monitoring`);
-    }
-
-    if (isMonitoring) {
-      console.log(`[MONITORING] Starting monitoring in ${bleService.CONFIG.MONITORING_DELAY}ms`);
-      // Use the configured delay from bleService
-      const timerId = setTimeout(startMonitoringWithDelay, bleService.CONFIG.MONITORING_DELAY);
-      return () => {
-        console.log(`[MONITORING] Cleaning up timer`);
-        clearTimeout(timerId);
-      };
-    } else {
-      console.log(`[MONITORING] Monitoring is disabled - stopping all monitoring`);
-      devices.forEach(device => {
-        console.log(`[MONITORING] Stopping monitoring for ${device.name}`);
-        bleService.stopMonitoring(`${device.id}_accel`);
-      });
-    }
-  }, [devices, characteristics, isMonitoring, updateDeviceData, handleMonitoringError]);
-
-  // This effect handles cleanup when the screen is unmounted.
-  useEffect(() => {
-    return () => {
-      console.log('Leaving data screen. Cleaning up...');
-      
-      // Update monitoring state to prevent error handling
-      setIsMonitoring(false);
-      
-      try {
-        // Stop all monitoring using the centralized function
-        console.log('Stopping all monitoring subscriptions...');
-        bleService.stopAllMonitoring();
-        
-        // Also manually stop device-specific monitoring to be thorough
-        devices.forEach(device => {
-          try {
-            bleService.stopMonitoring(`${device.id}_accel`);
-          } catch (error) {
-            console.error(`Error stopping monitoring for ${device.id}:`, error);
-          }
-        });
-        
-        // Then disconnect from all devices
-        devices.forEach(device => {
-          bleService.disconnectFromDevice(device.id).catch(error => {
-            console.error(`Error disconnecting from ${device.id}:`, error);
-            // Don't throw, just log the error
-          });
-        });
-        
-      } catch (error) {
-        console.error('Error during cleanup:', error);
-      }
-      
-      console.log('Cleanup completed.');
-    };
-  }, [devices]);
-
-  const handleStopMonitoring = async () => {
-      console.log('[MONITORING] User requested to stop monitoring');
-      
-      // Update state first to prevent further error handling
-      setIsMonitoring(false);
-      
-      // Clear any existing error states immediately
-      setConnectionErrors({});
-      
-      try {
-        // Stopping monitoring
-        console.log('[MONITORING] Stopping all device monitoring...');
-        
-        // Use the stopAllMonitoring function for cleaner shutdown
-        await bleService.stopAllMonitoring();
-        
-        // Also manually stop device-specific monitoring to be thorough
-        const stopPromises = [];
-        devices.forEach(device => {
-          console.log(`[MONITORING] Ensuring monitoring stopped for ${device.name}`);
-          stopPromises.push(
-            Promise.resolve(bleService.stopMonitoring(`${device.id}_accel`))
-          );
-        });
-        
-        // Wait for all monitoring to stop
-        await Promise.all(stopPromises);
-        console.log('[MONITORING] All monitoring stopped successfully');
-        
-        // Disconnect from all devices
-        const disconnectPromises = devices.map(device => 
-          bleService.disconnectFromDevice(device.id).catch(error => {
-            console.error(`Error disconnecting from ${device.id}:`, error);
-            // Don't throw, just log the error
-          })
-        );
-        
-        await Promise.all(disconnectPromises);
-        console.log('[MONITORING] All devices disconnected');
-        
-      } catch (error) {
-        console.error('[MONITORING] Error during stop monitoring:', error);
-        // Continue with navigation even if there were errors
-      }
-      
-      // Show alert and navigate back to scan screen when OK is pressed
-      Alert.alert(
-        'Monitoring Stopped', 
-        'Data monitoring has been stopped for all devices.',
-        [
-          {
-            text: 'OK',
-            onPress: () => {
-              console.log('[NAVIGATION] Navigating back to Home screen');
-              navigation.navigate('Home');
-            }
-          }
-        ]
       );
-  }
+
+      // Stop scan after timeout if device not found
+      setTimeout(() => {
+        if (!foundDevice && !isConnected) {
+          bleService.stopScanning();
+          console.log(`[AUTO-SCAN] Timeout reached, device not found`);
+          setConnectionStatus(`${TARGET_DEVICE_NAME} not found. Will retry...`);
+        }
+      }, bleService.CONFIG.SCAN_TIMEOUT);
+
+    } catch (error) {
+      console.error('[AUTO-SCAN] Error during scan:', error);
+      setConnectionStatus(`Scan error: ${error.message}`);
+    }
+  }, [isConnected]);
+
+  // Set up periodic scanning when not connected
+  useEffect(() => {
+    // Initial scan
+    scanForTargetDevice();
+
+    // Set up periodic scanning
+    const interval = setInterval(() => {
+      if (!isConnected) {
+        console.log('[AUTO-SCAN] Periodic scan triggered');
+        scanForTargetDevice();
+      }
+    }, SCAN_INTERVAL);
+
+    setScanInterval(interval);
+
+    // Cleanup on unmount
+    return () => {
+      console.log('[CLEANUP] Stopping all monitoring and disconnecting...');
+      if (interval) {
+        clearInterval(interval);
+      }
+      bleService.stopScanning();
+      bleService.stopAllMonitoring();
+      if (connectedDevice) {
+        bleService.disconnectFromDevice(connectedDevice.id).catch(err => {
+          console.error('Error disconnecting on cleanup:', err);
+        });
+      }
+    };
+  }, []);
+
+  // Re-trigger scanning when connection is lost
+  useEffect(() => {
+    if (!isConnected && !scanInterval) {
+      const interval = setInterval(() => {
+        console.log('[AUTO-SCAN] Periodic scan triggered (reconnect)');
+        scanForTargetDevice();
+      }, SCAN_INTERVAL);
+      setScanInterval(interval);
+    } else if (isConnected && scanInterval) {
+      // Clear interval when connected
+      clearInterval(scanInterval);
+      setScanInterval(null);
+    }
+  }, [isConnected, scanInterval, scanForTargetDevice]);
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView>
-        <View style={styles.controlPanel}>
-            <Button 
-                title="Stop Monitoring"
-                onPress={handleStopMonitoring}
-                color='#F44336'
-            />
-            <Text style={[styles.statusText, { color: '#4CAF50' }]}>
-              Status: Monitoring Active
+        <View style={styles.header}>
+          <Text style={styles.title}>Exercise Rep Counter</Text>
+          <View style={styles.statusContainer}>
+            {!isConnected && (
+              <ActivityIndicator size="small" color="#007BFF" style={styles.loader} />
+            )}
+            <Text style={[
+              styles.statusText,
+              isConnected ? styles.connectedText : styles.disconnectedText
+            ]}>
+              {connectionStatus}
             </Text>
-            <Text style={styles.statusText}>
-              Connected to {devices.length} device{devices.length !== 1 ? 's' : ''}
-            </Text>
+          </View>
         </View>
         
-        {/* Show connection errors if any */}
-        {Object.keys(connectionErrors).length > 0 && (
-          <View style={styles.errorPanel}>
-            <Text style={styles.errorTitle}>Connection Issues:</Text>
-            {Object.entries(connectionErrors).map(([key, error]) => (
-              <Text key={key} style={styles.errorText}>
-                {key}: {error}
-              </Text>
-            ))}
+        {isConnected && connectedDevice ? (
+          <View style={styles.deviceSection}>
+            <Text style={styles.deviceNameTitle}>
+              {connectedDevice.name}
+            </Text>
+            
+            <DataView 
+              deviceData={deviceData[connectedDevice.id]} 
+              deviceName={connectedDevice.name}
+            />
+          </View>
+        ) : (
+          <View style={styles.waitingContainer}>
+            <ActivityIndicator size="large" color="#007BFF" />
+            <Text style={styles.waitingText}>
+              Waiting for {TARGET_DEVICE_NAME} to be available...
+            </Text>
+            <Text style={styles.instructionText}>
+              Make sure your device is powered on and in range.
+            </Text>
           </View>
         )}
-        
-        {devices.map((device, index) => {
-          return (
-            <View key={device.id} style={styles.deviceSection}>
-              <Text style={styles.deviceNameTitle}>
-                Device {index + 1}: {device.name}
-              </Text>
-              
-              <DataView 
-                deviceData={deviceData[device.id]} 
-                deviceId={device.id}
-                deviceName={device.name}
-              />
-            </View>
-          );
-        })}
       </ScrollView>
     </SafeAreaView>
   );
@@ -331,18 +346,60 @@ const DataDisplayScreen = ({ route, navigation }) => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#FFFFFF' },
-  controlPanel: { padding: 20, borderBottomWidth: 1, borderBottomColor: '#EEEEEE' },
-  statusText: { fontSize: 14, color: '#666666', textAlign: 'center', marginTop: 10 },
-  errorPanel: { 
-    backgroundColor: '#FFEBEE', 
-    padding: 15, 
-    margin: 15, 
-    borderRadius: 8, 
-    borderLeftWidth: 4, 
-    borderLeftColor: '#F44336' 
+  header: {
+    padding: 20,
+    backgroundColor: '#007BFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#0056b3',
   },
-  errorTitle: { fontSize: 16, fontWeight: 'bold', color: '#C62828', marginBottom: 8 },
-  errorText: { fontSize: 14, color: '#D32F2F', marginBottom: 4 },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+  statusContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  loader: {
+    marginRight: 10,
+  },
+  statusText: {
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  connectedText: {
+    color: '#E8F5E9',
+    fontWeight: '600',
+  },
+  disconnectedText: {
+    color: '#FFEBEE',
+    fontStyle: 'italic',
+  },
+  waitingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+    marginTop: 60,
+  },
+  waitingText: {
+    fontSize: 18,
+    color: '#666666',
+    textAlign: 'center',
+    marginTop: 20,
+    marginBottom: 10,
+  },
+  instructionText: {
+    fontSize: 14,
+    color: '#999999',
+    textAlign: 'center',
+    marginTop: 10,
+  },
   deviceSection: { padding: 25, borderBottomWidth: 1, borderBottomColor: '#EEEEEE' },
   deviceNameTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 20, color: '#333333', textAlign: 'center' },
   dataContainer: { flexDirection: 'row', justifyContent: 'center', paddingVertical: 20 },
