@@ -26,6 +26,7 @@ enum ConnectionStatus: Equatable {
     case connecting
     case discovering
     case connected
+    case disconnected
     case failed(String)
     
     var displayText: String {
@@ -34,6 +35,7 @@ enum ConnectionStatus: Equatable {
         case .connecting: return "Connecting..."
         case .discovering: return "Discovering..."
         case .connected: return "Connected"
+        case .disconnected: return "Disconnected"
         case .failed(let error): return "Failed: \(error)"
         }
     }
@@ -43,7 +45,8 @@ enum ConnectionStatus: Equatable {
         case (.pending, .pending),
              (.connecting, .connecting),
              (.discovering, .discovering),
-             (.connected, .connected):
+             (.connected, .connected),
+             (.disconnected, .disconnected):
             return true
         case (.failed(let lhsError), .failed(let rhsError)):
             return lhsError == rhsError
