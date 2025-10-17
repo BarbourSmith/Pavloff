@@ -339,7 +339,7 @@ struct WorkoutView: View {
     
     private func scanForTargetDevice() {
         guard bleManager.bluetoothState == .poweredOn else {
-            connectionStatus = "Bluetooth is \(bleManager.bluetoothState.description). Please enable Bluetooth."
+            connectionStatus = "Bluetooth is \(bleManager.bluetoothState.stateDescription). Please enable Bluetooth."
             print("[WORKOUT] Bluetooth not powered on: \(bleManager.bluetoothState)")
             return
         }
@@ -426,7 +426,7 @@ struct WorkoutView: View {
 
 // Extension to get string description of CBManagerState
 extension CBManagerState {
-    var description: String {
+    var stateDescription: String {
         switch self {
         case .unknown: return "Unknown"
         case .resetting: return "Resetting"
