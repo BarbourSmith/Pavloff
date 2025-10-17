@@ -103,6 +103,50 @@ Firmware/
 
 ## Troubleshooting
 
+### PlatformIO Extension Not Detecting the Project
+
+If VS Code doesn't show PlatformIO features after opening the Firmware folder:
+
+**Step 1: Verify Extension is Installed**
+1. Go to Extensions (`Ctrl+Shift+X` / `Cmd+Shift+X`)
+2. Search for "PlatformIO IDE" 
+3. Ensure it's installed (shows "Installed" not "Install")
+4. Check it's enabled (no "Enable" button visible)
+5. If you just installed it, **restart VS Code completely** (close all windows)
+
+**Step 2: Verify You Opened the Correct Folder**
+- You must open the **`Firmware` directory** specifically, NOT the repository root
+- The folder you open should contain `platformio.ini` at the top level
+- In VS Code Explorer, you should see `platformio.ini` directly in the workspace root
+
+**Step 3: Force PlatformIO to Initialize**
+1. Press `Ctrl+Shift+P` / `Cmd+Shift+P` to open Command Palette
+2. Type "PlatformIO: Home"
+3. Press Enter - this should open PIO Home tab
+4. If this works, PlatformIO is active
+
+**Step 4: Check VS Code Status Bar**
+- Look at the bottom of VS Code
+- You should see PlatformIO initialization messages appear
+- Wait 30-60 seconds for initialization to complete on first open
+
+**Step 5: Manual Reload**
+1. Close the Firmware folder in VS Code
+2. Completely quit VS Code (close all windows)
+3. Reopen VS Code
+4. Open Firmware folder again
+5. Wait for PlatformIO to initialize (watch bottom status bar)
+
+**Step 6: Check for Conflicting Extensions**
+- C/C++ extension can sometimes interfere
+- If installed, ensure it's updated to latest version
+- PlatformIO should manage IntelliSense automatically
+
+**Step 7: Verify platformio.ini is Valid**
+- Open `platformio.ini` in the editor
+- Check there are no syntax errors
+- Should have `[platformio]` and `[env]` sections
+
 ### "PlatformIO: PIO Home" doesn't appear
 - Close and reopen VS Code
 - Check that the PlatformIO extension is properly installed and enabled

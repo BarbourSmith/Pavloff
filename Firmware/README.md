@@ -112,6 +112,8 @@ See detailed documentation:
 
 **📖 New to PlatformIO?** See [PLATFORMIO_SETUP.md](PLATFORMIO_SETUP.md) for a detailed step-by-step guide with screenshots and troubleshooting tips.
 
+**🔍 Project not being detected?** See [PLATFORMIO_DETECTION_CHECKLIST.md](PLATFORMIO_DETECTION_CHECKLIST.md) for a comprehensive troubleshooting checklist.
+
 ### Option 1: Using PlatformIO IDE (VS Code)
 
 1. Install [Visual Studio Code](https://code.visualstudio.com/)
