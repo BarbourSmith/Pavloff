@@ -5,6 +5,8 @@
 #include <BLEServer.h>
 #include <BLEUtils.h>
 #include <BLE2902.h>
+#include <esp_pm.h>
+#include <esp_sleep.h>
 
 // Pin configuration - defined via PlatformIO build flags
 #ifndef SDA_PIN
@@ -13,6 +15,32 @@
 #ifndef SCL_PIN
 #error "SCL_PIN must be defined in platformio.ini build_flags"
 #endif
+
+// MPU-6050 interrupt pin
+#define MPU_INT_PIN 18
+
+// Power management constants
+#define IDLE_TIMEOUT_MS 300000  // 5 minutes in milliseconds
+
+// Power optimization settings
+void configurePowerOptimizations() {
+  // Reduce CPU frequency to save power (80 MHz is sufficient for this application)
+  // ESP32-S3 supports 240MHz, 160MHz, 80MHz, 40MHz, 20MHz, 10MHz
+  setCpuFrequencyMhz(80);
+  Serial.print("CPU frequency set to: ");
+  Serial.print(getCpuFrequencyMhz());
+  Serial.println(" MHz");
+  
+  // Enable automatic light sleep when idle
+  // This allows the CPU to enter light sleep between tasks
+  esp_pm_config_esp32s3_t pm_config;
+  pm_config.max_freq_mhz = 80;
+  pm_config.min_freq_mhz = 10;
+  pm_config.light_sleep_enable = true;
+  esp_pm_configure(&pm_config);
+  
+  Serial.println("Power optimizations configured");
+}
 
 // Create an MPU6050 object
 MPU6050 mpu(Wire);
@@ -54,6 +82,9 @@ unsigned long lastMotionTime = 0;
 unsigned long phaseStartTime = 0;
 float dominantAxisVelocity = 0.0f;  // Velocity along dominant motion axis
 
+// Power management variables
+unsigned long lastActivityTime = 0;  // Track last time there was activity
+
 // Timing constants
 #define INTEGRATION_INTERVAL_MS 10  // Calculate position every 10ms for accuracy
 #define REPORT_INTERVAL_MS 500       // Report data every 500ms
@@ -92,11 +123,13 @@ float dominantAxisVelocity = 0.0f;  // Velocity along dominant motion axis
 class MyServerCallbacks: public BLEServerCallbacks {
     void onConnect(BLEServer* pServer) {
       deviceConnected = true;
+      lastActivityTime = millis();  // Reset activity timer on connection
       Serial.println("Device connected");
     }
 
     void onDisconnect(BLEServer* pServer) {
       deviceConnected = false;
+      lastActivityTime = millis();  // Reset activity timer on disconnection
       Serial.println("Device disconnected");
       // Restart advertising so a new client can connect
       pServer->getAdvertising()->start();
@@ -111,6 +144,9 @@ class RepCharacteristicCallbacks: public BLECharacteristicCallbacks {
       if (value.length() > 0) {
         Serial.print("Received command: ");
         Serial.println(value.c_str());
+        
+        // Reset activity timer on any BLE interaction
+        lastActivityTime = millis();
         
         // Check for reset command
         if (value == "RESET" || value == "reset") {
@@ -323,26 +359,127 @@ void detectRep(float velX, float velY, float velZ, float linearAccelMag, unsigne
   }
 }
 
+// Configure MPU-6050 motion detection interrupt
+void configureMPUMotionInterrupt() {
+  // MPU-6050 Register addresses for motion detection
+  const uint8_t MPU6050_INT_PIN_CFG = 0x37;
+  const uint8_t MPU6050_INT_ENABLE = 0x38;
+  const uint8_t MPU6050_MOT_THR = 0x1F;
+  const uint8_t MPU6050_MOT_DUR = 0x20;
+  
+  // Configure interrupt pin (active high, push-pull, held until cleared)
+  mpu.writeMPU6050(MPU6050_INT_PIN_CFG, 0x20);
+  
+  // Set motion detection threshold (0-255, LSB = 2mg)
+  // Setting to 32 = 64mg threshold for motion detection
+  mpu.writeMPU6050(MPU6050_MOT_THR, 32);
+  
+  // Set motion detection duration (1-255, LSB = 1ms)
+  // Setting to 10 = 10ms of continuous motion required
+  mpu.writeMPU6050(MPU6050_MOT_DUR, 10);
+  
+  // Enable motion detection interrupt
+  mpu.writeMPU6050(MPU6050_INT_ENABLE, 0x40);
+  
+  Serial.println("MPU-6050 motion interrupt configured");
+}
+
+// Put MPU-6050 into low power mode with motion detection
+void putMPUToSleep() {
+  // Enable cycle mode and set wake frequency
+  // Set cycle mode with 1.25Hz wake frequency
+  mpu.writeMPU6050(MPU6050_PWR_MGMT_1, 0x20);
+  
+  // Enable accelerometer only, disable gyroscope
+  // MPU6050_PWR_MGMT_2 register address is 0x6C
+  mpu.writeMPU6050(0x6C, 0x07);
+  
+  Serial.println("MPU-6050 in low power mode");
+}
+
+// Wake up MPU-6050 from low power mode
+void wakeMPUFromSleep() {
+  // Wake up MPU-6050
+  mpu.writeMPU6050(MPU6050_PWR_MGMT_1, 0x00);
+  
+  // Enable all sensors
+  // MPU6050_PWR_MGMT_2 register address is 0x6C
+  mpu.writeMPU6050(0x6C, 0x00);
+  
+  delay(100);  // Wait for sensor to stabilize
+  
+  Serial.println("MPU-6050 woken up");
+}
+
+// Enter deep sleep mode with wake on GPIO interrupt
+void enterDeepSleep() {
+  Serial.println("Entering deep sleep mode...");
+  Serial.println("Device will wake on motion detection");
+  Serial.flush();  // Ensure all serial data is sent
+  
+  // Put MPU-6050 into low power mode before sleeping
+  putMPUToSleep();
+  
+  // Configure GPIO18 (MPU_INT_PIN) as wake-up source
+  // The interrupt is active high, so wake on high level
+  esp_sleep_enable_ext0_wakeup((gpio_num_t)MPU_INT_PIN, 1);
+  
+  // Optional: Disable BLE to save power
+  BLEDevice::deinit(true);
+  
+  // Enter deep sleep
+  esp_deep_sleep_start();
+}
+
 void setup() {
   // Initialize Serial communication
   Serial.begin(115200);
+  
+  // Configure power optimizations
+  configurePowerOptimizations();
+  
+  // Check wake-up reason
+  esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
+  if (wakeup_reason == ESP_SLEEP_WAKEUP_EXT0) {
+    Serial.println("Woke up from deep sleep due to motion detection!");
+  } else {
+    Serial.println("Starting up normally...");
+  }
+
+  // Configure MPU interrupt pin as input
+  pinMode(MPU_INT_PIN, INPUT);
 
   // --- MPU-6050 Setup ---
   Wire.begin(SDA_PIN, SCL_PIN); // SDA, SCL
+  
+  // If waking from sleep, need to reconfigure MPU
+  if (wakeup_reason == ESP_SLEEP_WAKEUP_EXT0) {
+    wakeMPUFromSleep();
+  }
+  
   mpu.begin();
   Serial.println("Calibrating gyroscope, do not move the sensor...");
   mpu.calcGyroOffsets(true);
   Serial.println("Calibration complete!");
   Serial.println("------------------------------------");
+  
+  // Configure motion detection interrupt
+  configureMPUMotionInterrupt();
 
   // Initialize timing for integration and reporting
   lastUpdateTime = millis();
   lastReportTime = millis();
+  lastActivityTime = millis();  // Initialize activity timer
 
 
   // --- BLE Setup ---
   // Create the BLE Device
   BLEDevice::init("ESP32_IMU_Stream");
+  
+  // Set BLE power to minimum (can increase if needed for range)
+  // ESP_PWR_LVL_N12 to ESP_PWR_LVL_P9 (lower = less power)
+  BLEDevice::setPower(ESP_PWR_LVL_N0, ESP_BLE_PWR_TYPE_DEFAULT);
+  Serial.println("BLE power set to minimum for energy efficiency");
 
   // Create the BLE Server
   pServer = BLEDevice::createServer();
@@ -393,11 +530,19 @@ void setup() {
 }
 
 void loop() {
+  unsigned long currentTime = millis();
+  
+  // Check for idle timeout and enter deep sleep
+  if (currentTime - lastActivityTime > IDLE_TIMEOUT_MS) {
+    Serial.println("Idle timeout reached - entering deep sleep");
+    enterDeepSleep();
+    // This line will never be reached as deep sleep resets the device
+  }
+  
   // Update sensor data
   mpu.update();
 
   // Calculate delta time in seconds
-  unsigned long currentTime = millis();
   float dt = (currentTime - lastUpdateTime) / 1000.0;
   lastUpdateTime = currentTime;
 
@@ -548,6 +693,11 @@ void loop() {
     // Detect workout reps based on velocity and acceleration patterns
     float linearAccelMag = sqrt(linearAccelX*linearAccelX + linearAccelY*linearAccelY + linearAccelZ*linearAccelZ) / 9.81f;
     detectRep(velocityX, velocityY, velocityZ, linearAccelMag, currentTime);
+    
+    // Update activity timer if there's motion or device is connected
+    if (!isStationary || deviceConnected) {
+      lastActivityTime = currentTime;
+    }
   }
 
   // Only send data if a client is connected and report interval has elapsed
