@@ -30,3 +30,6 @@ Pods/
 /tmp
 Firmware/.vscode/extensions.json
 .DS_Store
+
+# CodeQL artifacts
+_codeql_detected_source_root
