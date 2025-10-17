@@ -7,6 +7,7 @@
 #include <BLE2902.h>
 #include <esp_pm.h>
 #include <esp_sleep.h>
+#include <Preferences.h>
 
 // Pin configuration - defined via PlatformIO build flags
 #ifndef SDA_PIN
@@ -21,6 +22,7 @@
 
 // Power management constants
 #define IDLE_TIMEOUT_MS 300000  // 5 minutes in milliseconds
+#define CALIBRATION_STILLNESS_MS 240000  // 4 minutes in milliseconds
 
 // Power optimization settings
 void configurePowerOptimizations() {
@@ -44,6 +46,9 @@ void configurePowerOptimizations() {
 
 // Create an MPU6050 object
 MPU6050 mpu(Wire);
+
+// Preferences object for storing calibration data
+Preferences preferences;
 
 // BLE Server and Characteristic pointers
 BLEServer* pServer = NULL;
@@ -84,6 +89,9 @@ float dominantAxisVelocity = 0.0f;  // Velocity along dominant motion axis
 
 // Power management variables
 unsigned long lastActivityTime = 0;  // Track last time there was activity
+unsigned long lastStillTime = 0;     // Track when device became stationary
+bool wasStationary = false;          // Track if device was stationary in previous iteration
+bool calibrationComplete = false;    // Track if calibration has been done
 
 // Timing constants
 #define INTEGRATION_INTERVAL_MS 10  // Calculate position every 10ms for accuracy
@@ -174,6 +182,68 @@ float invSqrt(float x) {
   y = *(float*)&i;
   y = y * (1.5f - (halfx * y * y));
   return y;
+}
+
+// Save gyro calibration offsets to persistent storage
+void saveGyroOffsets(float offsetX, float offsetY, float offsetZ) {
+  preferences.begin("mpu6050", false);  // Open in read-write mode
+  preferences.putFloat("gyroOffsetX", offsetX);
+  preferences.putFloat("gyroOffsetY", offsetY);
+  preferences.putFloat("gyroOffsetZ", offsetZ);
+  preferences.putBool("hasOffsets", true);
+  preferences.end();
+  Serial.println("Gyro offsets saved to persistent storage");
+  Serial.print("Offsets: X=");
+  Serial.print(offsetX, 4);
+  Serial.print(", Y=");
+  Serial.print(offsetY, 4);
+  Serial.print(", Z=");
+  Serial.println(offsetZ, 4);
+}
+
+// Load gyro calibration offsets from persistent storage
+bool loadGyroOffsets(float* offsetX, float* offsetY, float* offsetZ) {
+  preferences.begin("mpu6050", true);  // Open in read-only mode
+  bool hasOffsets = preferences.getBool("hasOffsets", false);
+  
+  if (hasOffsets) {
+    *offsetX = preferences.getFloat("gyroOffsetX", 0.0f);
+    *offsetY = preferences.getFloat("gyroOffsetY", 0.0f);
+    *offsetZ = preferences.getFloat("gyroOffsetZ", 0.0f);
+    preferences.end();
+    Serial.println("Loaded gyro offsets from persistent storage");
+    Serial.print("Offsets: X=");
+    Serial.print(*offsetX, 4);
+    Serial.print(", Y=");
+    Serial.print(*offsetY, 4);
+    Serial.print(", Z=");
+    Serial.println(*offsetZ, 4);
+    return true;
+  }
+  
+  preferences.end();
+  Serial.println("No stored gyro offsets found");
+  return false;
+}
+
+// Perform gyro calibration and save results
+void performCalibration() {
+  Serial.println("Starting gyroscope calibration...");
+  Serial.println("Device is stationary - calibrating gyro offsets");
+  
+  mpu.calcGyroOffsets(true);
+  
+  // Get the calculated offsets from the MPU6050 object
+  // Note: MPU6050_tockn library stores offsets internally
+  // We'll read them after calibration completes
+  float offsetX = mpu.getGyroXoffset();
+  float offsetY = mpu.getGyroYoffset();
+  float offsetZ = mpu.getGyroZoffset();
+  
+  saveGyroOffsets(offsetX, offsetY, offsetZ);
+  calibrationComplete = true;
+  
+  Serial.println("Calibration complete!");
 }
 
 // Mahony AHRS algorithm update (IMU version without magnetometer)
@@ -458,9 +528,20 @@ void setup() {
   }
   
   mpu.begin();
-  Serial.println("Calibrating gyroscope, do not move the sensor...");
-  mpu.calcGyroOffsets(true);
-  Serial.println("Calibration complete!");
+  
+  // Try to load stored calibration offsets
+  float offsetX, offsetY, offsetZ;
+  if (loadGyroOffsets(&offsetX, &offsetY, &offsetZ)) {
+    // Set the loaded offsets
+    mpu.setGyroOffsets(offsetX, offsetY, offsetZ);
+    calibrationComplete = true;
+    Serial.println("Using stored calibration offsets");
+  } else {
+    // No stored offsets - calibration will happen when device is still for 4 minutes
+    calibrationComplete = false;
+    Serial.println("No stored calibration - will calibrate when device is still for 4 minutes");
+  }
+  
   Serial.println("------------------------------------");
   
   // Configure motion detection interrupt
@@ -627,6 +708,28 @@ void loop() {
       linearAccelX = 0.0f;
       linearAccelY = 0.0f;
       linearAccelZ = 0.0f;
+      
+      // Track stillness duration for calibration
+      if (!wasStationary) {
+        // Device just became stationary
+        lastStillTime = currentTime;
+        wasStationary = true;
+      } else {
+        // Device has been stationary - check if 4 minutes have passed
+        unsigned long stillDuration = currentTime - lastStillTime;
+        if (!calibrationComplete && stillDuration >= CALIBRATION_STILLNESS_MS) {
+          // Device has been still for 4 minutes and not yet calibrated - perform calibration
+          performCalibration();
+          lastStillTime = currentTime;  // Reset still time to avoid immediate recalibration
+        } else if (calibrationComplete && stillDuration >= CALIBRATION_STILLNESS_MS) {
+          // Recalibrate periodically when device is still for 4 minutes
+          performCalibration();
+          lastStillTime = currentTime;  // Reset still time
+        }
+      }
+    } else {
+      // Device is moving - reset stillness tracking
+      wasStationary = false;
     }
 
     // Debug: Print linear acceleration
