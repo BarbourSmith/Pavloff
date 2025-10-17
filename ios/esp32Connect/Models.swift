@@ -122,3 +122,30 @@ struct DiscoveredCharacteristics {
         return accelUUID != nil && gyroUUID != nil
     }
 }
+
+// MARK: - Workout Models
+struct Exercise: Identifiable, Equatable {
+    let id: UUID
+    let name: String
+    var targetReps: Int
+    
+    init(id: UUID = UUID(), name: String, targetReps: Int) {
+        self.id = id
+        self.name = name
+        self.targetReps = targetReps
+    }
+}
+
+struct WorkoutSettings {
+    var exercises: [Exercise]
+    
+    static let defaultExercises = [
+        Exercise(name: "Bicep Curls", targetReps: 10),
+        Exercise(name: "Shoulder Press", targetReps: 10),
+        Exercise(name: "Lateral Raises", targetReps: 10)
+    ]
+    
+    init(exercises: [Exercise] = defaultExercises) {
+        self.exercises = exercises
+    }
+}
