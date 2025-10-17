@@ -13,6 +13,25 @@ This project implements real-time motion tracking on ESP32 microcontrollers usin
 - **High-pass Butterworth filters** for drift removal
 - **BLE communication** for wireless data streaming
 
+## Project Structure
+
+This is a PlatformIO project with the following structure:
+
+```
+Firmware/
+├── platformio.ini       # PlatformIO configuration file
+├── src/                 # Source code directory
+│   └── esp1/           # ESP1 environment source files
+│       └── main.cpp    # Main firmware code
+├── include/            # Project header files (.h)
+├── lib/                # Project-specific libraries
+├── test/               # Unit tests
+└── .vscode/            # VS Code/PlatformIO IDE settings
+    ├── extensions.json
+    ├── settings.json
+    └── launch.json
+```
+
 ## Hardware
 
 - **ESP32 Development Board**
@@ -91,8 +110,24 @@ See detailed documentation:
 
 ## Installation
 
-1. Install [PlatformIO](https://platformio.org/install)
-2. Clone this repository
+### Option 1: Using PlatformIO IDE (VS Code)
+
+1. Install [Visual Studio Code](https://code.visualstudio.com/)
+2. Install the [PlatformIO IDE extension](https://platformio.org/install/ide?install=vscode)
+3. Open the `Firmware` folder in VS Code:
+   - File → Open Folder → Select the `Firmware` directory
+   - PlatformIO will automatically detect the project and configure it
+4. Build and upload:
+   - Click the PlatformIO icon in the left sidebar
+   - Under "Project Tasks" → "esp1" → Click "Upload"
+
+### Option 2: Using PlatformIO CLI
+
+1. Install [PlatformIO Core](https://platformio.org/install/cli)
+2. Navigate to the Firmware directory:
+   ```bash
+   cd Firmware
+   ```
 3. Build and upload to ESP32:
    ```bash
    pio run -e esp1 -t upload
