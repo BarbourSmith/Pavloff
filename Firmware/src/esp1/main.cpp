@@ -8,6 +8,7 @@
 #include <esp_pm.h>
 #include <esp_sleep.h>
 #include <Preferences.h>
+#include <esp_gap_ble_api.h>
 
 // Pin configuration - defined via PlatformIO build flags
 #ifndef SDA_PIN
@@ -556,6 +557,9 @@ void setup() {
   // --- BLE Setup ---
   // Create the BLE Device
   BLEDevice::init("Pavloff Workout Sensor");
+  
+  // Explicitly set the device name to override any cached value in NVS
+  esp_ble_gap_set_device_name("Pavloff Workout Sensor");
   
   // Set BLE power to minimum (can increase if needed for range)
   // ESP_PWR_LVL_N12 to ESP_PWR_LVL_P9 (lower = less power)
