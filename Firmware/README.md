@@ -116,14 +116,27 @@ See detailed documentation:
 
 ### Option 1: Using PlatformIO IDE (VS Code)
 
+**Method A: Multi-Root Workspace (Work on both app and firmware)**
+
+1. Install [Visual Studio Code](https://code.visualstudio.com/)
+2. Install the [PlatformIO IDE extension](https://platformio.org/install/ide?install=vscode)
+3. Open the workspace file from repository root:
+   - File → Open Workspace from File
+   - Select `Exercise-App.code-workspace`
+   - Both the app and firmware will be available in the same workspace
+   - PlatformIO will automatically detect the Firmware folder
+
+**Method B: Open Firmware Folder Only (Firmware development only)**
+
 1. Install [Visual Studio Code](https://code.visualstudio.com/)
 2. Install the [PlatformIO IDE extension](https://platformio.org/install/ide?install=vscode)
 3. Open the `Firmware` folder in VS Code:
    - File → Open Folder → Select the `Firmware` directory
    - PlatformIO will automatically detect the project and configure it
-4. Build and upload:
-   - Click the PlatformIO icon in the left sidebar
-   - Under "Project Tasks" → "esp1" → Click "Upload"
+
+**Building and Uploading:**
+- Click the PlatformIO icon in the left sidebar
+- Under "Project Tasks" → "esp1" → Click "Upload"
 
 ### Option 2: Using PlatformIO CLI
 

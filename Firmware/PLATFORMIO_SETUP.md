@@ -22,14 +22,28 @@ PlatformIO is a professional collaborative platform for embedded development. It
 
 ## Opening the Project
 
-### Method 1: Direct Folder Open
+### Method 1: Multi-Root Workspace (Recommended for full-stack development)
+1. Launch Visual Studio Code
+2. Go to **File → Open Workspace from File**
+3. Navigate to the repository root
+4. Select **`Exercise-App.code-workspace`**
+5. Click "Open"
+6. Both the mobile app and firmware will be available in the workspace
+7. PlatformIO will automatically detect the Firmware folder
+
+**Benefits:**
+- Work on both mobile app and firmware in one workspace
+- Switch between app and firmware easily
+- No need to open separate VS Code windows
+
+### Method 2: Direct Firmware Folder Open
 1. Launch Visual Studio Code
 2. Go to **File → Open Folder** (or `Ctrl+K Ctrl+O` / `Cmd+K Cmd+O`)
 3. Navigate to and select the **`Firmware`** directory
 4. Click "Select Folder" / "Open"
 5. PlatformIO will automatically detect the project and initialize it
 
-### Method 2: Using PlatformIO Home
+### Method 3: Using PlatformIO Home
 1. Launch Visual Studio Code
 2. Click the PlatformIO icon (alien head) in the left sidebar
 3. Click "Open" in the PIO Home tab
