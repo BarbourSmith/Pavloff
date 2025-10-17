@@ -23,13 +23,13 @@ The app has been updated to support multi-exercise workout tracking with configu
 
 **Test Cases - Not Connected**:
 - [ ] Shows "Workout Tracker" title
-- [ ] Displays "Scanning for ESP32_IMU_Stream" status
+- [ ] Displays "Scanning for Pavloff Workout Sensor" status
 - [ ] Shows progress spinner
 - [ ] Shows waiting message with device instructions
 - [ ] "Workout Settings" button is accessible
 
 **Test Cases - Connected**:
-- [ ] Connection status shows "Connected to ESP32_IMU_Stream"
+- [ ] Connection status shows "Connected to Pavloff Workout Sensor"
 - [ ] Progress spinner disappears
 - [ ] Exercise indicators show as dots (3 dots for 3 exercises)
 - [ ] Current exercise dot is blue, completed are green, upcoming are gray
@@ -60,7 +60,7 @@ The app has been updated to support multi-exercise workout tracking with configu
 
 ### 4. BLE Connection Handling
 **Test Cases**:
-- [ ] App automatically scans for ESP32_IMU_Stream device
+- [ ] App automatically scans for Pavloff Workout Sensor device
 - [ ] Connects when device is found
 - [ ] Shows appropriate status during connection process
 - [ ] Handles disconnection gracefully (shows "reconnecting" message)
@@ -107,7 +107,7 @@ The app has been updated to support multi-exercise workout tracking with configu
 
 ## Device Requirements
 - Physical iOS device (iOS 16.0+) - BLE requires physical device
-- ESP32 device broadcasting as "ESP32_IMU_Stream"
+- ESP32 device broadcasting as "Pavloff Workout Sensor"
 - ESP32 must send rep count data in format: "Count:X,State:Y"
 
 ## Known Behaviors

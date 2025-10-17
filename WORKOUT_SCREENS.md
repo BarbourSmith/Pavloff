@@ -15,12 +15,12 @@ App Launch → Workout Screen ⟷ Setup Screen
 ```
 ┌─────────────────────────────────────┐
 │    Workout Tracker                  │ ← Blue header
-│    ○ Scanning for ESP32_IMU_Stream  │
+│    ○ Scanning for Pavloff Workout Sensor  │
 ├─────────────────────────────────────┤
 │                                     │
 │           ⏳                        │
 │                                     │
-│     Waiting for ESP32_IMU_Stream    │
+│     Waiting for Pavloff Workout Sensor    │
 │        to be available...           │
 │                                     │
 │   Make sure your device is powered  │
@@ -37,7 +37,7 @@ App Launch → Workout Screen ⟷ Setup Screen
 ```
 ┌─────────────────────────────────────┐
 │    Workout Tracker                  │ ← Blue header
-│    Connected to ESP32_IMU_Stream    │
+│    Connected to Pavloff Workout Sensor    │
 ├─────────────────────────────────────┤
 │                                     │
 │         ● ○ ○                       │ ← Progress dots

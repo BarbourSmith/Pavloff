@@ -474,7 +474,7 @@ void setup() {
 
   // --- BLE Setup ---
   // Create the BLE Device
-  BLEDevice::init("ESP32_IMU_Stream");
+  BLEDevice::init("Pavloff Workout Sensor");
   
   // Set BLE power to minimum (can increase if needed for range)
   // ESP_PWR_LVL_N12 to ESP_PWR_LVL_P9 (lower = less power)

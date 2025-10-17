@@ -21,7 +21,7 @@ struct WorkoutView: View {
     @State private var showingCongratulations = false
     @State private var lastRepCount = 0
     
-    private let targetDeviceName = "ESP32_IMU_Stream"
+    private let targetDeviceName = "Pavloff Workout Sensor"
     private let scanInterval: TimeInterval = 5.0
     
     private var currentExercise: Exercise {

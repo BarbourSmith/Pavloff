@@ -42,7 +42,7 @@ REP: Direction change DOWN->UP | Total Reps: 2
 ### BLE Connection
 
 1. **Connect via BLE**
-   - Device advertises as "ESP32_IMU_Stream"
+   - Device advertises as "Pavloff Workout Sensor"
    - Connect using any BLE client app
 
 2. **Rep Count Characteristic**

@@ -16,7 +16,7 @@ struct AutoConnectDataDisplayView: View {
     @State private var scanTimer: Timer?
     @State private var isScanning: Bool = false
     
-    private let targetDeviceName = "ESP32_IMU_Stream"
+    private let targetDeviceName = "Pavloff Workout Sensor"
     private let scanInterval: TimeInterval = 5.0
     
     var body: some View {

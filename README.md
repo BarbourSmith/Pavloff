@@ -1,4 +1,4 @@
-# ESP32 Connect - Native Swift iOS App
+# Pavloff Workout - Native Swift iOS App
 
 **Version:** 2.1 (Workout Tracking)  
 **Platform:** iOS 16.0+  
@@ -6,7 +6,7 @@
 
 ## Overview
 
-ESP32 Connect is a native Swift iOS application designed for workout tracking using free weights with ESP32-based motion sensors. The app automatically tracks your reps through multiple exercises, providing real-time feedback and progression through your workout routine.
+Pavloff Workout is a native Swift iOS application designed for workout tracking using free weights with ESP32-based motion sensors. The app automatically tracks your reps through multiple exercises, providing real-time feedback and progression through your workout routine.
 
 This is a complete native Swift rewrite of the original React Native application, providing better performance, native iOS UI/UX, and simplified architecture.
 
@@ -171,7 +171,7 @@ struct Devices {
 
 1. **Launch the app**
    - App opens directly to the Workout Screen
-   - Automatically scans for ESP32 device named "ESP32_IMU_Stream"
+   - Automatically scans for ESP32 device named "Pavloff Workout Sensor"
 
 2. **Configure your workout (optional)**
    - Tap "Workout Settings" to adjust target reps
@@ -238,7 +238,7 @@ For detailed usage guide, see [WORKOUT_FEATURE.md](WORKOUT_FEATURE.md).
 
 ### Bluetooth permission denied
 - Go to Settings > Privacy & Security > Bluetooth
-- Enable Bluetooth access for ESP32 Connect
+- Enable Bluetooth access for Pavloff Workout
 
 ## Development Notes
 
@@ -300,7 +300,7 @@ This app replaces the previous React Native implementation with a native Swift a
 - **Device**: Physical iOS device (BLE not available in simulator)
 - **Bluetooth**: BLE 4.0 or later
 - **Permissions**: Bluetooth usage must be granted
-- **ESP32**: Device named "ESP32_IMU_Stream" for workout tracking
+- **ESP32**: Device named "Pavloff Workout Sensor" for workout tracking
 
 ## License
 
@@ -308,4 +308,4 @@ Proprietary software developed for BarbourSmith.
 
 ---
 
-ESP32 Connect v2.1 - Workout Tracking Edition - Native Swift iOS App
+Pavloff Workout v2.1 - Workout Tracking Edition - Native Swift iOS App
