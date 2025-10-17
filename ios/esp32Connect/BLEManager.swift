@@ -55,6 +55,20 @@ class BLEManager: NSObject, ObservableObject {
         }
     }
     
+    /// Start scanning for BLE devices without internal timeout (for external timeout management)
+    func startScanningWithoutTimeout() {
+        guard centralManager.state == .poweredOn else {
+            print("[BLE] Cannot scan - Bluetooth is not powered on")
+            return
+        }
+        
+        print("[BLE] Starting device scan...")
+        discoveredDevices.removeAll()
+        isScanning = true
+        
+        centralManager.scanForPeripherals(withServices: nil, options: [CBCentralManagerScanOptionAllowDuplicatesKey: false])
+    }
+    
     /// Stop scanning for BLE devices
     func stopScanning() {
         print("[BLE] Stopping device scan")

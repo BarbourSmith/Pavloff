@@ -1,12 +1,7 @@
 import React, { useEffect, Component } from 'react';
-import { NavigationContainer } from '@react-navigation/native';
-import 'react-native-gesture-handler';
-import { createStackNavigator } from '@react-navigation/stack';
 import { Platform, Alert, Text, View } from 'react-native';
 import { requestMultiple, PERMISSIONS, RESULTS, check } from 'react-native-permissions';
 
-import HomeScreen from './screens/HomeScreen';
-import ConnectionScreen from './screens/ConnectionScreen';
 import DataDisplayScreen from './screens/DataDisplayScreen';
 
 // Error Boundary Component
@@ -44,8 +39,6 @@ class ErrorBoundary extends Component {
     return this.props.children;
   }
 }
-
-const Stack = createStackNavigator();
 
 const App = () => {
   useEffect(() => {
@@ -106,36 +99,7 @@ const App = () => {
 
   return (
     <ErrorBoundary>
-      <NavigationContainer>
-        <Stack.Navigator 
-          initialRouteName="Home"
-          screenOptions={{
-            headerStyle: {
-              backgroundColor: '#007BFF',
-            },
-            headerTintColor: '#fff',
-            headerTitleStyle: {
-              fontWeight: 'bold',
-            },
-          }}
-        >
-          <Stack.Screen 
-            name="Home" 
-            component={HomeScreen}
-            options={{ title: 'BLE Device Scanner' }} 
-          />
-          <Stack.Screen 
-            name="Connection" 
-            component={ConnectionScreen}
-            options={{ title: 'Connecting...' }} 
-          />
-          <Stack.Screen 
-            name="DataDisplay" 
-            component={DataDisplayScreen}
-            options={{ title: 'Live IMU Data' }} 
-          />
-        </Stack.Navigator>
-      </NavigationContainer>
+      <DataDisplayScreen />
     </ErrorBoundary>
   );
 };
