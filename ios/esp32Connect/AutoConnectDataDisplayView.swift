@@ -58,6 +58,24 @@ struct AutoConnectDataDisplayView: View {
                         if let deviceData = bleManager.deviceDataMap[device.id] {
                             RepCountView(data: deviceData.accelData)
                                 .padding()
+                            
+                            // Reset button
+                            Button(action: {
+                                bleManager.resetRepCount(for: device.id)
+                            }) {
+                                HStack {
+                                    Image(systemName: "arrow.clockwise")
+                                        .font(.system(size: 18, weight: .semibold))
+                                    Text("Reset Count")
+                                        .font(.system(size: 18, weight: .semibold))
+                                }
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 30)
+                                .padding(.vertical, 15)
+                                .background(Color.red)
+                                .cornerRadius(25)
+                            }
+                            .padding(.top, 20)
                         }
                     }
                 } else {

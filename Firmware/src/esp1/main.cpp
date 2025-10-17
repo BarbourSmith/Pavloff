@@ -103,6 +103,32 @@ class MyServerCallbacks: public BLEServerCallbacks {
     }
 };
 
+// Handles write events to the rep characteristic
+class RepCharacteristicCallbacks: public BLECharacteristicCallbacks {
+    void onWrite(BLECharacteristic* pCharacteristic) {
+      std::string value = pCharacteristic->getValue();
+      
+      if (value.length() > 0) {
+        Serial.print("Received command: ");
+        Serial.println(value.c_str());
+        
+        // Check for reset command
+        if (value == "RESET" || value == "reset") {
+          repCount = 0;
+          repState = REP_IDLE;
+          phaseStartTime = millis();
+          Serial.println("Rep count reset to 0");
+          
+          // Send immediate update with new count
+          char repData[30];
+          snprintf(repData, sizeof(repData), "Count:0,State:IDLE");
+          pCharacteristic->setValue(repData);
+          pCharacteristic->notify();
+        }
+      }
+    }
+};
+
 // Fast inverse square root for quaternion normalization
 float invSqrt(float x) {
   float halfx = 0.5f * x;
@@ -345,9 +371,11 @@ void setup() {
   pRepCharacteristic = pService->createCharacteristic(
                       REP_CHARACTERISTIC_UUID,
                       BLECharacteristic::PROPERTY_READ |
+                      BLECharacteristic::PROPERTY_WRITE |
                       BLECharacteristic::PROPERTY_NOTIFY
                     );
   pRepCharacteristic->addDescriptor(new BLE2902());
+  pRepCharacteristic->setCallbacks(new RepCharacteristicCallbacks());
   // Set initial value before starting service
   pRepCharacteristic->setValue("Count:0,State:IDLE");
 
