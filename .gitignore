@@ -28,3 +28,5 @@ Pods/
 
 # Temporary files
 /tmp
+Firmware/.vscode/extensions.json
+.DS_Store
