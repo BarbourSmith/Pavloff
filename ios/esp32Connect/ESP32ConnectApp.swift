@@ -11,7 +11,7 @@ import SwiftUI
 struct ESP32ConnectApp: App {
     var body: some Scene {
         WindowGroup {
-            AutoConnectDataDisplayView()
+            WorkoutView()
         }
     }
 }
