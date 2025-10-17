@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import CoreBluetooth
 
 struct AutoConnectDataDisplayView: View {
     @StateObject private var bleManager = BLEManager()
