@@ -14,6 +14,7 @@ struct AutoConnectDataDisplayView: View {
     @State private var isConnected: Bool = false
     @State private var connectedDevice: BLEDevice?
     @State private var scanTimer: Timer?
+    @State private var isScanning: Bool = false
     
     private let targetDeviceName = "ESP32_IMU_Stream"
     private let scanInterval: TimeInterval = 5.0
@@ -99,6 +100,28 @@ struct AutoConnectDataDisplayView: View {
         .onDisappear {
             cleanup()
         }
+        .onChange(of: bleManager.connectionStatuses) { _ in
+            // Monitor for disconnections
+            if isConnected, let device = connectedDevice {
+                if let status = bleManager.connectionStatuses[device.id] {
+                    if case .disconnected = status {
+                        handleDisconnection()
+                    } else if case .failed = status {
+                        handleDisconnection()
+                    }
+                } else {
+                    // Status removed means device disconnected
+                    handleDisconnection()
+                }
+            }
+        }
+    }
+    
+    private func handleDisconnection() {
+        print("[AUTO-CONNECT] Device disconnected, resuming scan...")
+        isConnected = false
+        connectedDevice = nil
+        connectionStatus = "Device disconnected. Reconnecting..."
     }
     
     private func startAutoConnect() {
@@ -128,26 +151,34 @@ struct AutoConnectDataDisplayView: View {
             return
         }
         
+        // Prevent starting a new scan if one is already in progress
+        guard !isScanning else {
+            print("[AUTO-CONNECT] Scan already in progress, skipping")
+            return
+        }
+        
+        isScanning = true
         connectionStatus = "Scanning for \(targetDeviceName)..."
         print("[AUTO-CONNECT] Scanning for \(targetDeviceName)...")
         
         // Clear previous devices
         bleManager.discoveredDevices.removeAll()
         
-        // Start scanning
-        bleManager.startScanning()
+        // Start scanning (without BLEManager's internal timeout)
+        bleManager.startScanningWithoutTimeout()
         
         // Check for target device after scan timeout
         DispatchQueue.main.asyncAfter(deadline: .now() + AppConfig.BLE.scanTimeout) {
+            self.isScanning = false
             bleManager.stopScanning()
             
             // Look for target device
-            if let targetDevice = bleManager.discoveredDevices.first(where: { $0.name == targetDeviceName }) {
+            if let targetDevice = bleManager.discoveredDevices.first(where: { $0.name == self.targetDeviceName }) {
                 print("[AUTO-CONNECT] Target device found!")
-                connectToDevice(targetDevice)
-            } else if !isConnected {
+                self.connectToDevice(targetDevice)
+            } else if !self.isConnected {
                 print("[AUTO-CONNECT] Target device not found, will retry...")
-                connectionStatus = "\(targetDeviceName) not found. Will retry..."
+                self.connectionStatus = "\(self.targetDeviceName) not found. Will retry..."
             }
         }
     }
@@ -199,6 +230,7 @@ struct AutoConnectDataDisplayView: View {
     
     private func cleanup() {
         print("[AUTO-CONNECT] Cleaning up...")
+        isScanning = false
         scanTimer?.invalidate()
         scanTimer = nil
         bleManager.stopScanning()
