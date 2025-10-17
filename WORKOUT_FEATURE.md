@@ -144,7 +144,7 @@ UI Updates (reactive via @Published)
 - Verify device is still connected
 
 ### App Crashes
-- Ensure iOS 15.0 or later
+- Ensure iOS 16.0 or later
 - Check Bluetooth permissions are granted
 - Try force-quitting and reopening the app
 

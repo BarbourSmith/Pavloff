@@ -1,7 +1,7 @@
 # ESP32 Connect - Native Swift iOS App
 
 **Version:** 2.1 (Workout Tracking)  
-**Platform:** iOS 15.0+  
+**Platform:** iOS 16.0+  
 **Language:** Swift 5.0+ with SwiftUI
 
 ## Overview
@@ -125,7 +125,7 @@ Example: `Count:5,State:UP`
 ### Prerequisites
 - macOS 13.0 or later
 - Xcode 15.0 or later
-- iOS device running iOS 15.0 or later (BLE requires a physical device)
+- iOS device running iOS 16.0 or later (BLE requires a physical device)
 
 ### Build Instructions
 
@@ -296,7 +296,7 @@ This app replaces the previous React Native implementation with a native Swift a
 
 ## Requirements
 
-- **Minimum iOS Version**: 15.0
+- **Minimum iOS Version**: 16.0
 - **Device**: Physical iOS device (BLE not available in simulator)
 - **Bluetooth**: BLE 4.0 or later
 - **Permissions**: Bluetooth usage must be granted

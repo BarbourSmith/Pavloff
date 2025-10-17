@@ -139,7 +139,7 @@ Prevents false triggers and ensures accurate exercise advancement:
 ## Testing Requirements
 
 ### Hardware Prerequisites
-- Physical iOS device (iOS 15.0+)
+- Physical iOS device (iOS 16.0+)
 - ESP32 sensor broadcasting as "ESP32_IMU_Stream"
 - Bluetooth enabled on iPhone
 

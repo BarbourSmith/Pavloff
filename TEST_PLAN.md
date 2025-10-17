@@ -106,7 +106,7 @@ The app has been updated to support multi-exercise workout tracking with configu
 5. Continue workout from 0
 
 ## Device Requirements
-- Physical iOS device (iOS 15.0+) - BLE requires physical device
+- Physical iOS device (iOS 16.0+) - BLE requires physical device
 - ESP32 device broadcasting as "ESP32_IMU_Stream"
 - ESP32 must send rep count data in format: "Count:X,State:Y"
 

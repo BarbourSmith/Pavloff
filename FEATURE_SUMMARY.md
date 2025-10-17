@@ -128,7 +128,7 @@ App Launch → WorkoutView (auto-connect)
 ## Testing Requirements
 
 ### Prerequisites
-- Physical iOS device (iOS 15.0+)
+- Physical iOS device (iOS 16.0+)
 - Xcode 15.0 or later
 - ESP32 device configured as "ESP32_IMU_Stream"
 - ESP32 firmware sending rep data in format: "Count:X,State:Y"

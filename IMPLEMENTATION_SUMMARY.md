@@ -129,7 +129,7 @@ Congratulations Screen!
 ## Testing Notes
 
 The implementation is complete and should work correctly on a physical iOS device with:
-- iOS 15.0 or later
+- iOS 16.0 or later
 - Bluetooth enabled
 - ESP32 device broadcasting as "ESP32_IMU_Stream"
 - ESP32 sending rep data in "Count:X,State:Y" format
