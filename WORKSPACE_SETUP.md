@@ -18,11 +18,28 @@ A workspace file allows you to:
    - Any other extensions you use for React Native development
 
 2. **Open the Workspace:**
+   
+   **Method A: Direct Open**
    - Launch VS Code
    - Go to **File → Open Workspace from File**
    - Navigate to the repository root
    - Select `Exercise-App.code-workspace`
    - Click "Open"
+   
+   **Method B: From GitHub Desktop**
+   - Open the repository in GitHub Desktop
+   - Click "Repository → Open in Visual Studio Code"
+   - VS Code opens the root folder
+   - Press `Ctrl+Shift+P` / `Cmd+Shift+P` to open Command Palette
+   - Type "Tasks: Run Task"
+   - Select "Open Multi-Root Workspace"
+   - VS Code will reopen with the workspace loaded
+   
+   **Method C: Quick Task (after opening from GitHub Desktop)**
+   - After GitHub Desktop opens VS Code
+   - Press `Ctrl+Shift+P` / `Cmd+Shift+P`
+   - Type "task" and select "Tasks: Run Task"
+   - Choose "Open Multi-Root Workspace"
 
 ### What You'll See
 
@@ -72,6 +89,44 @@ After opening the workspace, you'll have two folders in the Explorer:
 ❌ Can't see or edit mobile app code  
 ❌ Need separate VS Code window for app development  
 ❌ Less convenient for full-stack work  
+
+## GitHub Desktop Integration
+
+### The Challenge
+
+When you use **"Repository → Open in Visual Studio Code"** from GitHub Desktop, it opens the repository root as a **folder**, not as a **workspace**. This means PlatformIO won't automatically detect the Firmware subfolder.
+
+### The Solution
+
+We've added a VS Code task that makes switching to the workspace easy:
+
+1. **Open from GitHub Desktop** (opens as folder)
+2. **Switch to workspace:**
+   - Press `Ctrl+Shift+P` / `Cmd+Shift+P`
+   - Type: `task` or `Tasks: Run Task`
+   - Select: **"Open Multi-Root Workspace"**
+3. **VS Code reopens** with the workspace loaded
+4. **PlatformIO activates** automatically for the Firmware folder
+
+### Why This Works
+
+- The repository root now has a `.vscode/tasks.json` file
+- This file defines a task that opens the workspace file
+- The task can be run from the Command Palette
+- VS Code reopens with the proper workspace configuration
+- PlatformIO detects the Firmware folder automatically
+
+### Quick Reference
+
+**After opening from GitHub Desktop:**
+
+```
+Ctrl+Shift+P (Cmd+Shift+P on Mac)
+→ "Tasks: Run Task"
+→ "Open Multi-Root Workspace"
+```
+
+That's it! VS Code will reload with both the app and firmware accessible, and PlatformIO will work.
 
 ## Customizing the Workspace
 

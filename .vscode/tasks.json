@@ -1,0 +1,19 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Open Multi-Root Workspace",
+      "type": "shell",
+      "command": "code",
+      "args": [
+        "${workspaceFolder}/Exercise-App.code-workspace"
+      ],
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "never",
+        "panel": "dedicated"
+      },
+      "detail": "Opens the multi-root workspace for both app and firmware development"
+    }
+  ]
+}

@@ -30,6 +30,21 @@ This repository contains both the mobile app and ESP32 firmware:
 - PlatformIO will detect and configure the project
 - See [Firmware/README.md](Firmware/README.md) for details
 
+**Using GitHub Desktop?**
+
+If you use "Repository → Open in Visual Studio Code" from GitHub Desktop:
+
+1. This opens the repository root (not the workspace)
+2. To enable PlatformIO support, switch to the workspace:
+   - Press `Ctrl+Shift+P` / `Cmd+Shift+P`
+   - Type "Tasks: Run Task"
+   - Select "Open Multi-Root Workspace"
+   
+   OR manually: File → Open Workspace from File → Select `Exercise-App.code-workspace`
+
+3. VS Code will reopen with both app and firmware accessible
+4. PlatformIO will automatically detect the Firmware folder
+
 ## Features
 
 - **Automatic device discovery** - Continuously scans for ESP32_IMU_Stream device
