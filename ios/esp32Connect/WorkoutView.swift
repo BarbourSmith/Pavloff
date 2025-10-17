@@ -21,7 +21,8 @@ struct WorkoutView: View {
     @State private var showingCongratulations = false
     @State private var lastRepCount = 0
     
-    private let targetDeviceName = "Pavloff Workout Sensor"
+    // Accept both old and new device names for backward compatibility
+    private let targetDeviceNames = ["Pavloff Workout Sensor", "ESP32_IMU_Stream"]
     private let scanInterval: TimeInterval = 5.0
     
     private var currentExercise: Exercise {
@@ -197,7 +198,7 @@ struct WorkoutView: View {
                                 .scaleEffect(1.5)
                                 .padding(.bottom, 20)
                             
-                            Text("Waiting for \(targetDeviceName)")
+                            Text("Waiting for sensor...")
                                 .font(.title3)
                                 .foregroundColor(.gray)
                                 .multilineTextAlignment(.center)
@@ -325,7 +326,7 @@ struct WorkoutView: View {
     }
     
     private func startAutoConnect() {
-        print("[WORKOUT] Starting auto-connect for \(targetDeviceName)")
+        print("[WORKOUT] Starting auto-connect for Pavloff sensors")
         
         scanForTargetDevice()
         
@@ -355,8 +356,8 @@ struct WorkoutView: View {
         }
         
         isScanning = true
-        connectionStatus = "Scanning for \(targetDeviceName)..."
-        print("[WORKOUT] Scanning for \(targetDeviceName)...")
+        connectionStatus = "Scanning for sensor..."
+        print("[WORKOUT] Scanning for Pavloff sensors...")
         
         bleManager.discoveredDevices.removeAll()
         bleManager.startScanningWithoutTimeout()
@@ -365,12 +366,16 @@ struct WorkoutView: View {
             self.isScanning = false
             bleManager.stopScanning()
             
-            if let targetDevice = bleManager.discoveredDevices.first(where: { $0.name == self.targetDeviceName }) {
-                print("[WORKOUT] Target device found!")
+            // Look for device with any of the accepted names
+            if let targetDevice = bleManager.discoveredDevices.first(where: { device in
+                self.targetDeviceNames.contains(device.name)
+            }) {
+                print("[WORKOUT] Target device found: \(targetDevice.name)")
+                self.connectionStatus = "Found \(targetDevice.name)"
                 self.connectToDevice(targetDevice)
             } else if !self.isConnected {
                 print("[WORKOUT] Target device not found, will retry...")
-                self.connectionStatus = "\(self.targetDeviceName) not found. Will retry..."
+                self.connectionStatus = "Device not found. Will retry..."
             }
         }
     }

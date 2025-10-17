@@ -8,7 +8,6 @@
 #include <esp_pm.h>
 #include <esp_sleep.h>
 #include <Preferences.h>
-#include <esp_gap_ble_api.h>
 
 // Pin configuration - defined via PlatformIO build flags
 #ifndef SDA_PIN
@@ -555,17 +554,8 @@ void setup() {
 
 
   // --- BLE Setup ---
-  // Completely deinit and reinit BLE to ensure device name change takes effect
-  // This clears any cached configuration including the old device name
-  BLEDevice::deinit(false);
-  delay(100);  // Short delay to ensure clean shutdown
-  
-  // Create the BLE Device with new name
-  BLEDevice::init("Pavloff Workout Sensor");
-  
-  // Explicitly set the device name to ensure it's properly registered
-  esp_ble_gap_set_device_name("Pavloff Workout Sensor");
-  Serial.println("BLE device name set to: Pavloff Workout Sensor");
+  // Create the BLE Device
+  BLEDevice::init("ESP32_IMU_Stream");
   
   // Set BLE power to minimum (can increase if needed for range)
   // ESP_PWR_LVL_N12 to ESP_PWR_LVL_P9 (lower = less power)
