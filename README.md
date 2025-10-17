@@ -1,162 +1,228 @@
-# ESP32 Connect - BLE IMU Data Monitor
+# ESP32 Connect - Native Swift iOS App
 
-**Version:** 3.0  
-**Platform:** React Native (iOS & Android)
+**Version:** 2.0  
+**Platform:** iOS 15.0+  
+**Language:** Swift 5.0+ with SwiftUI
 
 ## Overview
 
-ESP32 Connect is a **React Native application** that enables real-time monitoring of exercise rep counts from an ESP32 device via Bluetooth Low Energy (BLE). The app automatically scans for and connects to a device named "ESP32_IMU_Stream" and displays rep counting data in real-time.
+ESP32 Connect is a native Swift iOS application that enables real-time monitoring of IMU (Inertial Measurement Unit) sensor data from ESP32 devices via Bluetooth Low Energy (BLE). The app can simultaneously connect to and monitor data from up to 2 ESP32 devices, displaying accelerometer and gyroscope readings in real-time.
+
+This is a complete native Swift rewrite of the original React Native application, providing better performance, native iOS UI/UX, and simplified architecture.
 
 ## Features
 
-- **Automatic device discovery** - Continuously scans for ESP32_IMU_Stream device
-- **Auto-connect** - Automatically connects when target device is found
-- **Single screen interface** - Simplified UI with no manual navigation needed
-- **Real-time rep counting** - Displays exercise rep counts and state (UP/DOWN/IDLE)
-- **Auto-reconnect** - Automatically retries connection if device disconnects
-- **Comprehensive error handling** - User-friendly feedback for connection issues
-- **Cross-platform** - Works on both iOS and Android
+- **Native iOS Experience**: Built entirely with SwiftUI for a smooth, native iOS experience
+- **BLE Device Scanning**: Automatic discovery of ESP32 BLE devices broadcasting IMU data
+- **Multi-Device Support**: Connect and monitor up to 2 devices simultaneously
+- **Real-Time Data Monitoring**: Live display of accelerometer and gyroscope readings
+- **Connection Management**: Automatic connection handling with status feedback
+- **Clean Architecture**: Separation of concerns with dedicated managers, models, and views
 
 ## Technology Stack
 
-- **React Native** - Cross-platform mobile framework
-- **React** 19.0 - Modern UI library
-- **react-native-ble-plx** - BLE library for device communication
-- **Expo** - Development and build toolchain
+- **SwiftUI**: Modern declarative UI framework for iOS
+- **CoreBluetooth**: Native iOS framework for Bluetooth LE communication
+- **Combine**: Reactive framework for handling asynchronous events
+- **Swift**: Type-safe, modern programming language
 
 ## App Architecture
 
-### Single Screen Design
-The app uses a single screen that handles:
-1. **Auto-scanning** - Periodic BLE scanning for target device
-2. **Auto-connection** - Automatic connection when device is found
-3. **Data Display** - Real-time rep counter with state indicator
+### Files Structure
 
-### Core Components
-- **App.js** - Main app entry with permissions handling
-- **DataDisplayScreen.js** - Single screen with auto-connect and data display
-- **bleService.js** - BLE manager for device operations
-- **appConfig.js** - Centralized configuration and constants
+```
+ios/esp32Connect/
+├── ESP32ConnectApp.swift      # Main app entry point
+├── AppDelegate.swift           # App lifecycle delegate
+├── SceneDelegate.swift         # Scene lifecycle delegate
+├── AppConfig.swift             # Configuration constants
+├── Models.swift                # Data models
+├── BLEManager.swift            # Bluetooth LE manager
+├── HomeView.swift              # Device scanning screen
+├── ConnectionView.swift        # Connection status screen
+└── DataDisplayView.swift       # Data display screen
+```
 
-### Key Features
-- **Automatic Connection** - No user interaction needed for scanning/connecting
-- **Periodic Scanning** - Scans every 5 seconds when not connected
-- **Single Screen UI** - Entire app in one view for simplicity
-- **Error Recovery** - Automatic retry on connection failure
+### Key Components
+
+#### 1. **BLEManager**
+Central manager for all Bluetooth operations:
+- Device scanning and discovery
+- Connection management
+- Service and characteristic discovery
+- Real-time data parsing and updates
+
+#### 2. **Views**
+- **HomeView**: Device scanning and selection interface
+- **ConnectionView**: Shows connection progress for selected devices
+- **DataDisplayView**: Real-time display of IMU sensor data
+
+#### 3. **Models**
+- **BLEDevice**: Represents a discovered BLE device
+- **SensorData**: Contains parsed accelerometer/gyroscope data
+- **DeviceData**: Aggregates all data for a connected device
+- **ConnectionStatus**: Tracks device connection state
 
 ## ESP32 Requirements
 
-Your ESP32 device should:
+Your ESP32 devices must implement the following BLE service and characteristics:
 
-### Device Name
-- **Name**: `ESP32_IMU_Stream` (exact match required for auto-connect)
+### BLE Service UUID
+```
+4fafc201-1fb5-459e-8fcc-c5c9c331914b
+```
 
-### BLE Service
-- **Service UUID**: `4fafc201-1fb5-459e-8fcc-c5c9c331914b`
+### Characteristics
+- **Accelerometer**: `beb5483e-36e1-4688-b7f5-ea07361b26a8`
+- **Gyroscope**: `beb5483e-36e1-4688-b7f5-ea07361b26a9`
 
-### Characteristics  
-- **Rep Counter Characteristic**: First characteristic in the service
-  - Recommended UUID: `8d3f7a9e-4b2c-11ef-9f27-0242ac120002`
-  - Must support notifications/indications
+Both characteristics must support **notify** operations.
 
 ### Data Format
-The app expects rep counter data in this format:
+The app expects sensor data in comma-separated format:
 ```
-Count:value,State:value
+X:value,Y:value,Z:value
 ```
-Example: `Count:5,State:UP` or `Count:12,State:DOWN`
 
-Supported states: `UP`, `DOWN`, `IDLE`
+Example: `X:0.12,Y:-0.45,Z:9.81`
 
-## Installation & Setup
+## Building and Running
 
 ### Prerequisites
-- Node.js 18+ and npm
-- Expo CLI (`npm install -g expo-cli`)
-- iOS: Xcode and CocoaPods (for iOS development)
-- Android: Android Studio and SDK (for Android development)
+- macOS 13.0 or later
+- Xcode 15.0 or later
+- iOS device running iOS 15.0 or later (BLE requires a physical device)
 
-### Installation
-```bash
-# Install dependencies
-npm install
+### Build Instructions
 
-# For iOS (Mac only)
-cd ios && pod install && cd ..
+1. **Open the project**:
+   ```bash
+   cd ios
+   open esp32Connect.xcodeproj
+   ```
 
-# Start the development server
-npm start
+2. **Select your target**:
+   - In Xcode, select a physical iOS device (not simulator)
+   - BLE functionality requires a physical device for testing
 
-# Run on iOS
-npm run ios
+3. **Update signing**:
+   - Select the esp32Connect target
+   - Go to "Signing & Capabilities"
+   - Select your development team
 
-# Run on Android
-npm run android
+4. **Build and run**:
+   - Press Cmd+R or click the Run button
+   - The app will build and install on your device
+
+### Configuration
+
+Key configuration options are in `AppConfig.swift`:
+
+```swift
+struct BLE {
+    static let scanTimeout: TimeInterval = 10.0
+    static let connectionTimeout: TimeInterval = 15.0
+    static let maxRetryAttempts = 3
+}
+
+struct Devices {
+    static let maxSelectableDevices = 2
+    static let minSelectableDevices = 1
+}
 ```
 
 ## Usage
 
-1. Launch the app
-2. Grant Bluetooth permissions when prompted
-3. The app will automatically scan for "ESP32_IMU_Stream"
-4. When found, the app will automatically connect
-5. Rep count data will display in real-time
-6. If connection is lost, the app will automatically retry
+1. **Launch the app**
+   - Grant Bluetooth permissions when prompted
 
-The app requires no user interaction for scanning or connecting - it handles everything automatically!
+2. **Scan for devices**
+   - Tap "Scan for Devices" to start discovering ESP32 devices
+   - Scanning will automatically stop after 10 seconds
 
-## Configuration
+3. **Select devices**
+   - Tap on 1 or 2 devices to select them
+   - Selected devices are highlighted in blue
 
-Key configuration options in `config/appConfig.js`:
+4. **Connect**
+   - Tap "Proceed to Connect" to connect to selected devices
+   - Connection progress is shown for each device
 
-```javascript
-// Target device name
-const TARGET_DEVICE_NAME = 'ESP32_IMU_Stream';
+5. **View data**
+   - Once connected, tap "Show Data" to see real-time IMU readings
+   - Data updates automatically as it's received from devices
 
-// Scan interval when not connected (milliseconds)
-const SCAN_INTERVAL = 5000; // 5 seconds
-
-// BLE Service UUID
-UUIDS: {
-  IMU_SERVICE: '4fafc201-1fb5-459e-8fcc-c5c9c331914b',
-}
-```
-
-You can modify these values in the code if needed:
-- Change `TARGET_DEVICE_NAME` in `screens/DataDisplayScreen.js` to match your device name
-- Adjust `SCAN_INTERVAL` to change how frequently the app scans when disconnected
+6. **Stop monitoring**
+   - Tap "Stop Monitoring" to disconnect and return to scanning
 
 ## Troubleshooting
 
-**Device not found**: 
-- Ensure your ESP32 device is powered on and advertising
-- Verify the device name is exactly "ESP32_IMU_Stream"
-- Check that Bluetooth is enabled on your phone
+### No devices found
+- Ensure your ESP32 devices are powered on
+- Verify they're advertising the BLE service with correct UUID
+- Make sure Bluetooth is enabled on your iOS device
 
-**Connection failed**: 
-- Verify the ESP32 BLE service UUID matches `4fafc201-1fb5-459e-8fcc-c5c9c331914b`
-- Ensure the characteristic supports notifications
-- Check that the device is in range
+### Connection fails
+- Check that the ESP32 is still advertising
+- Verify the IMU service UUID matches: `4fafc201-1fb5-459e-8fcc-c5c9c331914b`
+- Try power cycling the ESP32 device
 
-**Permission denied**: 
-- Grant Bluetooth and location permissions in device settings
-- On Android 12+, ensure BLUETOOTH_SCAN and BLUETOOTH_CONNECT are granted
-- On Android 11 and below, ensure ACCESS_FINE_LOCATION is granted
+### No data displayed
+- Ensure characteristics support notify operations
+- Verify data format: `X:value,Y:value,Z:value`
+- Check ESP32 logs for transmission errors
 
-**No data displayed**:
-- Verify the ESP32 is sending data in the correct format: `Count:X,State:Y`
-- Check the console logs for data parsing errors
-- Ensure the characteristic has notifications enabled
+### Bluetooth permission denied
+- Go to Settings > Privacy & Security > Bluetooth
+- Enable Bluetooth access for ESP32 Connect
 
 ## Development Notes
 
-The app uses a simplified single-screen architecture:
-- No navigation stack needed
-- Auto-scan runs periodically in the background
-- Auto-connect triggers when target device is found
-- Connection state is managed automatically
+### Adding More Devices
+To support more than 2 devices, update in `AppConfig.swift`:
+```swift
+static let maxSelectableDevices = 4  // or your desired number
+```
 
-All BLE communication is handled through the `bleService.js` module which wraps the `react-native-ble-plx` library.
+### Customizing UUIDs
+If your ESP32 uses different UUIDs, update in `AppConfig.swift`:
+```swift
+struct UUIDs {
+    static let imuService = "your-service-uuid"
+    static let accelCharacteristic = "your-accel-uuid"
+    static let gyroCharacteristic = "your-gyro-uuid"
+}
+```
+
+### UI Customization
+All views are built with SwiftUI and can be easily customized:
+- Colors and styling in view files
+- Layout in SwiftUI view structs
+- Navigation flow in NavigationStack
+
+## Migration from React Native
+
+This app replaces the previous React Native implementation with a native Swift application:
+
+### Benefits
+- **Better Performance**: Native Swift code runs faster than JavaScript bridge
+- **Smaller App Size**: No React Native framework bundled
+- **Native UI**: True iOS look and feel with SwiftUI
+- **Simpler Build**: No Node.js, npm, or Metro bundler required
+- **Better Debugging**: Native Xcode debugging tools
+
+### Key Differences
+- Pure Swift/SwiftUI instead of React/JavaScript
+- CoreBluetooth instead of react-native-ble-plx
+- Native iOS navigation instead of React Navigation
+- Xcode-only build process (no npm/node required)
+
+## Requirements
+
+- **Minimum iOS Version**: 15.0
+- **Device**: Physical iOS device (BLE not available in simulator)
+- **Bluetooth**: BLE 4.0 or later
+- **Permissions**: Bluetooth usage must be granted
 
 ## License
 
@@ -164,4 +230,4 @@ Proprietary software developed for BarbourSmith.
 
 ---
 
-ESP32 Connect v3.0 - React Native Auto-Connect App
+ESP32 Connect v2.0 - Native Swift iOS App

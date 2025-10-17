@@ -1,6 +1,3 @@
-# Node modules (from old React Native app)
-/node_modules
-
 # Xcode
 *.xcworkspace
 !default.xcworkspace
@@ -13,7 +10,6 @@ DerivedData/
 *.xcscmblueprint
 
 # iOS
-Pods/
 *.pbxuser
 !default.pbxuser
 *.mode1v3
@@ -29,7 +25,6 @@ Pods/
 # Temporary files
 /tmp
 Firmware/.vscode/extensions.json
-.DS_Store
 
 # CodeQL artifacts
 _codeql_detected_source_root
