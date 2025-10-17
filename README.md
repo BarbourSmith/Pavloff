@@ -1,21 +1,33 @@
 # ESP32 Connect - Native Swift iOS App
 
-**Version:** 2.0  
-**Platform:** iOS 15.0+  
+**Version:** 2.1 (Workout Tracking)  
+**Platform:** iOS 16.0+  
 **Language:** Swift 5.0+ with SwiftUI
 
 ## Overview
 
-ESP32 Connect is a native Swift iOS application that enables real-time monitoring of IMU (Inertial Measurement Unit) sensor data from ESP32 devices via Bluetooth Low Energy (BLE). The app can simultaneously connect to and monitor data from up to 2 ESP32 devices, displaying accelerometer and gyroscope readings in real-time.
+ESP32 Connect is a native Swift iOS application designed for workout tracking using free weights with ESP32-based motion sensors. The app automatically tracks your reps through multiple exercises, providing real-time feedback and progression through your workout routine.
 
 This is a complete native Swift rewrite of the original React Native application, providing better performance, native iOS UI/UX, and simplified architecture.
 
-## Features
+## 🆕 Workout Tracking Features
+
+- **🏋️ Multi-Exercise Workouts**: Track progress through multiple exercises in sequence
+- **📊 Real-Time Rep Counting**: Automatic rep detection with large, easy-to-read display
+- **🎯 Customizable Targets**: Set target reps for each exercise (1-50 range)
+- **➡️ Auto-Progression**: Automatically advances to next exercise when target reached
+- **📈 Visual Progress**: Progress dots and bar show workout completion
+- **🎉 Celebration Screen**: Congratulations display when workout is complete
+- **⚙️ Mid-Workout Adjustments**: Change targets without losing progress
+- **🔄 Quick Reset**: Restart current exercise with one tap
+
+See [WORKOUT_FEATURE.md](WORKOUT_FEATURE.md) for complete feature guide.
+
+## Core Features
 
 - **Native iOS Experience**: Built entirely with SwiftUI for a smooth, native iOS experience
-- **BLE Device Scanning**: Automatic discovery of ESP32 BLE devices broadcasting IMU data
-- **Multi-Device Support**: Connect and monitor up to 2 devices simultaneously
-- **Real-Time Data Monitoring**: Live display of accelerometer and gyroscope readings
+- **BLE Auto-Connect**: Automatic discovery and connection to ESP32 devices
+- **Real-Time Data Monitoring**: Live display of rep count and movement state
 - **Connection Management**: Automatic connection handling with status feedback
 - **Clean Architecture**: Separation of concerns with dedicated managers, models, and views
 
@@ -32,40 +44,58 @@ This is a complete native Swift rewrite of the original React Native application
 
 ```
 ios/esp32Connect/
-├── ESP32ConnectApp.swift      # Main app entry point
-├── AppDelegate.swift           # App lifecycle delegate
-├── SceneDelegate.swift         # Scene lifecycle delegate
-├── AppConfig.swift             # Configuration constants
-├── Models.swift                # Data models
-├── BLEManager.swift            # Bluetooth LE manager
-├── HomeView.swift              # Device scanning screen
-├── ConnectionView.swift        # Connection status screen
-└── DataDisplayView.swift       # Data display screen
+├── ESP32ConnectApp.swift          # Main app entry point
+├── AppDelegate.swift               # App lifecycle delegate
+├── SceneDelegate.swift             # Scene lifecycle delegate
+├── AppConfig.swift                 # Configuration constants
+├── Models.swift                    # Data models (including Exercise & WorkoutSettings)
+├── BLEManager.swift                # Bluetooth LE manager
+├── WorkoutView.swift               # 🆕 Main workout tracking screen
+├── SetupView.swift                 # 🆕 Exercise configuration screen
+├── CongratulationsView.swift      # 🆕 Workout completion screen
+├── AutoConnectDataDisplayView.swift # Legacy auto-connect view
+├── HomeView.swift                  # Device scanning screen
+├── ConnectionView.swift            # Connection status screen
+└── DataDisplayView.swift           # Data display screen
 ```
 
 ### Key Components
 
-#### 1. **BLEManager**
+#### 1. **Workout System** 🆕
+Main workout tracking functionality:
+- **WorkoutView**: Primary screen for workout tracking with auto-progression
+- **SetupView**: Configuration screen for setting exercise targets
+- **CongratulationsView**: Celebration screen on workout completion
+- **Exercise Model**: Represents individual exercises with target reps
+- **WorkoutSettings Model**: Manages workout configuration
+
+#### 2. **BLEManager**
 Central manager for all Bluetooth operations:
 - Device scanning and discovery
 - Connection management
 - Service and characteristic discovery
 - Real-time data parsing and updates
+- Rep count tracking and reset functionality
 
-#### 2. **Views**
-- **HomeView**: Device scanning and selection interface
-- **ConnectionView**: Shows connection progress for selected devices
-- **DataDisplayView**: Real-time display of IMU sensor data
+#### 3. **Views**
+- **WorkoutView**: Main workout tracking interface (default screen)
+- **SetupView**: Exercise configuration and target setting
+- **CongratulationsView**: Workout completion celebration
+- **HomeView**: Device scanning and selection interface (legacy)
+- **ConnectionView**: Shows connection progress for selected devices (legacy)
+- **DataDisplayView**: Real-time display of IMU sensor data (legacy)
 
-#### 3. **Models**
+#### 4. **Models**
+- **Exercise**: Represents a workout exercise with name and target reps
+- **WorkoutSettings**: Manages collection of exercises with defaults
 - **BLEDevice**: Represents a discovered BLE device
-- **SensorData**: Contains parsed accelerometer/gyroscope data
+- **SensorData**: Contains parsed sensor data (count and state)
 - **DeviceData**: Aggregates all data for a connected device
 - **ConnectionStatus**: Tracks device connection state
 
 ## ESP32 Requirements
 
-Your ESP32 devices must implement the following BLE service and characteristics:
+Your ESP32 device must implement the following BLE service and characteristics for workout tracking:
 
 ### BLE Service UUID
 ```
@@ -73,25 +103,29 @@ Your ESP32 devices must implement the following BLE service and characteristics:
 ```
 
 ### Characteristics
-- **Accelerometer**: `beb5483e-36e1-4688-b7f5-ea07361b26a8`
-- **Gyroscope**: `beb5483e-36e1-4688-b7f5-ea07361b26a9`
+- **Rep Counter**: `8d3f7a9e-4b2c-11ef-9f27-0242ac120002`
 
-Both characteristics must support **notify** operations.
+The characteristic must support **notify** operations.
 
 ### Data Format
-The app expects sensor data in comma-separated format:
+The app expects rep counting data in comma-separated format:
 ```
-X:value,Y:value,Z:value
+Count:value,State:value
 ```
 
-Example: `X:0.12,Y:-0.45,Z:9.81`
+Example: `Count:5,State:UP`
+
+**States**:
+- `UP`: Upward motion detected
+- `DOWN`: Downward motion detected
+- `IDLE`: No significant motion
 
 ## Building and Running
 
 ### Prerequisites
 - macOS 13.0 or later
 - Xcode 15.0 or later
-- iOS device running iOS 15.0 or later (BLE requires a physical device)
+- iOS device running iOS 16.0 or later (BLE requires a physical device)
 
 ### Build Instructions
 
@@ -132,6 +166,36 @@ struct Devices {
 ```
 
 ## Usage
+
+### 🏋️ Workout Tracking Mode (Default)
+
+1. **Launch the app**
+   - App opens directly to the Workout Screen
+   - Automatically scans for ESP32 device named "ESP32_IMU_Stream"
+
+2. **Configure your workout (optional)**
+   - Tap "Workout Settings" to adjust target reps
+   - Set targets for each exercise (1-50 reps)
+   - Tap "Start Workout" to return
+
+3. **Perform your workout**
+   - Exercise name and progress dots show your position
+   - Large counter displays current/target reps (e.g., "5 / 10")
+   - Progress bar fills as you complete reps
+   - App automatically advances to next exercise when target reached
+
+4. **Complete workout**
+   - Congratulations screen appears after last exercise
+   - View workout summary
+   - Tap "Start New Workout" to do another set
+
+5. **Mid-workout controls**
+   - Tap "Reset Exercise" to restart current exercise
+   - Tap "Workout Settings" to adjust targets
+
+For detailed usage guide, see [WORKOUT_FEATURE.md](WORKOUT_FEATURE.md).
+
+### 📱 Legacy Device Management Mode
 
 1. **Launch the app**
    - Grant Bluetooth permissions when prompted
@@ -217,12 +281,26 @@ This app replaces the previous React Native implementation with a native Swift a
 - Native iOS navigation instead of React Navigation
 - Xcode-only build process (no npm/node required)
 
+## Documentation
+
+### Workout Tracking Feature
+- **[WORKOUT_FEATURE.md](WORKOUT_FEATURE.md)**: Complete user guide with quick start, tips, and troubleshooting
+- **[TEST_PLAN.md](TEST_PLAN.md)**: Comprehensive testing guide with test cases and workflows
+- **[WORKOUT_SCREENS.md](WORKOUT_SCREENS.md)**: Visual mockups and screen flow diagrams
+- **[IMPLEMENTATION_SUMMARY.md](IMPLEMENTATION_SUMMARY.md)**: Technical architecture and implementation details
+- **[FEATURE_SUMMARY.md](FEATURE_SUMMARY.md)**: Executive summary and requirements fulfillment
+
+### Original Documentation
+- **[SCREEN_LAYOUTS.md](SCREEN_LAYOUTS.md)**: Legacy screen designs for device management mode
+- **Firmware docs**: See `/Firmware` directory for ESP32 implementation guides
+
 ## Requirements
 
-- **Minimum iOS Version**: 15.0
+- **Minimum iOS Version**: 16.0
 - **Device**: Physical iOS device (BLE not available in simulator)
 - **Bluetooth**: BLE 4.0 or later
 - **Permissions**: Bluetooth usage must be granted
+- **ESP32**: Device named "ESP32_IMU_Stream" for workout tracking
 
 ## License
 
@@ -230,4 +308,4 @@ Proprietary software developed for BarbourSmith.
 
 ---
 
-ESP32 Connect v2.0 - Native Swift iOS App
+ESP32 Connect v2.1 - Workout Tracking Edition - Native Swift iOS App
