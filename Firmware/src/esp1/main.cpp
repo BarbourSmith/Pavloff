@@ -9,8 +9,6 @@
 #include <esp_sleep.h>
 #include <Preferences.h>
 #include <esp_gap_ble_api.h>
-#include <nvs_flash.h>
-#include <nvs.h>
 
 // Pin configuration - defined via PlatformIO build flags
 #ifndef SDA_PIN
@@ -557,18 +555,17 @@ void setup() {
 
 
   // --- BLE Setup ---
-  // Erase BLE NVS namespace to ensure old device name is cleared
-  // Open NVS namespace and erase it to force the ESP32 to use the new name
-  nvs_handle_t nvs_handle;
-  if (nvs_open("esp_ble_host", NVS_READWRITE, &nvs_handle) == ESP_OK) {
-    nvs_erase_all(nvs_handle);
-    nvs_commit(nvs_handle);
-    nvs_close(nvs_handle);
-    Serial.println("BLE NVS namespace erased");
-  }
+  // Completely deinit and reinit BLE to ensure device name change takes effect
+  // This clears any cached configuration including the old device name
+  BLEDevice::deinit(false);
+  delay(100);  // Short delay to ensure clean shutdown
   
-  // Create the BLE Device
+  // Create the BLE Device with new name
   BLEDevice::init("Pavloff Workout Sensor");
+  
+  // Explicitly set the device name to ensure it's properly registered
+  esp_ble_gap_set_device_name("Pavloff Workout Sensor");
+  Serial.println("BLE device name set to: Pavloff Workout Sensor");
   
   // Set BLE power to minimum (can increase if needed for range)
   // ESP_PWR_LVL_N12 to ESP_PWR_LVL_P9 (lower = less power)
@@ -578,10 +575,6 @@ void setup() {
   // Create the BLE Server
   pServer = BLEDevice::createServer();
   pServer->setCallbacks(new MyServerCallbacks());
-  
-  // Explicitly set the device name after server creation to override any cached value
-  esp_ble_gap_set_device_name("Pavloff Workout Sensor");
-  Serial.println("BLE device name set to: Pavloff Workout Sensor");
 
   // Create the BLE Service
   BLEService *pService = pServer->createService(SERVICE_UUID);
