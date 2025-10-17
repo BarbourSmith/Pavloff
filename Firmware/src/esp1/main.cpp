@@ -10,6 +10,7 @@
 #include <Preferences.h>
 #include <esp_gap_ble_api.h>
 #include <nvs_flash.h>
+#include <nvs.h>
 
 // Pin configuration - defined via PlatformIO build flags
 #ifndef SDA_PIN
@@ -556,9 +557,15 @@ void setup() {
 
 
   // --- BLE Setup ---
-  // Erase BLE NVS to ensure old device name is cleared
-  // This forces the ESP32 to use the new name instead of cached value
-  nvs_flash_erase_key(NVS_DEFAULT_PART_NAME, "esp_ble_host");
+  // Erase BLE NVS namespace to ensure old device name is cleared
+  // Open NVS namespace and erase it to force the ESP32 to use the new name
+  nvs_handle_t nvs_handle;
+  if (nvs_open("esp_ble_host", NVS_READWRITE, &nvs_handle) == ESP_OK) {
+    nvs_erase_all(nvs_handle);
+    nvs_commit(nvs_handle);
+    nvs_close(nvs_handle);
+    Serial.println("BLE NVS namespace erased");
+  }
   
   // Create the BLE Device
   BLEDevice::init("Pavloff Workout Sensor");
