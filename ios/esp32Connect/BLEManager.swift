@@ -108,6 +108,28 @@ class BLEManager: NSObject, ObservableObject {
         }
     }
     
+    /// Reset rep count for a connected device
+    func resetRepCount(for deviceId: UUID) {
+        guard let peripheral = connectedPeripherals[deviceId],
+              let chars = characteristicMap[deviceId],
+              let repCharUUID = chars.accelUUID else {
+            print("[BLE] Cannot reset - device or characteristic not found")
+            return
+        }
+        
+        // Find the rep characteristic
+        guard let service = peripheral.services?.first(where: { $0.uuid == imuServiceUUID }),
+              let characteristic = service.characteristics?.first(where: { $0.uuid == repCharUUID }) else {
+            print("[BLE] Cannot find rep characteristic for reset")
+            return
+        }
+        
+        // Send RESET command
+        let resetData = "RESET".data(using: .utf8)!
+        peripheral.writeValue(resetData, for: characteristic, type: .withResponse)
+        print("[BLE] Sent RESET command to device: \(peripheral.name ?? "Unknown")")
+    }
+    
     /// Parse sensor data from characteristic value
     private func parseSensorData(from data: Data) -> SensorData? {
         guard let dataString = String(data: data, encoding: .utf8) else {

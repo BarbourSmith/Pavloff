@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, ScrollView, ActivityIndicator, Alert, TouchableOpacity } from 'react-native';
 import bleService from '../services/bleService';
 import { APP_CONFIG } from '../config/appConfig';
 
@@ -8,7 +8,7 @@ const IMU_SERVICE_UUID = APP_CONFIG.UUIDS.IMU_SERVICE;
 const TARGET_DEVICE_NAME = 'ESP32_IMU_Stream';
 const SCAN_INTERVAL = 5000; // Scan every 5 seconds when not connected
 
-const DataView = ({ deviceData, deviceName }) => {
+const DataView = ({ deviceData, deviceName, onReset }) => {
   const accelData = deviceData?.accel ?? null;
   const lastUpdate = deviceData?.lastUpdate;
 
@@ -64,6 +64,14 @@ const DataView = ({ deviceData, deviceName }) => {
           <Text style={styles.stateText}>{repData.state}</Text>
         </View>
         <Text style={styles.timestampText}>Last Update: {repData.timestamp}</Text>
+        
+        {/* Reset button */}
+        <TouchableOpacity 
+          style={styles.resetButton}
+          onPress={onReset}
+        >
+          <Text style={styles.resetButtonText}>Reset Count</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -104,6 +112,29 @@ const DataDisplayScreen = () => {
     }
     setConnectedDevice(null);
   }, [connectedDevice]);
+
+  // Function to reset rep count
+  const handleResetRepCount = useCallback(async () => {
+    if (!connectedDevice || !deviceCharacteristics?.accel) {
+      console.warn('Cannot reset - device or characteristics not available');
+      return;
+    }
+
+    try {
+      console.log('[RESET] Sending reset command to device...');
+      await bleService.writeToCharacteristic(
+        connectedDevice.id,
+        IMU_SERVICE_UUID,
+        deviceCharacteristics.accel,
+        'RESET'
+      );
+      console.log('[RESET] Reset command sent successfully');
+      Alert.alert('Success', 'Rep count has been reset');
+    } catch (error) {
+      console.error('[RESET ERROR] Failed to reset rep count:', error);
+      Alert.alert('Error', 'Failed to reset rep count. Please try again.');
+    }
+  }, [connectedDevice, deviceCharacteristics]);
 
   // Function to identify characteristics
   const identifyCharacteristics = (characteristics) => {
@@ -326,6 +357,7 @@ const DataDisplayScreen = () => {
             <DataView 
               deviceData={deviceData[connectedDevice.id]} 
               deviceName={connectedDevice.name}
+              onReset={handleResetRepCount}
             />
           </View>
         ) : (
@@ -451,6 +483,24 @@ const styles = StyleSheet.create({
     color: '#999',
     marginTop: 15,
     fontStyle: 'italic',
+  },
+  resetButton: {
+    backgroundColor: '#F44336',
+    paddingHorizontal: 30,
+    paddingVertical: 15,
+    borderRadius: 25,
+    marginTop: 25,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  resetButtonText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '600',
+    textAlign: 'center',
   },
 });
 
