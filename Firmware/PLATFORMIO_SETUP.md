@@ -39,13 +39,34 @@ PlatformIO is a professional collaborative platform for embedded development. It
 ## First-Time Setup
 
 When you first open the project, PlatformIO will:
-1. Download the ESP32 platform packages (espressif32@6.4.0)
-2. Install the required libraries:
+1. Detect the `platformio.ini` file and recognize this as a PlatformIO project
+2. Show a notification suggesting to install the PlatformIO IDE extension (if not already installed)
+3. Download the ESP32 platform packages (espressif32@6.4.0)
+4. Install the required libraries:
    - MPU6050_tockn
    - ESP32 BLE Arduino
-3. Configure the toolchain for ESP32-S3
+5. Configure the toolchain for ESP32-S3
 
 This process is automatic and may take 5-10 minutes depending on your internet connection.
+
+### Verifying PlatformIO Detection
+
+After opening the `Firmware` folder in VS Code, you should see:
+
+1. **PlatformIO icon** (alien head) in the left Activity Bar
+2. **PlatformIO toolbar** at the bottom with icons for:
+   - Build (✓ checkmark)
+   - Upload (→ arrow)
+   - Clean
+   - Test
+   - Serial Monitor (🔌 plug)
+3. **"PlatformIO" folder** in the VS Code Explorer sidebar (shows project tasks)
+
+If you don't see these, try:
+- Close and reopen VS Code
+- Check that the PlatformIO IDE extension is installed and enabled
+- Verify you opened the `Firmware` folder (not the repository root)
+- Check the VS Code status bar (bottom) for PlatformIO initialization messages
 
 ## Project Structure
 
