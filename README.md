@@ -13,6 +13,7 @@ ESP32 Connect is a **React Native application** that enables real-time monitorin
 - **Auto-connect** - Automatically connects when target device is found
 - **Single screen interface** - Simplified UI with no manual navigation needed
 - **Real-time rep counting** - Displays exercise rep counts and state (UP/DOWN/IDLE)
+- **Bidirectional communication** - Reset rep count from the app
 - **Auto-reconnect** - Automatically retries connection if device disconnects
 - **Comprehensive error handling** - User-friendly feedback for connection issues
 - **Cross-platform** - Works on both iOS and Android
@@ -101,7 +102,8 @@ npm run android
 3. The app will automatically scan for "ESP32_IMU_Stream"
 4. When found, the app will automatically connect
 5. Rep count data will display in real-time
-6. If connection is lost, the app will automatically retry
+6. Press "Reset Count" button to reset the counter to zero
+7. If connection is lost, the app will automatically retry
 
 The app requires no user interaction for scanning or connecting - it handles everything automatically!
 
@@ -157,6 +159,8 @@ The app uses a simplified single-screen architecture:
 - Connection state is managed automatically
 
 All BLE communication is handled through the `bleService.js` module which wraps the `react-native-ble-plx` library.
+
+For details on bidirectional communication and reset functionality, see [BIDIRECTIONAL_BLE.md](BIDIRECTIONAL_BLE.md).
 
 ## License
 

@@ -114,6 +114,12 @@ On startup, the device calibrates the gyroscope. **Keep the sensor stationary** 
 - Gyroscope data: `X:value,Y:value,Z:value` (in degrees/second)
 - Rep count data: `Count:value,State:state` (count is integer, state is IDLE/UP/DOWN)
 
+### Commands
+The device accepts write commands on the rep counter characteristic:
+- `RESET` or `reset` - Resets rep count to 0 and state to IDLE
+
+For more details on bidirectional communication, see [../BIDIRECTIONAL_BLE.md](../BIDIRECTIONAL_BLE.md)
+
 ## Applications
 
 This system is ideal for:
