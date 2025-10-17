@@ -23,8 +23,18 @@ This project implements real-time motion tracking on ESP32 microcontrollers usin
 
 - SDA: GPIO 8
 - SCL: GPIO 9
+- MPU-6050 INT: GPIO 18 (motion detection interrupt for wake-up)
 
 ## Features
+
+### Power Management
+Comprehensive power optimization for battery operation:
+- **Active Power Optimization**: Reduced CPU frequency (80 MHz), automatic light sleep, and optimized BLE power
+- **Automatic Deep Sleep**: Enters ultra-low power mode (< 50 μA) after 5 minutes of inactivity
+- **Wake-on-Motion**: MPU-6050 motion detection interrupt wakes device from deep sleep
+- **Extended Battery Life**: Up to 14 days on a 500 mAh battery with typical usage
+
+See [POWER_MANAGEMENT.md](POWER_MANAGEMENT.md) for detailed information.
 
 ### Workout Rep Detection
 Automatically counts workout repetitions using orientation-independent motion analysis:

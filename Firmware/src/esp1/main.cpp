@@ -5,6 +5,8 @@
 #include <BLEServer.h>
 #include <BLEUtils.h>
 #include <BLE2902.h>
+#include <esp_pm.h>
+#include <esp_sleep.h>
 
 // Pin configuration - defined via PlatformIO build flags
 #ifndef SDA_PIN
@@ -19,6 +21,26 @@
 
 // Power management constants
 #define IDLE_TIMEOUT_MS 300000  // 5 minutes in milliseconds
+
+// Power optimization settings
+void configurePowerOptimizations() {
+  // Reduce CPU frequency to save power (80 MHz is sufficient for this application)
+  // ESP32-S3 supports 240MHz, 160MHz, 80MHz, 40MHz, 20MHz, 10MHz
+  setCpuFrequencyMhz(80);
+  Serial.print("CPU frequency set to: ");
+  Serial.print(getCpuFrequencyMhz());
+  Serial.println(" MHz");
+  
+  // Enable automatic light sleep when idle
+  // This allows the CPU to enter light sleep between tasks
+  esp_pm_config_esp32s3_t pm_config;
+  pm_config.max_freq_mhz = 80;
+  pm_config.min_freq_mhz = 10;
+  pm_config.light_sleep_enable = true;
+  esp_pm_configure(&pm_config);
+  
+  Serial.println("Power optimizations configured");
+}
 
 // Create an MPU6050 object
 MPU6050 mpu(Wire);
@@ -413,6 +435,9 @@ void setup() {
   // Initialize Serial communication
   Serial.begin(115200);
   
+  // Configure power optimizations
+  configurePowerOptimizations();
+  
   // Check wake-up reason
   esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
   if (wakeup_reason == ESP_SLEEP_WAKEUP_EXT0) {
@@ -450,6 +475,11 @@ void setup() {
   // --- BLE Setup ---
   // Create the BLE Device
   BLEDevice::init("ESP32_IMU_Stream");
+  
+  // Set BLE power to minimum (can increase if needed for range)
+  // ESP_PWR_LVL_N12 to ESP_PWR_LVL_P9 (lower = less power)
+  BLEDevice::setPower(ESP_PWR_LVL_N0, ESP_BLE_PWR_TYPE_DEFAULT);
+  Serial.println("BLE power set to minimum for energy efficiency");
 
   // Create the BLE Server
   pServer = BLEDevice::createServer();
