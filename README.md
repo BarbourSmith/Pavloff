@@ -7,6 +7,15 @@
 
 ESP32 Connect is a **React Native application** that enables real-time monitoring of exercise rep counts from an ESP32 device via Bluetooth Low Energy (BLE). The app automatically scans for and connects to a device named "ESP32_IMU_Stream" and displays rep counting data in real-time.
 
+## Repository Structure
+
+This repository contains both the mobile app and ESP32 firmware:
+
+- **`/` (root)** - React Native mobile application for iOS & Android
+- **`Firmware/`** - ESP32 firmware for motion tracking and rep detection
+  - PlatformIO project ready to open in VS Code
+  - See [Firmware/README.md](Firmware/README.md) for setup instructions
+
 ## Features
 
 - **Automatic device discovery** - Continuously scans for ESP32_IMU_Stream device
@@ -47,6 +56,8 @@ The app uses a single screen that handles:
 ## ESP32 Requirements
 
 Your ESP32 device should:
+
+**💡 Note:** This repository includes ESP32 firmware in the `Firmware/` directory. See [Firmware/README.md](Firmware/README.md) for setup instructions with PlatformIO.
 
 ### Device Name
 - **Name**: `ESP32_IMU_Stream` (exact match required for auto-connect)
