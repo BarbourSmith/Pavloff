@@ -37,8 +37,7 @@ struct AutoConnectDataDisplayView: View {
                     Text(connectionStatus)
                         .font(.subheadline)
                         .foregroundColor(isConnected ? Color.white.opacity(0.9) : Color.white.opacity(0.8))
-                        .fontWeight(isConnected ? .semibold : .regular)
-                        .italic(!isConnected)
+                        .font(isConnected ? .subheadline.weight(.semibold) : .subheadline.weight(.regular))
                 }
             }
             .padding()
@@ -175,7 +174,7 @@ struct AutoConnectDataDisplayView: View {
                 connectionStatus = "Connected to \(device.name)"
                 print("[AUTO-CONNECT] Successfully connected to \(device.name)")
                 
-            case .connecting:
+            case .pending, .connecting, .discovering:
                 // Still connecting, check again later
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
                     checkConnectionStatus(device)
