@@ -252,6 +252,32 @@ const getBleState = async () => {
   }
 };
 
+// Write data to a characteristic
+const writeToCharacteristic = async (deviceId, serviceUUID, characteristicUUID, value) => {
+  try {
+    console.log(`[WRITE] Writing to characteristic: ${characteristicUUID}`);
+    console.log(`  Device: ${deviceId}`);
+    console.log(`  Service: ${serviceUUID}`);
+    console.log(`  Value: ${value}`);
+    
+    // Convert string to base64
+    const base64Value = Buffer.from(value, 'utf-8').toString('base64');
+    
+    await bleManager.writeCharacteristicWithResponseForDevice(
+      deviceId,
+      serviceUUID,
+      characteristicUUID,
+      base64Value
+    );
+    
+    console.log(`[WRITE SUCCESS] Successfully wrote to characteristic`);
+    return true;
+  } catch (error) {
+    console.error(`[WRITE ERROR] Failed to write to characteristic:`, error);
+    throw error;
+  }
+};
+
 export default {
   scanForDevices,
   stopScanning,
@@ -261,5 +287,6 @@ export default {
   stopMonitoring,
   stopAllMonitoring,
   getBleState,
+  writeToCharacteristic,
   CONFIG, // Export config for use in other components
 };
