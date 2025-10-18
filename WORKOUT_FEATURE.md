@@ -64,7 +64,7 @@ The app uses smart logic to prevent false triggers:
 ### ESP32 Integration
 Works seamlessly with your ESP32 sensor:
 - Auto-scans every 5 seconds when disconnected
-- Connects to device named "ESP32_IMU_Stream"
+- Connects to device named "Pavloff Workout Sensor"
 - Receives rep data in format: `Count:X,State:Y`
 - Handles disconnections gracefully with auto-reconnect
 
@@ -128,7 +128,7 @@ UI Updates (reactive via @Published)
 
 ### Device Won't Connect
 - Ensure ESP32 is powered on
-- Check device is named "ESP32_IMU_Stream"
+- Check device is named "Pavloff Workout Sensor"
 - Verify Bluetooth is enabled on iPhone
 - Try moving closer to the device
 

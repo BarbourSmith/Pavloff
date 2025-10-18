@@ -116,7 +116,7 @@ The project uses PlatformIO for dependency management. All required libraries (M
 On startup, the device calibrates the gyroscope. **Keep the sensor stationary** during this process (indicated by serial output).
 
 ### BLE Connection
-- ESP1 advertises as "ESP32_IMU_Stream"
+- ESP1 advertises as "Pavloff Workout Sensor"
 - Connect using BLE client to receive position and gyroscope data
 
 ### Data Format

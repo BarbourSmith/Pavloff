@@ -140,7 +140,7 @@ Prevents false triggers and ensures accurate exercise advancement:
 
 ### Hardware Prerequisites
 - Physical iOS device (iOS 16.0+)
-- ESP32 sensor broadcasting as "ESP32_IMU_Stream"
+- ESP32 sensor broadcasting as "Pavloff Workout Sensor"
 - Bluetooth enabled on iPhone
 
 ### ESP32 Data Format

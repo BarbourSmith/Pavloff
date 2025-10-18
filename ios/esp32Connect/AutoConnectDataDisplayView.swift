@@ -16,7 +16,8 @@ struct AutoConnectDataDisplayView: View {
     @State private var scanTimer: Timer?
     @State private var isScanning: Bool = false
     
-    private let targetDeviceName = "ESP32_IMU_Stream"
+    // Accept both old and new device names for backward compatibility
+    private let targetDeviceNames = ["Pavloff Workout Sensor", "ESP32_IMU_Stream"]
     private let scanInterval: TimeInterval = 5.0
     
     var body: some View {
@@ -88,7 +89,7 @@ struct AutoConnectDataDisplayView: View {
                             .scaleEffect(1.5)
                             .padding(.bottom, 20)
                         
-                        Text("Waiting for \(targetDeviceName)")
+                        Text("Waiting for sensor...")
                             .font(.title3)
                             .foregroundColor(.gray)
                             .multilineTextAlignment(.center)
@@ -143,7 +144,7 @@ struct AutoConnectDataDisplayView: View {
     }
     
     private func startAutoConnect() {
-        print("[AUTO-CONNECT] Starting auto-connect for \(targetDeviceName)")
+        print("[AUTO-CONNECT] Starting auto-connect for Pavloff sensors")
         
         // Start initial scan
         scanForTargetDevice()
@@ -176,8 +177,8 @@ struct AutoConnectDataDisplayView: View {
         }
         
         isScanning = true
-        connectionStatus = "Scanning for \(targetDeviceName)..."
-        print("[AUTO-CONNECT] Scanning for \(targetDeviceName)...")
+        connectionStatus = "Scanning for sensor..."
+        print("[AUTO-CONNECT] Scanning for Pavloff sensors...")
         
         // Clear previous devices
         bleManager.discoveredDevices.removeAll()
@@ -190,13 +191,16 @@ struct AutoConnectDataDisplayView: View {
             self.isScanning = false
             bleManager.stopScanning()
             
-            // Look for target device
-            if let targetDevice = bleManager.discoveredDevices.first(where: { $0.name == self.targetDeviceName }) {
-                print("[AUTO-CONNECT] Target device found!")
+            // Look for device with any of the accepted names
+            if let targetDevice = bleManager.discoveredDevices.first(where: { device in
+                self.targetDeviceNames.contains(device.name)
+            }) {
+                print("[AUTO-CONNECT] Target device found: \(targetDevice.name)")
+                self.connectionStatus = "Found \(targetDevice.name)"
                 self.connectToDevice(targetDevice)
             } else if !self.isConnected {
                 print("[AUTO-CONNECT] Target device not found, will retry...")
-                self.connectionStatus = "\(self.targetDeviceName) not found. Will retry..."
+                self.connectionStatus = "Device not found. Will retry..."
             }
         }
     }
