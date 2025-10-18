@@ -7,6 +7,7 @@
 
 import SwiftUI
 import CoreBluetooth
+import UIKit
 
 struct WorkoutView: View {
     @StateObject private var bleManager = BLEManager()
@@ -323,6 +324,9 @@ struct WorkoutView: View {
         isConnected = false
         connectedDevice = nil
         connectionStatus = "Device disconnected. Reconnecting..."
+        // Re-enable screen sleep when disconnected
+        UIApplication.shared.isIdleTimerDisabled = false
+        print("[WORKOUT] Screen idle timer re-enabled")
     }
     
     private func startAutoConnect() {
@@ -399,6 +403,9 @@ struct WorkoutView: View {
                 connectedDevice = device
                 connectionStatus = "Connected to \(device.name)"
                 print("[WORKOUT] Successfully connected to \(device.name)")
+                // Prevent screen from sleeping during workout
+                UIApplication.shared.isIdleTimerDisabled = true
+                print("[WORKOUT] Screen idle timer disabled")
                 
             case .pending, .connecting, .discovering:
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
@@ -411,6 +418,9 @@ struct WorkoutView: View {
                 isConnected = false
                 connectedDevice = nil
                 bleManager.disconnect(from: device.id)
+                // Re-enable screen sleep when disconnected
+                UIApplication.shared.isIdleTimerDisabled = false
+                print("[WORKOUT] Screen idle timer re-enabled")
             }
         } else {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
@@ -426,6 +436,9 @@ struct WorkoutView: View {
         scanTimer = nil
         bleManager.stopScanning()
         bleManager.disconnectAll()
+        // Re-enable screen sleep when leaving workout view
+        UIApplication.shared.isIdleTimerDisabled = false
+        print("[WORKOUT] Screen idle timer re-enabled")
     }
 }
 
