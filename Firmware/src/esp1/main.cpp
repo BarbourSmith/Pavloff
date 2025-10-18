@@ -436,9 +436,13 @@ void configureMPUMotionInterrupt() {
   const uint8_t MPU6050_INT_ENABLE = 0x38;
   const uint8_t MPU6050_MOT_THR = 0x1F;
   const uint8_t MPU6050_MOT_DUR = 0x20;
+  const uint8_t MPU6050_MOT_DETECT_CTRL = 0x69;
   
-  // Configure interrupt pin (active high, push-pull, held until cleared)
-  mpu.writeMPU6050(MPU6050_INT_PIN_CFG, 0x20);
+  // Configure interrupt pin
+  // Bit 7 = 0 (active high), Bit 6 = 0 (push-pull), Bit 5 = 1 (latch until cleared)
+  // Bit 4 = 1 (clear on any read operation)
+  // This ensures interrupt stays high until ESP32 wakes and clears it
+  mpu.writeMPU6050(MPU6050_INT_PIN_CFG, 0x30);
   
   // Set motion detection threshold (0-255, LSB = 2mg)
   // Setting to 32 = 64mg threshold for motion detection
@@ -448,7 +452,13 @@ void configureMPUMotionInterrupt() {
   // Setting to 10 = 10ms of continuous motion required
   mpu.writeMPU6050(MPU6050_MOT_DUR, 10);
   
+  // Enable motion detection logic
+  // MOT_DETECT_CTRL (0x69): Bits 7-6 = 01 for motion detection decrement (1 count)
+  // Bits 5-4 = 01 for ACCEL_ON_DELAY (4ms delay)
+  mpu.writeMPU6050(MPU6050_MOT_DETECT_CTRL, 0x50);
+  
   // Enable motion detection interrupt
+  // INT_ENABLE (0x38): Bit 6 = 1 to enable motion detection interrupt
   mpu.writeMPU6050(MPU6050_INT_ENABLE, 0x40);
   
   Serial.println("MPU-6050 motion interrupt configured");
@@ -457,11 +467,14 @@ void configureMPUMotionInterrupt() {
 // Put MPU-6050 into low power mode with motion detection
 void putMPUToSleep() {
   // Enable cycle mode and set wake frequency
-  // Set cycle mode with 1.25Hz wake frequency
+  // PWR_MGMT_1: Bit 5 = CYCLE, Bits 7-6 = 00 (use internal oscillator)
+  // Bits 3-2 = 00 (wake frequency 1.25Hz)
+  // This sets cycle mode with 1.25Hz wake frequency
   mpu.writeMPU6050(MPU6050_PWR_MGMT_1, 0x20);
   
   // Enable accelerometer only, disable gyroscope
-  // MPU6050_PWR_MGMT_2 register address is 0x6C
+  // PWR_MGMT_2 register (0x6C): Bits 2-0 = 111 to disable gyroscope axes
+  // Bits 5-3 = 000 to enable all accelerometer axes
   mpu.writeMPU6050(0x6C, 0x07);
   
   Serial.println("MPU-6050 in low power mode");
@@ -469,11 +482,16 @@ void putMPUToSleep() {
 
 // Wake up MPU-6050 from low power mode
 void wakeMPUFromSleep() {
-  // Wake up MPU-6050
+  // Clear the motion detection interrupt status first
+  // Reading the INT_STATUS register (0x3A) clears the interrupt
+  const uint8_t MPU6050_INT_STATUS = 0x3A;
+  mpu.readMPU6050(MPU6050_INT_STATUS);
+  
+  // Wake up MPU-6050 by clearing SLEEP and CYCLE bits
   mpu.writeMPU6050(MPU6050_PWR_MGMT_1, 0x00);
   
-  // Enable all sensors
-  // MPU6050_PWR_MGMT_2 register address is 0x6C
+  // Enable all sensors (gyroscope and accelerometer)
+  // PWR_MGMT_2 register (0x6C): 0x00 enables all axes
   mpu.writeMPU6050(0x6C, 0x00);
   
   delay(100);  // Wait for sensor to stabilize
@@ -489,6 +507,9 @@ void enterDeepSleep() {
   
   // Put MPU-6050 into low power mode before sleeping
   putMPUToSleep();
+  
+  // Wait for MPU-6050 to enter low power mode
+  delay(50);
   
   // Configure GPIO18 (MPU_INT_PIN) as wake-up source
   // The interrupt is active high, so wake on high level
