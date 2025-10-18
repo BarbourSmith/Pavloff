@@ -60,6 +60,7 @@ Activity is detected from:
 - Threshold: 32 (×2mg = 64mg)
 - Duration: 10ms
 - Interrupt: Active high, latched until cleared
+- Motion detection logic enabled with decrement count of 1
 
 **Low Power Mode**:
 - Cycle mode enabled
@@ -100,6 +101,11 @@ mpu.writeMPU6050(MPU6050_MOT_THR, 32);  // 32 = 64mg
 
 // Duration: 1-255, LSB = 1ms
 mpu.writeMPU6050(MPU6050_MOT_DUR, 10);  // 10ms
+
+// Motion detection logic control
+// Bits 7-6 control decrement count (01 = 1 count)
+// Bits 5-4 control accelerometer startup delay (01 = 4ms)
+mpu.writeMPU6050(MPU6050_MOT_DETECT_CTRL, 0x50);
 ```
 
 ### CPU Frequency
@@ -165,6 +171,8 @@ Assuming a 500 mAh battery:
 - Check GPIO 18 connection to MPU-6050 INT pin
 - Verify MPU-6050 motion detection configuration
 - Test with lower motion threshold
+- **Fixed in latest version**: The motion detection logic (MOT_DETECT_CTRL register) is now properly configured to enable wake-on-motion
+- **Fixed in latest version**: Interrupt status is cleared on wake-up to prevent stuck interrupts
 
 ### Enters sleep too quickly
 - Increase `IDLE_TIMEOUT_MS` value
