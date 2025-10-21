@@ -88,8 +88,11 @@ Activity is detected from:
 The idle timeout can be adjusted by modifying the constant in `main.cpp`:
 
 ```cpp
-#define IDLE_TIMEOUT_MS 300000  // 5 minutes in milliseconds
+#define IDLE_TIMEOUT_MS 20000  // 20 seconds in milliseconds (for testing)
+// For production use: #define IDLE_TIMEOUT_MS 300000  // 5 minutes
 ```
+
+**Note**: The current configuration uses 20 seconds for testing purposes. For production deployment, increase this to 300000 (5 minutes) or longer.
 
 ### Motion Detection Sensitivity
 
@@ -149,16 +152,33 @@ Assuming a 500 mAh battery:
 
 ### Test Deep Sleep Entry
 1. Upload firmware to ESP32
-2. Monitor serial output
-3. Wait 5 minutes without moving device
-4. Observe "Entering deep sleep mode..." message
-5. Serial output will stop (device is asleep)
+2. Monitor serial output at 115200 baud
+3. Wait 20 seconds without moving device (testing configuration)
+4. You will see a warning: "WARNING: Device will enter sleep in 5 seconds if no activity detected"
+5. After 5 more seconds, observe the sleep message:
+   ```
+   =====================================
+   ENTERING DEEP SLEEP MODE
+   Device will wake on motion detection
+   Current uptime: XX seconds
+   =====================================
+   ```
+6. Serial output will stop (device is asleep)
 
 ### Test Wake-on-Motion
 1. After device enters deep sleep
 2. Move or shake the device
-3. Observe serial output resumes with "Woke up from deep sleep..."
+3. Observe serial output resumes with:
+   ```
+   =====================================
+   WOKE UP FROM DEEP SLEEP
+   Reason: Motion detection triggered
+   Resuming normal operation...
+   =====================================
+   ```
 4. Device returns to normal operation
+
+**Note**: The current firmware is configured with a 20-second idle timeout for testing. For production use, change `IDLE_TIMEOUT_MS` to 300000 (5 minutes).
 
 ### Measure Current Consumption
 - Use a multimeter or power profiler in series with power supply

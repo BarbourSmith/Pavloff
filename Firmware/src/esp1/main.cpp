@@ -21,7 +21,7 @@
 #define MPU_INT_PIN 18
 
 // Power management constants
-#define IDLE_TIMEOUT_MS 300000  // 5 minutes in milliseconds
+#define IDLE_TIMEOUT_MS 20000  // 20 seconds in milliseconds (for testing)
 #define CALIBRATION_STILLNESS_MS 240000  // 4 minutes in milliseconds
 
 // Power optimization settings
@@ -501,8 +501,13 @@ void wakeMPUFromSleep() {
 
 // Enter deep sleep mode with wake on GPIO interrupt
 void enterDeepSleep() {
-  Serial.println("Entering deep sleep mode...");
+  Serial.println("=====================================");
+  Serial.println("ENTERING DEEP SLEEP MODE");
   Serial.println("Device will wake on motion detection");
+  Serial.print("Current uptime: ");
+  Serial.print(millis() / 1000);
+  Serial.println(" seconds");
+  Serial.println("=====================================");
   Serial.flush();  // Ensure all serial data is sent
   
   // Put MPU-6050 into low power mode before sleeping
@@ -532,9 +537,16 @@ void setup() {
   // Check wake-up reason
   esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
   if (wakeup_reason == ESP_SLEEP_WAKEUP_EXT0) {
-    Serial.println("Woke up from deep sleep due to motion detection!");
+    Serial.println("=====================================");
+    Serial.println("WOKE UP FROM DEEP SLEEP");
+    Serial.println("Reason: Motion detection triggered");
+    Serial.println("Resuming normal operation...");
+    Serial.println("=====================================");
   } else {
-    Serial.println("Starting up normally...");
+    Serial.println("=====================================");
+    Serial.println("DEVICE STARTING");
+    Serial.println("Power-on or reset detected");
+    Serial.println("=====================================");
   }
 
   // Configure MPU interrupt pin as input
@@ -639,6 +651,22 @@ void loop() {
     Serial.println("Idle timeout reached - entering deep sleep");
     enterDeepSleep();
     // This line will never be reached as deep sleep resets the device
+  }
+  
+  // Warn when approaching sleep (5 seconds before)
+  static bool warningPrinted = false;
+  if (currentTime - lastActivityTime > (IDLE_TIMEOUT_MS - 5000) && !warningPrinted) {
+    Serial.println("WARNING: Device will enter sleep in 5 seconds if no activity detected");
+    warningPrinted = true;
+  }
+  
+  // Reset warning flag when there's activity
+  static unsigned long lastWarningResetTime = 0;
+  if (currentTime - lastActivityTime < (IDLE_TIMEOUT_MS - 5000) && warningPrinted) {
+    if (currentTime - lastWarningResetTime > 1000) {  // Debounce reset
+      warningPrinted = false;
+      lastWarningResetTime = currentTime;
+    }
   }
   
   // Update sensor data
