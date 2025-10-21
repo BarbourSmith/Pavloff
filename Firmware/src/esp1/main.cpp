@@ -21,9 +21,11 @@
 #define MPU_INT_PIN 18
 
 // Test mode - set to true to test interrupt without actually sleeping
-#define TEST_INTERRUPT_MODE true
+// NOW THAT MOTION DETECTION IS WORKING: Set to false for production use
+#define TEST_INTERRUPT_MODE false
 
 // Power management constants
+// NOTE: Using 20 seconds for testing (production should use 300000 = 5 minutes)
 #define IDLE_TIMEOUT_MS 20000  // 20 seconds in milliseconds (for testing)
 #define CALIBRATION_STILLNESS_MS 240000  // 4 minutes in milliseconds
 
