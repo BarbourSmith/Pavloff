@@ -442,10 +442,11 @@ void configureMPUMotionInterrupt() {
   const uint8_t MPU6050_MOT_DETECT_CTRL = 0x69;
   
   // Configure interrupt pin
-  // Bit 7 = 0 (active high), Bit 6 = 0 (push-pull), Bit 5 = 1 (latch until cleared)
+  // Bit 7 = 1 (active low), Bit 6 = 0 (push-pull), Bit 5 = 1 (latch until cleared)
   // Bit 4 = 1 (clear on any read operation)
-  // This ensures interrupt stays high until ESP32 wakes and clears it
-  mpu.writeMPU6050(MPU6050_INT_PIN_CFG, 0x30);
+  // Active-low is more reliable as it doesn't require pull-up resistor
+  // This ensures interrupt stays low until ESP32 wakes and clears it
+  mpu.writeMPU6050(MPU6050_INT_PIN_CFG, 0xB0);
   
   // Set motion detection threshold (0-255, LSB = 2mg)
   // Setting to 32 = 64mg threshold for motion detection
@@ -475,8 +476,9 @@ void putMPUToSleep() {
   // This sets cycle mode with 1.25Hz wake frequency
   mpu.writeMPU6050(MPU6050_PWR_MGMT_1, 0x20);
   
-  // Enable accelerometer only, disable gyroscope
-  // PWR_MGMT_2 register (0x6C): Bits 2-0 = 111 to disable gyroscope axes
+  // Set wake frequency in PWR_MGMT_2
+  // PWR_MGMT_2: Bits 7-6 = 00 (1.25 Hz wake frequency)
+  // Bits 2-0 = 111 to disable gyroscope axes
   // Bits 5-3 = 000 to enable all accelerometer axes
   mpu.writeMPU6050(0x6C, 0x07);
   
@@ -516,10 +518,41 @@ void enterDeepSleep() {
   Serial.println("=====================================");
   Serial.flush();
   
+  // Read and display register values BEFORE entering sleep mode
+  Serial.println("\n--- REGISTER VALUES BEFORE SLEEP ---");
+  Serial.print("PWR_MGMT_1 (0x6B): 0x");
+  Serial.println(mpu.readMPU6050(MPU6050_PWR_MGMT_1), HEX);
+  Serial.print("PWR_MGMT_2 (0x6C): 0x");
+  Serial.println(mpu.readMPU6050(0x6C), HEX);
+  Serial.print("INT_PIN_CFG (0x37): 0x");
+  Serial.println(mpu.readMPU6050(0x37), HEX);
+  Serial.print("INT_ENABLE (0x38): 0x");
+  Serial.println(mpu.readMPU6050(0x38), HEX);
+  Serial.print("INT_STATUS (0x3A): 0x");
+  Serial.println(mpu.readMPU6050(0x3A), HEX);
+  Serial.print("MOT_THR (0x1F): 0x");
+  Serial.println(mpu.readMPU6050(0x1F), HEX);
+  Serial.print("MOT_DUR (0x20): 0x");
+  Serial.println(mpu.readMPU6050(0x20), HEX);
+  Serial.print("MOT_DETECT_CTRL (0x69): 0x");
+  Serial.println(mpu.readMPU6050(0x69), HEX);
+  Serial.println("------------------------------------");
+  Serial.flush();
+  
   // Put MPU-6050 into low power mode before "sleeping"
   putMPUToSleep();
   
   delay(50);
+  
+  // Read and display register values AFTER entering sleep mode
+  Serial.println("\n--- REGISTER VALUES AFTER SLEEP ---");
+  Serial.print("PWR_MGMT_1 (0x6B): 0x");
+  Serial.println(mpu.readMPU6050(MPU6050_PWR_MGMT_1), HEX);
+  Serial.print("PWR_MGMT_2 (0x6C): 0x");
+  Serial.println(mpu.readMPU6050(0x6C), HEX);
+  Serial.print("INT_STATUS (0x3A): 0x");
+  Serial.println(mpu.readMPU6050(0x3A), HEX);
+  Serial.println("------------------------------------");
   
   Serial.println("MPU-6050 now in low power mode");
   Serial.println("Waiting for motion interrupt...");
@@ -533,6 +566,7 @@ void enterDeepSleep() {
   
   Serial.print("Initial interrupt pin state: ");
   Serial.println(lastPinState ? "HIGH" : "LOW");
+  Serial.println("(Note: Interrupt is active-LOW, so it should go LOW when motion detected)");
   
   while (millis() - startTime < 60000) {  // Monitor for 60 seconds
     int currentPinState = digitalRead(MPU_INT_PIN);
@@ -543,8 +577,9 @@ void enterDeepSleep() {
       lastPinState = currentPinState;
     }
     
-    if (currentPinState == HIGH && !interruptDetected) {
-      Serial.println("*** INTERRUPT DETECTED! ***");
+    // Interrupt is active-LOW, so trigger when pin goes LOW
+    if (currentPinState == LOW && !interruptDetected) {
+      Serial.println("*** INTERRUPT DETECTED! (Pin went LOW) ***");
       Serial.print("Time since 'sleep': ");
       Serial.print((millis() - startTime) / 1000.0);
       Serial.println(" seconds");
@@ -595,8 +630,8 @@ void enterDeepSleep() {
   delay(50);
   
   // Configure GPIO18 (MPU_INT_PIN) as wake-up source
-  // The interrupt is active high, so wake on high level
-  esp_sleep_enable_ext0_wakeup((gpio_num_t)MPU_INT_PIN, 1);
+  // The interrupt is active low, so wake on low level (0)
+  esp_sleep_enable_ext0_wakeup((gpio_num_t)MPU_INT_PIN, 0);
   
   // Optional: Disable BLE to save power
   BLEDevice::deinit(true);
@@ -629,6 +664,7 @@ void setup() {
   }
 
   // Configure MPU interrupt pin as input
+  // With active-low push-pull configuration, no pull-up is needed
   pinMode(MPU_INT_PIN, INPUT);
 
   // --- MPU-6050 Setup ---
