@@ -470,7 +470,7 @@ void configureMPUMotionInterrupt() {
 
 // Put MPU-6050 into low power mode with motion detection
 void putMPUToSleep() {
-  // Enable cycle mode and set wake frequency
+  // First, enable cycle mode and set wake frequency
   // PWR_MGMT_1: Bit 5 = CYCLE, Bits 7-6 = 00 (use internal oscillator)
   // Bits 3-2 = 00 (wake frequency 1.25Hz)
   // This sets cycle mode with 1.25Hz wake frequency
@@ -482,7 +482,15 @@ void putMPUToSleep() {
   // Bits 5-3 = 000 to enable all accelerometer axes
   mpu.writeMPU6050(0x6C, 0x07);
   
-  Serial.println("MPU-6050 in low power mode");
+  // Wait for mode change to take effect
+  delay(10);
+  
+  // Re-enable motion detection interrupt while in cycle mode
+  // This ensures motion detection works properly in low power mode
+  const uint8_t MPU6050_INT_ENABLE = 0x38;
+  mpu.writeMPU6050(MPU6050_INT_ENABLE, 0x40);
+  
+  Serial.println("MPU-6050 in low power mode with motion detection enabled");
 }
 
 // Wake up MPU-6050 from low power mode
@@ -568,6 +576,10 @@ void enterDeepSleep() {
   Serial.println(lastPinState ? "HIGH" : "LOW");
   Serial.println("(Note: Interrupt is active-LOW, so it should go LOW when motion detected)");
   
+  // Continuously monitor for motion
+  Serial.println("\nMonitoring INT_STATUS register every second...");
+  Serial.println("(This helps detect if motion is being registered internally)");
+  
   while (millis() - startTime < 60000) {  // Monitor for 60 seconds
     int currentPinState = digitalRead(MPU_INT_PIN);
     
@@ -592,6 +604,27 @@ void enterDeepSleep() {
       Serial.println(intStatus, HEX);
       if (intStatus & 0x40) {
         Serial.println("Motion detection interrupt confirmed!");
+      }
+    }
+    
+    // Every second, read INT_STATUS to see if motion is being detected internally
+    static unsigned long lastStatusCheck = 0;
+    if (millis() - lastStatusCheck > 1000) {
+      lastStatusCheck = millis();
+      const uint8_t MPU6050_INT_STATUS = 0x3A;
+      uint8_t intStatus = mpu.readMPU6050(MPU6050_INT_STATUS);
+      if (intStatus != 0) {
+        Serial.print("[");
+        Serial.print((millis() - startTime) / 1000);
+        Serial.print("s] INT_STATUS: 0x");
+        Serial.print(intStatus, HEX);
+        if (intStatus & 0x40) {
+          Serial.print(" - MOTION DETECTED!");
+          if (currentPinState == HIGH) {
+            Serial.print(" (but pin is still HIGH - interrupt not working!)");
+          }
+        }
+        Serial.println();
       }
     }
     
