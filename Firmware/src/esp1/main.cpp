@@ -20,6 +20,9 @@
 // MPU-6050 interrupt pin
 #define MPU_INT_PIN 18
 
+// Test mode - set to true to test interrupt without actually sleeping
+#define TEST_INTERRUPT_MODE true
+
 // Power management constants
 #define IDLE_TIMEOUT_MS 20000  // 20 seconds in milliseconds (for testing)
 #define CALIBRATION_STILLNESS_MS 240000  // 4 minutes in milliseconds
@@ -501,6 +504,81 @@ void wakeMPUFromSleep() {
 
 // Enter deep sleep mode with wake on GPIO interrupt
 void enterDeepSleep() {
+#if TEST_INTERRUPT_MODE
+  Serial.println("=====================================");
+  Serial.println("TEST MODE: Simulating sleep");
+  Serial.println("Monitoring interrupt pin for motion");
+  Serial.print("Current uptime: ");
+  Serial.print(millis() / 1000);
+  Serial.println(" seconds");
+  Serial.println("Interrupt pin (GPIO 18) state: ");
+  Serial.println(digitalRead(MPU_INT_PIN) ? "HIGH" : "LOW");
+  Serial.println("=====================================");
+  Serial.flush();
+  
+  // Put MPU-6050 into low power mode before "sleeping"
+  putMPUToSleep();
+  
+  delay(50);
+  
+  Serial.println("MPU-6050 now in low power mode");
+  Serial.println("Waiting for motion interrupt...");
+  Serial.println("(Move the device to trigger interrupt)");
+  Serial.flush();
+  
+  // Monitor the interrupt pin instead of sleeping
+  unsigned long startTime = millis();
+  bool interruptDetected = false;
+  int lastPinState = digitalRead(MPU_INT_PIN);
+  
+  Serial.print("Initial interrupt pin state: ");
+  Serial.println(lastPinState ? "HIGH" : "LOW");
+  
+  while (millis() - startTime < 60000) {  // Monitor for 60 seconds
+    int currentPinState = digitalRead(MPU_INT_PIN);
+    
+    if (currentPinState != lastPinState) {
+      Serial.print("Pin state changed to: ");
+      Serial.println(currentPinState ? "HIGH" : "LOW");
+      lastPinState = currentPinState;
+    }
+    
+    if (currentPinState == HIGH && !interruptDetected) {
+      Serial.println("*** INTERRUPT DETECTED! ***");
+      Serial.print("Time since 'sleep': ");
+      Serial.print((millis() - startTime) / 1000.0);
+      Serial.println(" seconds");
+      interruptDetected = true;
+      
+      // Read interrupt status to see what triggered it
+      const uint8_t MPU6050_INT_STATUS = 0x3A;
+      uint8_t intStatus = mpu.readMPU6050(MPU6050_INT_STATUS);
+      Serial.print("INT_STATUS register: 0x");
+      Serial.println(intStatus, HEX);
+      if (intStatus & 0x40) {
+        Serial.println("Motion detection interrupt confirmed!");
+      }
+    }
+    
+    delay(100);  // Check every 100ms
+  }
+  
+  if (!interruptDetected) {
+    Serial.println("*** NO INTERRUPT DETECTED IN 60 SECONDS ***");
+    Serial.println("This indicates the MPU-6050 motion detection is not working correctly");
+  } else {
+    Serial.println("*** TEST SUCCESSFUL - INTERRUPT WORKS! ***");
+  }
+  
+  // Wake MPU back up and reset
+  wakeMPUFromSleep();
+  Serial.println("MPU-6050 woken up, resuming normal operation");
+  Serial.println("Restarting device in 3 seconds...");
+  delay(3000);
+  ESP.restart();
+  
+#else
+  // Normal deep sleep mode
   Serial.println("=====================================");
   Serial.println("ENTERING DEEP SLEEP MODE");
   Serial.println("Device will wake on motion detection");
@@ -525,6 +603,7 @@ void enterDeepSleep() {
   
   // Enter deep sleep
   esp_deep_sleep_start();
+#endif
 }
 
 void setup() {
