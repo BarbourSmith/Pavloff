@@ -470,27 +470,31 @@ void configureMPUMotionInterrupt() {
 
 // Put MPU-6050 into low power mode with motion detection
 void putMPUToSleep() {
-  // First, enable cycle mode and set wake frequency
-  // PWR_MGMT_1: Bit 5 = CYCLE, Bits 7-6 = 00 (use internal oscillator)
-  // Bits 3-2 = 00 (wake frequency 1.25Hz)
-  // This sets cycle mode with 1.25Hz wake frequency
-  mpu.writeMPU6050(MPU6050_PWR_MGMT_1, 0x20);
+  // For motion detection to work, we need to use SLEEP mode (not CYCLE mode)
+  // with motion detection interrupt enabled. When motion is detected, the
+  // MPU-6050 will generate an interrupt to wake the ESP32.
   
-  // Set wake frequency in PWR_MGMT_2
-  // PWR_MGMT_2: Bits 7-6 = 00 (1.25 Hz wake frequency)
-  // Bits 2-0 = 111 to disable gyroscope axes
-  // Bits 5-3 = 000 to enable all accelerometer axes
+  // Step 1: Disable CYCLE and TEMP_DIS, enable SLEEP mode
+  // PWR_MGMT_1: Bit 6 = SLEEP (1), Bit 5 = CYCLE (0), Bit 3 = TEMP_DIS (1 to save power)
+  // This puts the device in sleep mode with temperature sensor disabled
+  mpu.writeMPU6050(MPU6050_PWR_MGMT_1, 0x48);
+  
+  // Step 2: Keep accelerometer enabled, disable gyroscope to save power
+  // PWR_MGMT_2: Bits 2-0 = 111 to disable gyroscope axes
+  // Bits 5-3 = 000 to enable all accelerometer axes (needed for motion detection)
   mpu.writeMPU6050(0x6C, 0x07);
   
   // Wait for mode change to take effect
   delay(10);
   
-  // Re-enable motion detection interrupt while in cycle mode
-  // This ensures motion detection works properly in low power mode
+  // Step 3: Ensure motion detection interrupt is enabled
+  // The configureMPUMotionInterrupt() function already set this, but re-enable
+  // to make sure it's active after entering sleep mode
   const uint8_t MPU6050_INT_ENABLE = 0x38;
   mpu.writeMPU6050(MPU6050_INT_ENABLE, 0x40);
   
-  Serial.println("MPU-6050 in low power mode with motion detection enabled");
+  Serial.println("MPU-6050 in sleep mode with motion detection enabled");
+  Serial.println("(Using SLEEP mode instead of CYCLE mode for motion detection to work)");
 }
 
 // Wake up MPU-6050 from low power mode
