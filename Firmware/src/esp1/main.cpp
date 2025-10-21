@@ -470,31 +470,32 @@ void configureMPUMotionInterrupt() {
 
 // Put MPU-6050 into low power mode with motion detection
 void putMPUToSleep() {
-  // For motion detection to work, we need to use SLEEP mode (not CYCLE mode)
-  // with motion detection interrupt enabled. When motion is detected, the
-  // MPU-6050 will generate an interrupt to wake the ESP32.
+  // For motion detection to work in low power mode, we use CYCLE mode
+  // with LP_WAKE_CTRL to set a fast wake frequency (40 Hz).
+  // This allows the accelerometer to sample frequently enough to detect motion
+  // while still being in a low-power state.
   
-  // Step 1: Disable CYCLE and TEMP_DIS, enable SLEEP mode
-  // PWR_MGMT_1: Bit 6 = SLEEP (1), Bit 5 = CYCLE (0), Bit 3 = TEMP_DIS (1 to save power)
-  // This puts the device in sleep mode with temperature sensor disabled
-  mpu.writeMPU6050(MPU6050_PWR_MGMT_1, 0x48);
+  // Step 1: Enable CYCLE mode with TEMP_DIS for power savings
+  // PWR_MGMT_1: Bit 5 = CYCLE (1), Bit 6 = SLEEP (0), Bit 3 = TEMP_DIS (1)
+  // 0x28 = 0b00101000
+  mpu.writeMPU6050(MPU6050_PWR_MGMT_1, 0x28);
   
-  // Step 2: Keep accelerometer enabled, disable gyroscope to save power
-  // PWR_MGMT_2: Bits 2-0 = 111 to disable gyroscope axes
+  // Step 2: Set LP_WAKE_CTRL for 40 Hz wake frequency and disable gyroscope
+  // PWR_MGMT_2: Bits 7-6 = 00 (40 Hz wake frequency for motion detection)
+  // Bits 2-0 = 111 to disable gyroscope axes
   // Bits 5-3 = 000 to enable all accelerometer axes (needed for motion detection)
+  // 0x07 keeps the 40Hz setting with gyro disabled
   mpu.writeMPU6050(0x6C, 0x07);
   
   // Wait for mode change to take effect
   delay(10);
   
   // Step 3: Ensure motion detection interrupt is enabled
-  // The configureMPUMotionInterrupt() function already set this, but re-enable
-  // to make sure it's active after entering sleep mode
+  // Re-enable to make sure it's active after entering cycle mode
   const uint8_t MPU6050_INT_ENABLE = 0x38;
   mpu.writeMPU6050(MPU6050_INT_ENABLE, 0x40);
   
-  Serial.println("MPU-6050 in sleep mode with motion detection enabled");
-  Serial.println("(Using SLEEP mode instead of CYCLE mode for motion detection to work)");
+  Serial.println("MPU-6050 in cycle mode (40Hz) with motion detection enabled");
 }
 
 // Wake up MPU-6050 from low power mode
