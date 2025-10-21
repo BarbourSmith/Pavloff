@@ -449,20 +449,28 @@ void configureMPUMotionInterrupt() {
   mpu.writeMPU6050(MPU6050_INT_PIN_CFG, 0xB0);
   
   // Set motion detection threshold (0-255, LSB = 2mg)
-  // Setting to 32 = 64mg threshold for motion detection
-  mpu.writeMPU6050(MPU6050_MOT_THR, 32);
+  // Setting to 8 = 16mg threshold for more sensitive motion detection
+  // (Lowered from 32/64mg for easier testing)
+  mpu.writeMPU6050(MPU6050_MOT_THR, 8);
   
   // Set motion detection duration (1-255, LSB = 1ms)
-  // Setting to 10 = 10ms of continuous motion required
-  mpu.writeMPU6050(MPU6050_MOT_DUR, 10);
+  // Setting to 5 = 5ms of continuous motion required
+  // (Lowered from 10ms for easier testing)
+  mpu.writeMPU6050(MPU6050_MOT_DUR, 5);
   
   // Enable motion detection logic
   // MOT_DETECT_CTRL (0x69): Bits 7-6 = 01 for motion detection decrement (1 count)
   // Bits 5-4 = 01 for ACCEL_ON_DELAY (4ms delay)
   mpu.writeMPU6050(MPU6050_MOT_DETECT_CTRL, 0x50);
   
-  // Enable motion detection interrupt
+  // CRITICAL: Disable ALL interrupts first, then enable ONLY motion detection
+  // This prevents DATA_RDY interrupt (bit 0) from interfering
+  mpu.writeMPU6050(MPU6050_INT_ENABLE, 0x00);  // Disable all interrupts
+  delay(1);
+  
+  // Enable ONLY motion detection interrupt
   // INT_ENABLE (0x38): Bit 6 = 1 to enable motion detection interrupt
+  // All other bits = 0 to disable other interrupts (especially DATA_RDY at bit 0)
   mpu.writeMPU6050(MPU6050_INT_ENABLE, 0x40);
   
   Serial.println("MPU-6050 motion interrupt configured");
