@@ -470,32 +470,29 @@ void configureMPUMotionInterrupt() {
 
 // Put MPU-6050 into low power mode with motion detection
 void putMPUToSleep() {
-  // For motion detection to work in low power mode, we use CYCLE mode
-  // with LP_WAKE_CTRL to set a fast wake frequency (40 Hz).
-  // This allows the accelerometer to sample frequently enough to detect motion
-  // while still being in a low-power state.
+  // CRITICAL: Motion detection interrupt ONLY works in normal operation mode,
+  // NOT in CYCLE or SLEEP mode. We keep the device in normal mode but disable
+  // the gyroscope and temperature sensor for power savings.
   
-  // Step 1: Enable CYCLE mode with TEMP_DIS for power savings
-  // PWR_MGMT_1: Bit 5 = CYCLE (1), Bit 6 = SLEEP (0), Bit 3 = TEMP_DIS (1)
-  // 0x28 = 0b00101000
-  mpu.writeMPU6050(MPU6050_PWR_MGMT_1, 0x28);
+  // Step 1: Keep device in normal mode (no SLEEP, no CYCLE), disable TEMP for power savings
+  // PWR_MGMT_1: Bit 6 = SLEEP (0), Bit 5 = CYCLE (0), Bit 3 = TEMP_DIS (1)
+  // 0x08 = 0b00001000 (normal mode with temp sensor disabled)
+  mpu.writeMPU6050(MPU6050_PWR_MGMT_1, 0x08);
   
-  // Step 2: Set LP_WAKE_CTRL for 40 Hz wake frequency and disable gyroscope
-  // PWR_MGMT_2: Bits 7-6 = 00 (40 Hz wake frequency for motion detection)
-  // Bits 2-0 = 111 to disable gyroscope axes
-  // Bits 5-3 = 000 to enable all accelerometer axes (needed for motion detection)
-  // 0x07 keeps the 40Hz setting with gyro disabled
+  // Step 2: Disable gyroscope to save power, keep accelerometer enabled
+  // PWR_MGMT_2: Bits 2-0 = 111 to disable gyroscope axes
+  // Bits 5-3 = 000 to enable all accelerometer axes (required for motion detection)
   mpu.writeMPU6050(0x6C, 0x07);
   
   // Wait for mode change to take effect
   delay(10);
   
   // Step 3: Ensure motion detection interrupt is enabled
-  // Re-enable to make sure it's active after entering cycle mode
   const uint8_t MPU6050_INT_ENABLE = 0x38;
   mpu.writeMPU6050(MPU6050_INT_ENABLE, 0x40);
   
-  Serial.println("MPU-6050 in cycle mode (40Hz) with motion detection enabled");
+  Serial.println("MPU-6050 in normal mode with motion detection enabled");
+  Serial.println("(Gyroscope disabled, temperature sensor disabled for power savings)");
 }
 
 // Wake up MPU-6050 from low power mode
