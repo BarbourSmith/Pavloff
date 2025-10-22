@@ -526,7 +526,8 @@ void resetStateVariables() {
   
   // Reset rep detection state
   repState = REP_IDLE;
-  // Note: repCount is intentionally NOT reset to preserve count across wake cycles
+  // Note: repCount is reset to 0 since deep sleep causes a full device reset
+  // To preserve rep count across sleep, it would need to be stored in persistent storage
   lastMotionTime = millis();
   phaseStartTime = millis();
   dominantAxisVelocity = 0.0f;
