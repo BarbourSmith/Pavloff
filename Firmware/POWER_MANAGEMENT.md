@@ -44,7 +44,7 @@ Activity is detected from:
 1. ESP32 detects wake-up was from motion interrupt
 2. MPU-6050 is restored to full power mode
 3. Motion tracking state variables are reset (velocity, position, AHRS quaternion, filters)
-4. Rep detection state machine is reset to IDLE (rep count preserved)
+4. Rep detection state machine is reset to IDLE (rep count resets to 0)
 5. System loads stored gyroscope calibration offsets
 6. BLE advertising restarts
 7. Normal operation resumes
@@ -199,7 +199,7 @@ Assuming a 500 mAh battery:
 ### Rep detection doesn't work after wake from sleep
 - **Fixed in latest version**: All motion tracking state variables (velocity, position, AHRS quaternion, filter states, and rep detection state machine) are now properly reset after wake-up
 - The `resetStateVariables()` function ensures clean state initialization for accurate rep detection
-- Rep count is preserved across wake cycles to maintain workout continuity
+- Note: Rep count resets to 0 after deep sleep (device performs full reset). To preserve rep count would require storing it in persistent storage.
 
 ### Enters sleep too quickly
 - Increase `IDLE_TIMEOUT_MS` value
