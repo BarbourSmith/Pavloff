@@ -43,9 +43,11 @@ Activity is detected from:
 **Wake-up Process**:
 1. ESP32 detects wake-up was from motion interrupt
 2. MPU-6050 is restored to full power mode
-3. System recalibrates gyroscope
-4. BLE advertising restarts
-5. Normal operation resumes
+3. Motion tracking state variables are reset (velocity, position, AHRS quaternion, filters)
+4. Rep detection state machine is reset to IDLE (rep count preserved)
+5. System loads stored gyroscope calibration offsets
+6. BLE advertising restarts
+7. Normal operation resumes
 
 ## Hardware Configuration
 
@@ -193,6 +195,11 @@ Assuming a 500 mAh battery:
 - Test with lower motion threshold
 - **Fixed in latest version**: The motion detection logic (MOT_DETECT_CTRL register) is now properly configured to enable wake-on-motion
 - **Fixed in latest version**: Interrupt status is cleared on wake-up to prevent stuck interrupts
+
+### Rep detection doesn't work after wake from sleep
+- **Fixed in latest version**: All motion tracking state variables (velocity, position, AHRS quaternion, filter states, and rep detection state machine) are now properly reset after wake-up
+- The `resetStateVariables()` function ensures clean state initialization for accurate rep detection
+- Rep count is preserved across wake cycles to maintain workout continuity
 
 ### Enters sleep too quickly
 - Increase `IDLE_TIMEOUT_MS` value
