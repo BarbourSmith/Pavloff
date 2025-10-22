@@ -500,6 +500,49 @@ void putMPUToSleep() {
   Serial.println("(Gyroscope disabled, temperature sensor disabled for power savings)");
 }
 
+// Reset all state variables to prepare for motion tracking
+void resetStateVariables() {
+  // Reset velocity and position tracking
+  velocityX = 0.0f;
+  velocityY = 0.0f;
+  velocityZ = 0.0f;
+  positionX = 0.0f;
+  positionY = 0.0f;
+  positionZ = 0.0f;
+  
+  // Reset filter states
+  filteredAccelX = 0.0f;
+  filteredAccelY = 0.0f;
+  filteredAccelZ = 0.0f;
+  
+  // Reset AHRS quaternion to identity (no rotation)
+  q0 = 1.0f;
+  q1 = 0.0f;
+  q2 = 0.0f;
+  q3 = 0.0f;
+  integralFBx = 0.0f;
+  integralFBy = 0.0f;
+  integralFBz = 0.0f;
+  
+  // Reset rep detection state
+  repState = REP_IDLE;
+  // Note: repCount is intentionally NOT reset to preserve count across wake cycles
+  lastMotionTime = millis();
+  phaseStartTime = millis();
+  dominantAxisVelocity = 0.0f;
+  
+  // Reset timing variables
+  lastUpdateTime = millis();
+  lastReportTime = millis();
+  firstIteration = true;
+  
+  // Reset stationary tracking
+  wasStationary = false;
+  lastStillTime = millis();
+  
+  Serial.println("State variables reset");
+}
+
 // Wake up MPU-6050 from low power mode
 void wakeMPUFromSleep() {
   // Clear the motion detection interrupt status first
@@ -601,10 +644,11 @@ void setup() {
   // Configure motion detection interrupt
   configureMPUMotionInterrupt();
 
-  // Initialize timing for integration and reporting
-  lastUpdateTime = millis();
-  lastReportTime = millis();
-  lastActivityTime = millis();  // Initialize activity timer
+  // Reset all state variables (critical after wake from sleep)
+  resetStateVariables();
+  
+  // Initialize activity timer
+  lastActivityTime = millis();
 
 
   // --- BLE Setup ---
