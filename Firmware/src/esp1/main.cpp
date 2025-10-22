@@ -20,13 +20,8 @@
 // MPU-6050 interrupt pin
 #define MPU_INT_PIN 18
 
-// Test mode - set to true to test interrupt without actually sleeping
-// NOW THAT MOTION DETECTION IS WORKING: Set to false for production use
-#define TEST_INTERRUPT_MODE false
-
 // Power management constants
-// NOTE: Using 20 seconds for testing (production should use 300000 = 5 minutes)
-#define IDLE_TIMEOUT_MS 20000  // 20 seconds in milliseconds (for testing)
+#define IDLE_TIMEOUT_MS 300000  // 5 minutes in milliseconds
 #define CALIBRATION_STILLNESS_MS 240000  // 4 minutes in milliseconds
 
 // Power optimization settings
@@ -526,139 +521,6 @@ void wakeMPUFromSleep() {
 
 // Enter deep sleep mode with wake on GPIO interrupt
 void enterDeepSleep() {
-#if TEST_INTERRUPT_MODE
-  Serial.println("=====================================");
-  Serial.println("TEST MODE: Simulating sleep");
-  Serial.println("Monitoring interrupt pin for motion");
-  Serial.print("Current uptime: ");
-  Serial.print(millis() / 1000);
-  Serial.println(" seconds");
-  Serial.println("Interrupt pin (GPIO 18) state: ");
-  Serial.println(digitalRead(MPU_INT_PIN) ? "HIGH" : "LOW");
-  Serial.println("=====================================");
-  Serial.flush();
-  
-  // Read and display register values BEFORE entering sleep mode
-  Serial.println("\n--- REGISTER VALUES BEFORE SLEEP ---");
-  Serial.print("PWR_MGMT_1 (0x6B): 0x");
-  Serial.println(mpu.readMPU6050(MPU6050_PWR_MGMT_1), HEX);
-  Serial.print("PWR_MGMT_2 (0x6C): 0x");
-  Serial.println(mpu.readMPU6050(0x6C), HEX);
-  Serial.print("INT_PIN_CFG (0x37): 0x");
-  Serial.println(mpu.readMPU6050(0x37), HEX);
-  Serial.print("INT_ENABLE (0x38): 0x");
-  Serial.println(mpu.readMPU6050(0x38), HEX);
-  Serial.print("INT_STATUS (0x3A): 0x");
-  Serial.println(mpu.readMPU6050(0x3A), HEX);
-  Serial.print("MOT_THR (0x1F): 0x");
-  Serial.println(mpu.readMPU6050(0x1F), HEX);
-  Serial.print("MOT_DUR (0x20): 0x");
-  Serial.println(mpu.readMPU6050(0x20), HEX);
-  Serial.print("MOT_DETECT_CTRL (0x69): 0x");
-  Serial.println(mpu.readMPU6050(0x69), HEX);
-  Serial.println("------------------------------------");
-  Serial.flush();
-  
-  // Put MPU-6050 into low power mode before "sleeping"
-  putMPUToSleep();
-  
-  delay(50);
-  
-  // Read and display register values AFTER entering sleep mode
-  Serial.println("\n--- REGISTER VALUES AFTER SLEEP ---");
-  Serial.print("PWR_MGMT_1 (0x6B): 0x");
-  Serial.println(mpu.readMPU6050(MPU6050_PWR_MGMT_1), HEX);
-  Serial.print("PWR_MGMT_2 (0x6C): 0x");
-  Serial.println(mpu.readMPU6050(0x6C), HEX);
-  Serial.print("INT_STATUS (0x3A): 0x");
-  Serial.println(mpu.readMPU6050(0x3A), HEX);
-  Serial.println("------------------------------------");
-  
-  Serial.println("MPU-6050 now in low power mode");
-  Serial.println("Waiting for motion interrupt...");
-  Serial.println("(Move the device to trigger interrupt)");
-  Serial.flush();
-  
-  // Monitor the interrupt pin instead of sleeping
-  unsigned long startTime = millis();
-  bool interruptDetected = false;
-  int lastPinState = digitalRead(MPU_INT_PIN);
-  
-  Serial.print("Initial interrupt pin state: ");
-  Serial.println(lastPinState ? "HIGH" : "LOW");
-  Serial.println("(Note: Interrupt is active-LOW, so it should go LOW when motion detected)");
-  
-  // Continuously monitor for motion
-  Serial.println("\nMonitoring INT_STATUS register every second...");
-  Serial.println("(This helps detect if motion is being registered internally)");
-  
-  while (millis() - startTime < 60000) {  // Monitor for 60 seconds
-    int currentPinState = digitalRead(MPU_INT_PIN);
-    
-    if (currentPinState != lastPinState) {
-      Serial.print("Pin state changed to: ");
-      Serial.println(currentPinState ? "HIGH" : "LOW");
-      lastPinState = currentPinState;
-    }
-    
-    // Interrupt is active-LOW, so trigger when pin goes LOW
-    if (currentPinState == LOW && !interruptDetected) {
-      Serial.println("*** INTERRUPT DETECTED! (Pin went LOW) ***");
-      Serial.print("Time since 'sleep': ");
-      Serial.print((millis() - startTime) / 1000.0);
-      Serial.println(" seconds");
-      interruptDetected = true;
-      
-      // Read interrupt status to see what triggered it
-      const uint8_t MPU6050_INT_STATUS = 0x3A;
-      uint8_t intStatus = mpu.readMPU6050(MPU6050_INT_STATUS);
-      Serial.print("INT_STATUS register: 0x");
-      Serial.println(intStatus, HEX);
-      if (intStatus & 0x40) {
-        Serial.println("Motion detection interrupt confirmed!");
-      }
-    }
-    
-    // Every second, read INT_STATUS to see if motion is being detected internally
-    static unsigned long lastStatusCheck = 0;
-    if (millis() - lastStatusCheck > 1000) {
-      lastStatusCheck = millis();
-      const uint8_t MPU6050_INT_STATUS = 0x3A;
-      uint8_t intStatus = mpu.readMPU6050(MPU6050_INT_STATUS);
-      if (intStatus != 0) {
-        Serial.print("[");
-        Serial.print((millis() - startTime) / 1000);
-        Serial.print("s] INT_STATUS: 0x");
-        Serial.print(intStatus, HEX);
-        if (intStatus & 0x40) {
-          Serial.print(" - MOTION DETECTED!");
-          if (currentPinState == HIGH) {
-            Serial.print(" (but pin is still HIGH - interrupt not working!)");
-          }
-        }
-        Serial.println();
-      }
-    }
-    
-    delay(100);  // Check every 100ms
-  }
-  
-  if (!interruptDetected) {
-    Serial.println("*** NO INTERRUPT DETECTED IN 60 SECONDS ***");
-    Serial.println("This indicates the MPU-6050 motion detection is not working correctly");
-  } else {
-    Serial.println("*** TEST SUCCESSFUL - INTERRUPT WORKS! ***");
-  }
-  
-  // Wake MPU back up and reset
-  wakeMPUFromSleep();
-  Serial.println("MPU-6050 woken up, resuming normal operation");
-  Serial.println("Restarting device in 3 seconds...");
-  delay(3000);
-  ESP.restart();
-  
-#else
-  // Normal deep sleep mode
   Serial.println("=====================================");
   Serial.println("ENTERING DEEP SLEEP MODE");
   Serial.println("Device will wake on motion detection");
@@ -683,7 +545,6 @@ void enterDeepSleep() {
   
   // Enter deep sleep
   esp_deep_sleep_start();
-#endif
 }
 
 void setup() {
