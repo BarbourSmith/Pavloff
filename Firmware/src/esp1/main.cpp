@@ -436,19 +436,38 @@ void configureMPUMotionInterrupt() {
   const uint8_t MPU6050_INT_ENABLE = 0x38;
   const uint8_t MPU6050_MOT_THR = 0x1F;
   const uint8_t MPU6050_MOT_DUR = 0x20;
+  const uint8_t MPU6050_MOT_DETECT_CTRL = 0x69;
   
-  // Configure interrupt pin (active high, push-pull, held until cleared)
-  mpu.writeMPU6050(MPU6050_INT_PIN_CFG, 0x20);
+  // Configure interrupt pin
+  // Bit 7 = 1 (active low), Bit 6 = 0 (push-pull), Bit 5 = 1 (latch until cleared)
+  // Bit 4 = 1 (clear on any read operation)
+  // Active-low is more reliable as it doesn't require pull-up resistor
+  // This ensures interrupt stays low until ESP32 wakes and clears it
+  mpu.writeMPU6050(MPU6050_INT_PIN_CFG, 0xB0);
   
   // Set motion detection threshold (0-255, LSB = 2mg)
-  // Setting to 32 = 64mg threshold for motion detection
-  mpu.writeMPU6050(MPU6050_MOT_THR, 32);
+  // Setting to 8 = 16mg threshold for more sensitive motion detection
+  // (Lowered from 32/64mg for easier testing)
+  mpu.writeMPU6050(MPU6050_MOT_THR, 8);
   
   // Set motion detection duration (1-255, LSB = 1ms)
-  // Setting to 10 = 10ms of continuous motion required
-  mpu.writeMPU6050(MPU6050_MOT_DUR, 10);
+  // Setting to 5 = 5ms of continuous motion required
+  // (Lowered from 10ms for easier testing)
+  mpu.writeMPU6050(MPU6050_MOT_DUR, 5);
   
-  // Enable motion detection interrupt
+  // Enable motion detection logic
+  // MOT_DETECT_CTRL (0x69): Bits 7-6 = 01 for motion detection decrement (1 count)
+  // Bits 5-4 = 01 for ACCEL_ON_DELAY (4ms delay)
+  mpu.writeMPU6050(MPU6050_MOT_DETECT_CTRL, 0x50);
+  
+  // CRITICAL: Disable ALL interrupts first, then enable ONLY motion detection
+  // This prevents DATA_RDY interrupt (bit 0) from interfering
+  mpu.writeMPU6050(MPU6050_INT_ENABLE, 0x00);  // Disable all interrupts
+  delay(1);
+  
+  // Enable ONLY motion detection interrupt
+  // INT_ENABLE (0x38): Bit 6 = 1 to enable motion detection interrupt
+  // All other bits = 0 to disable other interrupts (especially DATA_RDY at bit 0)
   mpu.writeMPU6050(MPU6050_INT_ENABLE, 0x40);
   
   Serial.println("MPU-6050 motion interrupt configured");
@@ -456,24 +475,43 @@ void configureMPUMotionInterrupt() {
 
 // Put MPU-6050 into low power mode with motion detection
 void putMPUToSleep() {
-  // Enable cycle mode and set wake frequency
-  // Set cycle mode with 1.25Hz wake frequency
-  mpu.writeMPU6050(MPU6050_PWR_MGMT_1, 0x20);
+  // CRITICAL: Motion detection interrupt ONLY works in normal operation mode,
+  // NOT in CYCLE or SLEEP mode. We keep the device in normal mode but disable
+  // the gyroscope and temperature sensor for power savings.
   
-  // Enable accelerometer only, disable gyroscope
-  // MPU6050_PWR_MGMT_2 register address is 0x6C
+  // Step 1: Keep device in normal mode (no SLEEP, no CYCLE), disable TEMP for power savings
+  // PWR_MGMT_1: Bit 6 = SLEEP (0), Bit 5 = CYCLE (0), Bit 3 = TEMP_DIS (1)
+  // 0x08 = 0b00001000 (normal mode with temp sensor disabled)
+  mpu.writeMPU6050(MPU6050_PWR_MGMT_1, 0x08);
+  
+  // Step 2: Disable gyroscope to save power, keep accelerometer enabled
+  // PWR_MGMT_2: Bits 2-0 = 111 to disable gyroscope axes
+  // Bits 5-3 = 000 to enable all accelerometer axes (required for motion detection)
   mpu.writeMPU6050(0x6C, 0x07);
   
-  Serial.println("MPU-6050 in low power mode");
+  // Wait for mode change to take effect
+  delay(10);
+  
+  // Step 3: Ensure motion detection interrupt is enabled
+  const uint8_t MPU6050_INT_ENABLE = 0x38;
+  mpu.writeMPU6050(MPU6050_INT_ENABLE, 0x40);
+  
+  Serial.println("MPU-6050 in normal mode with motion detection enabled");
+  Serial.println("(Gyroscope disabled, temperature sensor disabled for power savings)");
 }
 
 // Wake up MPU-6050 from low power mode
 void wakeMPUFromSleep() {
-  // Wake up MPU-6050
+  // Clear the motion detection interrupt status first
+  // Reading the INT_STATUS register (0x3A) clears the interrupt
+  const uint8_t MPU6050_INT_STATUS = 0x3A;
+  mpu.readMPU6050(MPU6050_INT_STATUS);
+  
+  // Wake up MPU-6050 by clearing SLEEP and CYCLE bits
   mpu.writeMPU6050(MPU6050_PWR_MGMT_1, 0x00);
   
-  // Enable all sensors
-  // MPU6050_PWR_MGMT_2 register address is 0x6C
+  // Enable all sensors (gyroscope and accelerometer)
+  // PWR_MGMT_2 register (0x6C): 0x00 enables all axes
   mpu.writeMPU6050(0x6C, 0x00);
   
   delay(100);  // Wait for sensor to stabilize
@@ -483,16 +521,24 @@ void wakeMPUFromSleep() {
 
 // Enter deep sleep mode with wake on GPIO interrupt
 void enterDeepSleep() {
-  Serial.println("Entering deep sleep mode...");
+  Serial.println("=====================================");
+  Serial.println("ENTERING DEEP SLEEP MODE");
   Serial.println("Device will wake on motion detection");
+  Serial.print("Current uptime: ");
+  Serial.print(millis() / 1000);
+  Serial.println(" seconds");
+  Serial.println("=====================================");
   Serial.flush();  // Ensure all serial data is sent
   
   // Put MPU-6050 into low power mode before sleeping
   putMPUToSleep();
   
+  // Wait for MPU-6050 to enter low power mode
+  delay(50);
+  
   // Configure GPIO18 (MPU_INT_PIN) as wake-up source
-  // The interrupt is active high, so wake on high level
-  esp_sleep_enable_ext0_wakeup((gpio_num_t)MPU_INT_PIN, 1);
+  // The interrupt is active low, so wake on low level (0)
+  esp_sleep_enable_ext0_wakeup((gpio_num_t)MPU_INT_PIN, 0);
   
   // Optional: Disable BLE to save power
   BLEDevice::deinit(true);
@@ -511,12 +557,20 @@ void setup() {
   // Check wake-up reason
   esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
   if (wakeup_reason == ESP_SLEEP_WAKEUP_EXT0) {
-    Serial.println("Woke up from deep sleep due to motion detection!");
+    Serial.println("=====================================");
+    Serial.println("WOKE UP FROM DEEP SLEEP");
+    Serial.println("Reason: Motion detection triggered");
+    Serial.println("Resuming normal operation...");
+    Serial.println("=====================================");
   } else {
-    Serial.println("Starting up normally...");
+    Serial.println("=====================================");
+    Serial.println("DEVICE STARTING");
+    Serial.println("Power-on or reset detected");
+    Serial.println("=====================================");
   }
 
   // Configure MPU interrupt pin as input
+  // With active-low push-pull configuration, no pull-up is needed
   pinMode(MPU_INT_PIN, INPUT);
 
   // --- MPU-6050 Setup ---
@@ -618,6 +672,22 @@ void loop() {
     Serial.println("Idle timeout reached - entering deep sleep");
     enterDeepSleep();
     // This line will never be reached as deep sleep resets the device
+  }
+  
+  // Warn when approaching sleep (5 seconds before)
+  static bool warningPrinted = false;
+  if (currentTime - lastActivityTime > (IDLE_TIMEOUT_MS - 5000) && !warningPrinted) {
+    Serial.println("WARNING: Device will enter sleep in 5 seconds if no activity detected");
+    warningPrinted = true;
+  }
+  
+  // Reset warning flag when there's activity
+  static unsigned long lastWarningResetTime = 0;
+  if (currentTime - lastActivityTime < (IDLE_TIMEOUT_MS - 5000) && warningPrinted) {
+    if (currentTime - lastWarningResetTime > 1000) {  // Debounce reset
+      warningPrinted = false;
+      lastWarningResetTime = currentTime;
+    }
   }
   
   // Update sensor data
