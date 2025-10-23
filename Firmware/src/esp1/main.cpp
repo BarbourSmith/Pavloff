@@ -633,6 +633,18 @@ void enterDeepSleep() {
     Serial.print("MPU INT pin state after clear: ");
     Serial.println(intPinState == HIGH ? "HIGH (inactive - good)" : "LOW (still active - may wake immediately)");
   }
+  
+  // Read and display motion detection configuration for debugging
+  Serial.println("Motion detection configuration:");
+  Serial.print("  MOT_THR (0x1F): ");
+  Serial.println(mpu.readMPU6050(0x1F));
+  Serial.print("  MOT_DUR (0x20): ");
+  Serial.println(mpu.readMPU6050(0x20));
+  Serial.print("  INT_ENABLE (0x38): 0x");
+  Serial.println(mpu.readMPU6050(0x38), HEX);
+  Serial.print("  INT_STATUS (0x3A): 0x");
+  Serial.println(mpu.readMPU6050(MPU6050_INT_STATUS), HEX);
+  
   Serial.flush();
   
   // Disable BLE and wait for clean shutdown
@@ -644,15 +656,32 @@ void enterDeepSleep() {
   esp_wifi_stop();
   esp_wifi_deinit();
   
+  // Wait for all radio shutdowns to complete before configuring sleep
+  // Power transitions can cause GPIO glitches
+  delay(200);
+  Serial.println("BLE and WiFi shut down, waiting for power to stabilize...");
+  Serial.flush();
+  delay(100);
+  
   // Disable unused peripherals
   // Turn off ADC, DAC, and other peripherals to minimize power consumption
   esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_OFF);
   esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_SLOW_MEM, ESP_PD_OPTION_OFF);
   esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_FAST_MEM, ESP_PD_OPTION_OFF);
   
+  // Final check of INT pin right before configuring wake-up
+  int finalIntCheck = digitalRead(MPU_INT_PIN);
+  Serial.print("Final INT pin check before wake config: ");
+  Serial.println(finalIntCheck == HIGH ? "HIGH" : "LOW");
+  Serial.flush();
+  
   // Configure GPIO18 (MPU_INT_PIN) as wake-up source
   // The interrupt is active low, so wake on low level (0)
   esp_sleep_enable_ext0_wakeup((gpio_num_t)MPU_INT_PIN, 0);
+  
+  Serial.println("Entering deep sleep NOW...");
+  Serial.flush();
+  delay(10);  // Final delay to ensure serial output completes
   
   // Enter deep sleep
   esp_deep_sleep_start();
@@ -680,13 +709,19 @@ void setup() {
   if (wakeup_reason == ESP_SLEEP_WAKEUP_EXT0) {
     Serial.println("=====================================");
     Serial.println("WOKE UP FROM DEEP SLEEP");
-    Serial.println("Reason: Motion detection triggered");
+    Serial.println("Reason: EXT0 (GPIO interrupt)");
     Serial.println("Resuming normal operation...");
+    Serial.println("=====================================");
+  } else if (wakeup_reason == ESP_SLEEP_WAKEUP_UNDEFINED) {
+    Serial.println("=====================================");
+    Serial.println("DEVICE STARTING");
+    Serial.println("Reason: Power-on or hard reset");
     Serial.println("=====================================");
   } else {
     Serial.println("=====================================");
     Serial.println("DEVICE STARTING");
-    Serial.println("Power-on or reset detected");
+    Serial.print("Wake-up reason: ");
+    Serial.println(wakeup_reason);
     Serial.println("=====================================");
   }
 
@@ -699,6 +734,26 @@ void setup() {
   
   // If waking from sleep, need to reconfigure MPU
   if (wakeup_reason == ESP_SLEEP_WAKEUP_EXT0) {
+    // Read and display interrupt status immediately after wake
+    Serial.println("Reading MPU interrupt status after wake...");
+    const uint8_t MPU6050_INT_STATUS = 0x3A;
+    uint8_t intStatus = mpu.readMPU6050(MPU6050_INT_STATUS);
+    Serial.print("INT_STATUS register: 0x");
+    Serial.println(intStatus, HEX);
+    if (intStatus & 0x40) {
+      Serial.println("  - Motion interrupt flag is SET");
+    } else {
+      Serial.println("  - Motion interrupt flag is NOT set");
+    }
+    if (intStatus & 0x01) {
+      Serial.println("  - Data ready interrupt flag is SET");
+    }
+    
+    // Check GPIO pin state
+    int gpioState = digitalRead(MPU_INT_PIN);
+    Serial.print("GPIO18 state on wake: ");
+    Serial.println(gpioState == HIGH ? "HIGH" : "LOW");
+    
     wakeMPUFromSleep();
   }
   
