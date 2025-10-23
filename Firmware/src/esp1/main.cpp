@@ -7,6 +7,7 @@
 #include <BLE2902.h>
 #include <esp_pm.h>
 #include <esp_sleep.h>
+#include <esp_wifi.h>
 #include <Preferences.h>
 
 // Pin configuration - defined via PlatformIO build flags
@@ -446,14 +447,14 @@ void configureMPUMotionInterrupt() {
   mpu.writeMPU6050(MPU6050_INT_PIN_CFG, 0xB0);
   
   // Set motion detection threshold (0-255, LSB = 2mg)
-  // Setting to 8 = 16mg threshold for more sensitive motion detection
-  // (Lowered from 32/64mg for easier testing)
-  mpu.writeMPU6050(MPU6050_MOT_THR, 8);
+  // Setting to 64 = 128mg threshold to reduce spurious wake-ups and save power
+  // Higher threshold prevents wake-ups from minor vibrations/bumps
+  mpu.writeMPU6050(MPU6050_MOT_THR, 64);
   
   // Set motion detection duration (1-255, LSB = 1ms)
-  // Setting to 5 = 5ms of continuous motion required
-  // (Lowered from 10ms for easier testing)
-  mpu.writeMPU6050(MPU6050_MOT_DUR, 5);
+  // Setting to 20 = 20ms of continuous motion required
+  // Longer duration helps filter out brief vibrations
+  mpu.writeMPU6050(MPU6050_MOT_DUR, 20);
   
   // Enable motion detection logic
   // MOT_DETECT_CTRL (0x69): Bits 7-6 = 01 for motion detection decrement (1 count)
@@ -598,12 +599,24 @@ void enterDeepSleep() {
   // Wait for MPU-6050 to enter low power mode
   delay(50);
   
+  // Disable BLE and wait for clean shutdown
+  BLEDevice::deinit(true);
+  delay(100);  // Allow time for BLE to fully power down
+  
+  // Explicitly disable WiFi radio to save power (can consume 20-100mA if left on)
+  // Note: These may fail if WiFi was never started, which is expected
+  esp_wifi_stop();
+  esp_wifi_deinit();
+  
+  // Disable unused peripherals
+  // Turn off ADC, DAC, and other peripherals to minimize power consumption
+  esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_OFF);
+  esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_SLOW_MEM, ESP_PD_OPTION_OFF);
+  esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_FAST_MEM, ESP_PD_OPTION_OFF);
+  
   // Configure GPIO18 (MPU_INT_PIN) as wake-up source
   // The interrupt is active low, so wake on low level (0)
   esp_sleep_enable_ext0_wakeup((gpio_num_t)MPU_INT_PIN, 0);
-  
-  // Optional: Disable BLE to save power
-  BLEDevice::deinit(true);
   
   // Enter deep sleep
   esp_deep_sleep_start();
@@ -612,6 +625,16 @@ void enterDeepSleep() {
 void setup() {
   // Initialize Serial communication
   Serial.begin(115200);
+  
+  // Disable WiFi radio immediately to save power (not needed for BLE-only operation)
+  // WiFi can consume 20-100mA even when not actively used
+  // Note: esp_wifi_stop() may fail if WiFi was never started, which is expected and harmless
+  esp_err_t err = esp_wifi_stop();
+  if (err == ESP_OK) {
+    Serial.println("WiFi stopped successfully");
+  } else if (err == ESP_ERR_WIFI_NOT_INIT) {
+    Serial.println("WiFi was not initialized (expected for BLE-only mode)");
+  }
   
   // Configure power optimizations
   configurePowerOptimizations();

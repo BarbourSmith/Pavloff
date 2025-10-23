@@ -27,17 +27,19 @@ Activity is detected from:
 - BLE data writes (e.g., rep count reset commands)
 
 **Deep Sleep Mode**: When idle timeout is reached:
-1. MPU-6050 is put into low-power cycle mode (1.25 Hz wake frequency)
-2. BLE is powered down
-3. ESP32 enters deep sleep (consuming only ~10 μA)
-4. All state is lost; wake-up is like a fresh boot
+1. MPU-6050 is put into low-power mode (gyroscope and temperature sensor disabled)
+2. BLE is powered down completely with adequate time for clean shutdown
+3. WiFi radio is explicitly disabled to prevent power drain
+4. Unused RTC peripherals and memory domains are powered off
+5. ESP32 enters deep sleep (consuming only ~10 μA)
+6. All state is lost; wake-up is like a fresh boot
 
 ### 3. Wake-on-Motion
 
 **Motion Detection Interrupt**:
 - MPU-6050 is configured to generate an interrupt on GPIO 18 when motion is detected
-- Motion threshold: 64mg (configurable)
-- Motion duration: 10ms continuous motion required (configurable)
+- Motion threshold: 128mg (configurable) - set higher to reduce spurious wake-ups
+- Motion duration: 20ms continuous motion required (configurable)
 - ESP32 wakes from deep sleep on this interrupt
 
 **Wake-up Process**:
@@ -59,9 +61,9 @@ Activity is detected from:
 ### MPU-6050 Configuration
 
 **Motion Detection**:
-- Threshold: 32 (×2mg = 64mg)
-- Duration: 10ms
-- Interrupt: Active high, latched until cleared
+- Threshold: 64 (×2mg = 128mg)
+- Duration: 20ms
+- Interrupt: Active low, latched until cleared
 - Motion detection logic enabled with decrement count of 1
 
 **Low Power Mode**:
@@ -102,10 +104,10 @@ Adjust MPU-6050 motion detection in `configureMPUMotionInterrupt()`:
 
 ```cpp
 // Threshold: 0-255, LSB = 2mg
-mpu.writeMPU6050(MPU6050_MOT_THR, 32);  // 32 = 64mg
+mpu.writeMPU6050(MPU6050_MOT_THR, 64);  // 64 = 128mg (higher threshold reduces spurious wake-ups)
 
 // Duration: 1-255, LSB = 1ms
-mpu.writeMPU6050(MPU6050_MOT_DUR, 10);  // 10ms
+mpu.writeMPU6050(MPU6050_MOT_DUR, 20);  // 20ms (longer duration filters out brief vibrations)
 
 // Motion detection logic control
 // Bits 7-6 control decrement count (01 = 1 count)
@@ -129,6 +131,21 @@ Adjust BLE power in `setup()`:
 // Range: ESP_PWR_LVL_N12 (-12 dBm) to ESP_PWR_LVL_P9 (+9 dBm)
 BLEDevice::setPower(ESP_PWR_LVL_N0, ESP_BLE_PWR_TYPE_DEFAULT);
 ```
+
+### WiFi Radio Management
+
+The firmware explicitly disables the WiFi radio to prevent power drain:
+
+```cpp
+// In setup() - disable WiFi at startup (BLE-only mode)
+esp_wifi_stop();
+
+// In enterDeepSleep() - ensure WiFi is off before sleep
+esp_wifi_stop();
+esp_wifi_deinit();
+```
+
+**Note**: The WiFi radio can consume 20-100mA even when not actively transmitting. Since this device uses BLE exclusively, disabling WiFi provides significant power savings.
 
 ## Battery Life Estimates
 
@@ -192,7 +209,7 @@ Assuming a 500 mAh battery:
 ### Device doesn't wake from sleep
 - Check GPIO 18 connection to MPU-6050 INT pin
 - Verify MPU-6050 motion detection configuration
-- Test with lower motion threshold
+- Test with lower motion threshold (e.g., 32 instead of 64 for 64mg instead of 128mg)
 - **Fixed in latest version**: The motion detection logic (MOT_DETECT_CTRL register) is now properly configured to enable wake-on-motion
 - **Fixed in latest version**: Interrupt status is cleared on wake-up to prevent stuck interrupts
 
@@ -212,6 +229,14 @@ Assuming a 500 mAh battery:
 - Verify CPU frequency is set to 80 MHz
 - Check BLE power level is set to minimum
 - Ensure automatic light sleep is enabled
+- **Fixed in latest version**: WiFi radio is now explicitly disabled, saving 20-100mA
+
+### High power consumption in deep sleep
+- Verify WiFi radio is disabled (check serial output at startup)
+- Ensure BLE shutdown completes before entering sleep
+- Check that unused RTC peripherals are powered off
+- Verify MPU-6050 motion detection threshold is set appropriately (higher threshold = fewer wake-ups)
+- Use multimeter to measure actual current consumption and compare to expected ~50 μA
 
 ## References
 
