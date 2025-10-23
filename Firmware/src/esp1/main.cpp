@@ -982,8 +982,9 @@ void loop() {
     float linearAccelMag = sqrt(linearAccelX*linearAccelX + linearAccelY*linearAccelY + linearAccelZ*linearAccelZ) / 9.81f;
     detectRep(velocityX, velocityY, velocityZ, linearAccelMag, currentTime);
     
-    // Update activity timer if there's motion or device is connected
-    if (!isStationary || deviceConnected) {
+    // Update activity timer if there's motion (not stationary)
+    // Note: BLE connection state does not prevent sleep - only motion does
+    if (!isStationary) {
       lastActivityTime = currentTime;
     }
   }
