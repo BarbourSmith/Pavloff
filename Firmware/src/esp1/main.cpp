@@ -448,9 +448,12 @@ void configureMPUMotionInterrupt() {
   // Configure interrupt pin
   // Bit 7 = 1 (active low), Bit 6 = 0 (push-pull), Bit 5 = 1 (latch until cleared)
   // Bit 4 = 1 (clear on any read operation)
-  // Active-low is more reliable as it doesn't require pull-up resistor
-  // This ensures interrupt stays low until ESP32 wakes and clears it
+  // Active-low with latch is needed for reliable wake-up from deep sleep
+  // The latch ensures the INT pin stays LOW until we wake and clear the interrupt
+  // NOTE: In latch mode, ANY interrupt flag can pull INT LOW, even if not enabled
+  // We must ensure INT_STATUS is completely clear before sleep
   mpu.writeMPU6050(MPU6050_INT_PIN_CFG, 0xB0);
+  Serial.println("  - Configured INT pin: active-low, latched mode");
   
   // Set motion detection threshold (0-255, LSB = 2mg)
   // Setting to 64 = 128mg threshold to reduce spurious wake-ups and save power
@@ -614,10 +617,31 @@ void enterDeepSleep() {
   // Longer delay ensures any transient motion from configuration is settled
   delay(200);
   
-  // Clear any final stray interrupts that may have occurred during settling
+  // CRITICAL: Aggressively clear ALL interrupt flags before sleep
+  // The INT pin latches LOW if ANY flag is set in INT_STATUS, even disabled ones
+  // We must loop until INT_STATUS reads 0x00
   const uint8_t MPU6050_INT_STATUS = 0x3A;
-  mpu.readMPU6050(MPU6050_INT_STATUS);
-  Serial.println("Final interrupt clear before sleep verification");
+  int clearAttempts = 0;
+  uint8_t intStatus;
+  do {
+    intStatus = mpu.readMPU6050(MPU6050_INT_STATUS);
+    if (intStatus != 0x00) {
+      Serial.print("INT_STATUS not clear (0x");
+      Serial.print(intStatus, HEX);
+      Serial.print("), clearing attempt ");
+      Serial.println(clearAttempts + 1);
+      delay(10);  // Small delay to let sensor settle
+    }
+    clearAttempts++;
+  } while (intStatus != 0x00 && clearAttempts < 10);
+  
+  if (intStatus == 0x00) {
+    Serial.println("INT_STATUS successfully cleared (0x00)");
+  } else {
+    Serial.print("WARNING: INT_STATUS still has flags after 10 attempts: 0x");
+    Serial.println(intStatus, HEX);
+  }
+  
   delay(50);
   
   // Verify interrupt pin is HIGH (inactive) before sleeping
@@ -626,11 +650,13 @@ void enterDeepSleep() {
   Serial.println(intPinState == HIGH ? "HIGH (inactive - good)" : "LOW (active - WARNING!)");
   if (intPinState == LOW) {
     Serial.println("WARNING: Interrupt pin is LOW before sleep - may cause immediate wake-up");
-    Serial.println("Attempting to clear interrupt status...");
-    mpu.readMPU6050(MPU6050_INT_STATUS);
-    delay(50);
+    Serial.println("Attempting additional clears...");
+    for (int i = 0; i < 5; i++) {
+      mpu.readMPU6050(MPU6050_INT_STATUS);
+      delay(10);
+    }
     intPinState = digitalRead(MPU_INT_PIN);
-    Serial.print("MPU INT pin state after clear: ");
+    Serial.print("MPU INT pin state after additional clears: ");
     Serial.println(intPinState == HIGH ? "HIGH (inactive - good)" : "LOW (still active - may wake immediately)");
   }
   
