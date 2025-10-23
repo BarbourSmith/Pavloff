@@ -21,7 +21,7 @@
 #define MPU_INT_PIN 18
 
 // Power management constants
-#define IDLE_TIMEOUT_MS 300000  // 5 minutes in milliseconds
+#define IDLE_TIMEOUT_MS 20000  // 20 seconds in milliseconds (for testing)
 #define CALIBRATION_STILLNESS_MS 240000  // 4 minutes in milliseconds
 
 // Power optimization settings
@@ -475,6 +475,11 @@ void configureMPUMotionInterrupt() {
 
 // Put MPU-6050 into low power mode with motion detection
 void putMPUToSleep() {
+  Serial.println("Preparing MPU-6050 for sleep mode...");
+  
+  // First, configure motion detection interrupt
+  configureMPUMotionInterrupt();
+  
   // CRITICAL: Motion detection interrupt ONLY works in normal operation mode,
   // NOT in CYCLE or SLEEP mode. We keep the device in normal mode but disable
   // the gyroscope and temperature sensor for power savings.
@@ -483,11 +488,13 @@ void putMPUToSleep() {
   // PWR_MGMT_1: Bit 6 = SLEEP (0), Bit 5 = CYCLE (0), Bit 3 = TEMP_DIS (1)
   // 0x08 = 0b00001000 (normal mode with temp sensor disabled)
   mpu.writeMPU6050(MPU6050_PWR_MGMT_1, 0x08);
+  Serial.println("  - Set to normal mode with temp disabled");
   
   // Step 2: Disable gyroscope to save power, keep accelerometer enabled
   // PWR_MGMT_2: Bits 2-0 = 111 to disable gyroscope axes
   // Bits 5-3 = 000 to enable all accelerometer axes (required for motion detection)
   mpu.writeMPU6050(0x6C, 0x07);
+  Serial.println("  - Disabled gyroscope, kept accelerometer enabled");
   
   // Wait for mode change to take effect
   delay(10);
@@ -495,8 +502,9 @@ void putMPUToSleep() {
   // Step 3: Ensure motion detection interrupt is enabled
   const uint8_t MPU6050_INT_ENABLE = 0x38;
   mpu.writeMPU6050(MPU6050_INT_ENABLE, 0x40);
+  Serial.println("  - Motion interrupt enabled");
   
-  Serial.println("MPU-6050 in normal mode with motion detection enabled");
+  Serial.println("MPU-6050 in low-power mode with motion detection enabled");
   Serial.println("(Gyroscope disabled, temperature sensor disabled for power savings)");
 }
 
@@ -526,8 +534,8 @@ void resetStateVariables() {
   
   // Reset rep detection state
   repState = REP_IDLE;
-  // Note: repCount is reset to 0 since deep sleep causes a full device reset
-  // To preserve rep count across sleep, it would need to be stored in persistent storage
+  repCount = 0;  // Explicitly reset rep count (deep sleep causes full device reset)
+  // Note: To preserve rep count across sleep, it would need to be stored in persistent storage
   lastMotionTime = millis();
   phaseStartTime = millis();
   dominantAxisVelocity = 0.0f;
@@ -546,21 +554,31 @@ void resetStateVariables() {
 
 // Wake up MPU-6050 from low power mode
 void wakeMPUFromSleep() {
+  Serial.println("Waking MPU-6050 from low power mode...");
+  
   // Clear the motion detection interrupt status first
   // Reading the INT_STATUS register (0x3A) clears the interrupt
   const uint8_t MPU6050_INT_STATUS = 0x3A;
   mpu.readMPU6050(MPU6050_INT_STATUS);
+  Serial.println("  - Cleared motion interrupt status");
   
   // Wake up MPU-6050 by clearing SLEEP and CYCLE bits
   mpu.writeMPU6050(MPU6050_PWR_MGMT_1, 0x00);
+  Serial.println("  - Set to normal mode (PWR_MGMT_1 = 0x00)");
   
   // Enable all sensors (gyroscope and accelerometer)
   // PWR_MGMT_2 register (0x6C): 0x00 enables all axes
   mpu.writeMPU6050(0x6C, 0x00);
+  Serial.println("  - Enabled all sensors (PWR_MGMT_2 = 0x00)");
+  
+  // Disable motion detection interrupt (will be re-enabled before next sleep)
+  const uint8_t MPU6050_INT_ENABLE = 0x38;
+  mpu.writeMPU6050(MPU6050_INT_ENABLE, 0x00);
+  Serial.println("  - Disabled motion interrupt (INT_ENABLE = 0x00)");
   
   delay(100);  // Wait for sensor to stabilize
   
-  Serial.println("MPU-6050 woken up");
+  Serial.println("MPU-6050 woken up and ready for normal operation");
 }
 
 // Enter deep sleep mode with wake on GPIO interrupt
@@ -626,6 +644,7 @@ void setup() {
   }
   
   mpu.begin();
+  Serial.println("MPU-6050 initialized");
   
   // Try to load stored calibration offsets
   float offsetX, offsetY, offsetZ;
@@ -642,8 +661,9 @@ void setup() {
   
   Serial.println("------------------------------------");
   
-  // Configure motion detection interrupt
-  configureMPUMotionInterrupt();
+  // NOTE: Motion detection interrupt is NOT configured here during normal operation
+  // It will be configured in putMPUToSleep() before entering deep sleep
+  // This ensures the MPU operates normally for rep detection
 
   // Reset all state variables (critical after wake from sleep)
   resetStateVariables();
@@ -654,7 +674,7 @@ void setup() {
 
   // --- BLE Setup ---
   // Create the BLE Device
-  BLEDevice::init("ESP32_IMU_Stream");
+  BLEDevice::init("Pavloff Workout Sensor");
   
   // Set BLE power to minimum (can increase if needed for range)
   // ESP_PWR_LVL_N12 to ESP_PWR_LVL_P9 (lower = less power)
@@ -711,6 +731,33 @@ void setup() {
 
 void loop() {
   unsigned long currentTime = millis();
+  
+  // Periodic diagnostic output every 2 seconds
+  static unsigned long lastDiagnosticTime = 0;
+  if (currentTime - lastDiagnosticTime >= 2000) {
+    lastDiagnosticTime = currentTime;
+    Serial.println("======== STATE DIAGNOSTIC ========");
+    Serial.print("Uptime: "); Serial.print(currentTime / 1000); Serial.println(" seconds");
+    Serial.print("BLE Connected: "); Serial.println(deviceConnected ? "YES" : "NO");
+    Serial.print("Rep Count: "); Serial.print(repCount);
+    Serial.print(" | State: ");
+    switch(repState) {
+      case REP_IDLE: Serial.println("IDLE"); break;
+      case REP_MOVING_UP: Serial.println("MOVING_UP"); break;
+      case REP_MOVING_DOWN: Serial.println("MOVING_DOWN"); break;
+      case REP_TRANSITION: Serial.println("TRANSITION"); break;
+      default: Serial.println("UNKNOWN"); break;
+    }
+    Serial.print("Position (m): X="); Serial.print(positionX, 3);
+    Serial.print(", Y="); Serial.print(positionY, 3);
+    Serial.print(", Z="); Serial.print(positionZ, 3); Serial.println();
+    Serial.print("Velocity (m/s): X="); Serial.print(velocityX, 3);
+    Serial.print(", Y="); Serial.print(velocityY, 3);
+    Serial.print(", Z="); Serial.print(velocityZ, 3); Serial.println();
+    Serial.print("Idle timer: "); Serial.print((currentTime - lastActivityTime) / 1000); 
+    Serial.print(" / "); Serial.print(IDLE_TIMEOUT_MS / 1000); Serial.println(" seconds");
+    Serial.println("==================================");
+  }
   
   // Check for idle timeout and enter deep sleep
   if (currentTime - lastActivityTime > IDLE_TIMEOUT_MS) {
