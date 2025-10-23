@@ -446,14 +446,13 @@ void configureMPUMotionInterrupt() {
   Serial.println("  - Cleared any pending interrupt status");
   
   // Configure interrupt pin
-  // Bit 7 = 1 (active low), Bit 6 = 0 (push-pull), Bit 5 = 1 (latch until cleared)
-  // Bit 4 = 1 (clear on any read operation)
-  // Active-low with latch is needed for reliable wake-up from deep sleep
-  // The latch ensures the INT pin stays LOW until we wake and clear the interrupt
-  // NOTE: In latch mode, ANY interrupt flag can pull INT LOW, even if not enabled
-  // We must ensure INT_STATUS is completely clear before sleep
-  mpu.writeMPU6050(MPU6050_INT_PIN_CFG, 0xB0);
-  Serial.println("  - Configured INT pin: active-low, latched mode");
+  // Bit 7 = 1 (active low), Bit 6 = 0 (push-pull), Bit 5 = 0 (50us pulse), Bit 4 = 1 (clear on any read)
+  // CRITICAL: Use pulse mode (bit 5 = 0) NOT latch mode
+  // In latch mode, INT pin goes LOW for ANY flag in INT_STATUS, even disabled ones like DATA_RDY
+  // In pulse mode, INT pin only pulses for ENABLED interrupts (motion detection)
+  // This prevents DATA_RDY flag from triggering spurious wake-ups
+  mpu.writeMPU6050(MPU6050_INT_PIN_CFG, 0x90);
+  Serial.println("  - Configured INT pin: active-low, 50us pulse mode");
   
   // Set motion detection threshold (0-255, LSB = 2mg)
   // Setting to 64 = 128mg threshold to reduce spurious wake-ups and save power
