@@ -713,9 +713,29 @@ void enterDeepSleep() {
   // The interrupt is active low, so wake on low level (0)
   esp_sleep_enable_ext0_wakeup((gpio_num_t)MPU_INT_PIN, 0);
   
+  Serial.println("Wake-up source configured, waiting for final stabilization...");
+  Serial.flush();
+  
+  // CRITICAL: Long delay after configuring wake source to let everything stabilize
+  // Power transitions during deep sleep entry can cause brief GPIO glitches
+  delay(500);
+  
+  // Absolute final check of INT pin state right before sleep
+  int absoluteFinalCheck = digitalRead(MPU_INT_PIN);
+  Serial.print("FINAL INT pin check (right before sleep): ");
+  Serial.println(absoluteFinalCheck == HIGH ? "HIGH" : "LOW");
+  
+  if (absoluteFinalCheck == LOW) {
+    Serial.println("CRITICAL WARNING: INT pin is LOW right before sleep!");
+    Serial.println("Device will wake immediately. Aborting sleep.");
+    Serial.flush();
+    // Don't enter sleep if INT pin is LOW
+    return;
+  }
+  
   Serial.println("Entering deep sleep NOW...");
   Serial.flush();
-  delay(10);  // Final delay to ensure serial output completes
+  delay(100);  // Extra delay to ensure serial output completes and system stabilizes
   
   // Enter deep sleep
   esp_deep_sleep_start();
