@@ -491,12 +491,8 @@ void configureMPUMotionInterrupt() {
 void putMPUToSleep() {
   Serial.println("Preparing MPU-6050 for sleep mode...");
   
-  // First, configure motion detection interrupt
-  configureMPUMotionInterrupt();
-  
-  // CRITICAL: Motion detection interrupt ONLY works in normal operation mode,
-  // NOT in CYCLE or SLEEP mode. We keep the device in normal mode but disable
-  // the gyroscope and temperature sensor for power savings.
+  // CRITICAL: Configure power management FIRST, before enabling motion detection
+  // This prevents sensor fluctuations from power mode changes from triggering false interrupts
   
   // Step 1: Keep device in normal mode (no SLEEP, no CYCLE), disable TEMP for power savings
   // PWR_MGMT_1: Bit 6 = SLEEP (0), Bit 5 = CYCLE (0), Bit 3 = TEMP_DIS (1)
@@ -510,13 +506,18 @@ void putMPUToSleep() {
   mpu.writeMPU6050(0x6C, 0x07);
   Serial.println("  - Disabled gyroscope, kept accelerometer enabled");
   
-  // Wait for mode change to take effect
-  delay(10);
+  // Wait for power mode changes to fully settle
+  // Sensor needs time to stabilize after changing power configuration
+  delay(100);
+  Serial.println("  - Waited for sensor to stabilize after power changes");
   
-  // Step 3: Ensure motion detection interrupt is enabled
-  const uint8_t MPU6050_INT_ENABLE = 0x38;
-  mpu.writeMPU6050(MPU6050_INT_ENABLE, 0x40);
-  Serial.println("  - Motion interrupt enabled");
+  // Clear any interrupts that occurred during power mode transition
+  const uint8_t MPU6050_INT_STATUS = 0x3A;
+  mpu.readMPU6050(MPU6050_INT_STATUS);
+  Serial.println("  - Cleared interrupts from power mode transition");
+  
+  // NOW configure motion detection interrupt (after sensor is stable)
+  configureMPUMotionInterrupt();
   
   Serial.println("MPU-6050 in low-power mode with motion detection enabled");
   Serial.println("(Gyroscope disabled, temperature sensor disabled for power savings)");
@@ -609,8 +610,15 @@ void enterDeepSleep() {
   // Put MPU-6050 into low power mode before sleeping
   putMPUToSleep();
   
-  // Wait for MPU-6050 to enter low power mode and stabilize
-  delay(100);
+  // Wait for MPU-6050 to enter low power mode and fully stabilize
+  // Longer delay ensures any transient motion from configuration is settled
+  delay(200);
+  
+  // Clear any final stray interrupts that may have occurred during settling
+  const uint8_t MPU6050_INT_STATUS = 0x3A;
+  mpu.readMPU6050(MPU6050_INT_STATUS);
+  Serial.println("Final interrupt clear before sleep verification");
+  delay(50);
   
   // Verify interrupt pin is HIGH (inactive) before sleeping
   int intPinState = digitalRead(MPU_INT_PIN);
@@ -619,7 +627,6 @@ void enterDeepSleep() {
   if (intPinState == LOW) {
     Serial.println("WARNING: Interrupt pin is LOW before sleep - may cause immediate wake-up");
     Serial.println("Attempting to clear interrupt status...");
-    const uint8_t MPU6050_INT_STATUS = 0x3A;
     mpu.readMPU6050(MPU6050_INT_STATUS);
     delay(50);
     intPinState = digitalRead(MPU_INT_PIN);
