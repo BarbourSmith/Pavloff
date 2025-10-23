@@ -617,10 +617,23 @@ void enterDeepSleep() {
   // Longer delay ensures any transient motion from configuration is settled
   delay(200);
   
+  // Read and display motion detection configuration for debugging
+  // IMPORTANT: Do this BEFORE the clearing loop to avoid triggering new DATA_RDY flags
+  Serial.println("Motion detection configuration:");
+  Serial.print("  MOT_THR (0x1F): ");
+  Serial.println(mpu.readMPU6050(0x1F));
+  Serial.print("  MOT_DUR (0x20): ");
+  Serial.println(mpu.readMPU6050(0x20));
+  Serial.print("  INT_ENABLE (0x38): 0x");
+  Serial.println(mpu.readMPU6050(0x38), HEX);
+  Serial.print("  INT_STATUS (0x3A) before clearing: 0x");
+  const uint8_t MPU6050_INT_STATUS = 0x3A;
+  Serial.println(mpu.readMPU6050(MPU6050_INT_STATUS), HEX);
+  
   // CRITICAL: Aggressively clear ALL interrupt flags before sleep
   // The INT pin latches LOW if ANY flag is set in INT_STATUS, even disabled ones
   // We must loop until INT_STATUS reads 0x00
-  const uint8_t MPU6050_INT_STATUS = 0x3A;
+  // Do NOT read any MPU registers after this point to avoid triggering DATA_RDY
   int clearAttempts = 0;
   uint8_t intStatus;
   do {
@@ -630,19 +643,23 @@ void enterDeepSleep() {
       Serial.print(intStatus, HEX);
       Serial.print("), clearing attempt ");
       Serial.println(clearAttempts + 1);
-      delay(10);  // Small delay to let sensor settle
+      delay(50);  // Longer delay to let sensor fully settle
     }
     clearAttempts++;
-  } while (intStatus != 0x00 && clearAttempts < 10);
+  } while (intStatus != 0x00 && clearAttempts < 20);  // Increased to 20 attempts
   
   if (intStatus == 0x00) {
     Serial.println("INT_STATUS successfully cleared (0x00)");
   } else {
-    Serial.print("WARNING: INT_STATUS still has flags after 10 attempts: 0x");
+    Serial.print("WARNING: INT_STATUS still has flags after ");
+    Serial.print(clearAttempts);
+    Serial.print(" attempts: 0x");
     Serial.println(intStatus, HEX);
+    Serial.println("This may be persistent DATA_RDY from accelerometer readings");
+    Serial.println("INT pin state is more important than INT_STATUS for wake-up");
   }
   
-  delay(50);
+  delay(100);  // Final long delay to ensure no new data is generated
   
   // Verify interrupt pin is HIGH (inactive) before sleeping
   int intPinState = digitalRead(MPU_INT_PIN);
@@ -651,26 +668,17 @@ void enterDeepSleep() {
   if (intPinState == LOW) {
     Serial.println("WARNING: Interrupt pin is LOW before sleep - may cause immediate wake-up");
     Serial.println("Attempting additional clears...");
-    for (int i = 0; i < 5; i++) {
+    for (int i = 0; i < 10; i++) {
       mpu.readMPU6050(MPU6050_INT_STATUS);
-      delay(10);
+      delay(20);
     }
     intPinState = digitalRead(MPU_INT_PIN);
     Serial.print("MPU INT pin state after additional clears: ");
     Serial.println(intPinState == HIGH ? "HIGH (inactive - good)" : "LOW (still active - may wake immediately)");
   }
   
-  // Read and display motion detection configuration for debugging
-  Serial.println("Motion detection configuration:");
-  Serial.print("  MOT_THR (0x1F): ");
-  Serial.println(mpu.readMPU6050(0x1F));
-  Serial.print("  MOT_DUR (0x20): ");
-  Serial.println(mpu.readMPU6050(0x20));
-  Serial.print("  INT_ENABLE (0x38): 0x");
-  Serial.println(mpu.readMPU6050(0x38), HEX);
-  Serial.print("  INT_STATUS (0x3A): 0x");
-  Serial.println(mpu.readMPU6050(MPU6050_INT_STATUS), HEX);
-  
+  // DO NOT READ ANY MPU REGISTERS AFTER THIS POINT
+  Serial.println("NOTE: INT pin is HIGH - device should sleep properly even if INT_STATUS shows DATA_RDY");
   Serial.flush();
   
   // Disable BLE and wait for clean shutdown
