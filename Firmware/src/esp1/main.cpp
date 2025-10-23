@@ -435,9 +435,15 @@ void configureMPUMotionInterrupt() {
   // MPU-6050 Register addresses for motion detection
   const uint8_t MPU6050_INT_PIN_CFG = 0x37;
   const uint8_t MPU6050_INT_ENABLE = 0x38;
+  const uint8_t MPU6050_INT_STATUS = 0x3A;
   const uint8_t MPU6050_MOT_THR = 0x1F;
   const uint8_t MPU6050_MOT_DUR = 0x20;
   const uint8_t MPU6050_MOT_DETECT_CTRL = 0x69;
+  
+  // CRITICAL: Clear any pending interrupts FIRST before configuring
+  // This prevents spurious wake-ups from stale interrupt flags
+  mpu.readMPU6050(MPU6050_INT_STATUS);
+  Serial.println("  - Cleared any pending interrupt status");
   
   // Configure interrupt pin
   // Bit 7 = 1 (active low), Bit 6 = 0 (push-pull), Bit 5 = 1 (latch until cleared)
@@ -470,6 +476,13 @@ void configureMPUMotionInterrupt() {
   // INT_ENABLE (0x38): Bit 6 = 1 to enable motion detection interrupt
   // All other bits = 0 to disable other interrupts (especially DATA_RDY at bit 0)
   mpu.writeMPU6050(MPU6050_INT_ENABLE, 0x40);
+  
+  // Allow time for motion detection to stabilize after configuration
+  delay(10);
+  
+  // Clear interrupt status again after enabling to ensure clean state
+  mpu.readMPU6050(MPU6050_INT_STATUS);
+  Serial.println("  - Cleared interrupt status after configuration");
   
   Serial.println("MPU-6050 motion interrupt configured");
 }
@@ -596,8 +609,24 @@ void enterDeepSleep() {
   // Put MPU-6050 into low power mode before sleeping
   putMPUToSleep();
   
-  // Wait for MPU-6050 to enter low power mode
-  delay(50);
+  // Wait for MPU-6050 to enter low power mode and stabilize
+  delay(100);
+  
+  // Verify interrupt pin is HIGH (inactive) before sleeping
+  int intPinState = digitalRead(MPU_INT_PIN);
+  Serial.print("MPU INT pin state before sleep: ");
+  Serial.println(intPinState == HIGH ? "HIGH (inactive - good)" : "LOW (active - WARNING!)");
+  if (intPinState == LOW) {
+    Serial.println("WARNING: Interrupt pin is LOW before sleep - may cause immediate wake-up");
+    Serial.println("Attempting to clear interrupt status...");
+    const uint8_t MPU6050_INT_STATUS = 0x3A;
+    mpu.readMPU6050(MPU6050_INT_STATUS);
+    delay(50);
+    intPinState = digitalRead(MPU_INT_PIN);
+    Serial.print("MPU INT pin state after clear: ");
+    Serial.println(intPinState == HIGH ? "HIGH (inactive - good)" : "LOW (still active - may wake immediately)");
+  }
+  Serial.flush();
   
   // Disable BLE and wait for clean shutdown
   BLEDevice::deinit(true);
