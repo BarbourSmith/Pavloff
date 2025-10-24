@@ -58,7 +58,9 @@ class ScreenTimeManager: ObservableObject {
         
         // Shield the selected apps
         store.shield.applications = selectedApps.applicationTokens
-        store.shield.applicationCategories = selectedApps.categoryTokens
+        if !selectedApps.categoryTokens.isEmpty {
+            store.shield.applicationCategories = .specific(selectedApps.categoryTokens)
+        }
         
         // Set up the schedule from midnight to midnight next day (blocks until cleared)
         let schedule = DeviceActivitySchedule(
