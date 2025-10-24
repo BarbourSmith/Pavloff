@@ -152,6 +152,43 @@ platformio device monitor -b 115200
 - ✅ All state variables are reset
 - ✅ **Rep detection works immediately after wake-up**
 
+## Improved Wake System (Latest Update)
+
+### Problem: Immediate Wake-up from Deep Sleep
+The ESP32 was waking up immediately after entering deep sleep instead of waiting for motion detection. This was caused by incorrect MPU-6050 interrupt pin configuration.
+
+### Root Cause
+The INT_PIN_CFG register (0x37) was set to 0xB0, which has bit 4 = 1. This means the interrupt is cleared on ANY register read, not just reading INT_STATUS. When sensor data is read during pre-sleep operations, this can clear the interrupt and cause the INT pin to become unstable or go HIGH/LOW at the wrong time.
+
+### Solution Implemented
+Based on the proven solution from [Arduino Stack Exchange](https://arduino.stackexchange.com/questions/48424/how-to-generate-hardware-interrupt-in-mpu6050-to-wakeup-arduino-from-sleep-mode):
+
+1. **Changed INT_PIN_CFG from 0xB0 to 0xA0**
+   - 0xA0 = 0b10100000 (bit 4 = 0)
+   - Now INT is cleared ONLY when reading INT_STATUS register
+   - Prevents sensor data reads from clearing the interrupt
+   - Ensures INT pin stays LOW until explicitly cleared
+
+2. **Added Digital High-Pass Filter**
+   - ACCEL_CONFIG (0x1C) = 0x01 (5Hz cutoff)
+   - Filters out DC offset
+   - Improves motion detection accuracy
+
+3. **Updated Motion Detection Control**
+   - MOT_DETECT_CTRL changed from 0x50 to 0x15
+   - 0x15 = 0b00010101
+   - Optimized settings for better wake-up reliability
+
+### Key Change Detail
+**INT_PIN_CFG Register (0x37):**
+- Bit 7 = 1: Active LOW interrupt
+- Bit 6 = 0: Push-pull output
+- Bit 5 = 1: Latch mode (holds LOW until cleared)
+- **Bit 4 = 0: Clear only on INT_STATUS read** (was 1, causing the problem)
+- Bits 3-0 = 0000: Other settings
+
+This ensures the INT pin remains stable and LOW during the entire sleep period, only clearing when the ESP32 wakes and reads the INT_STATUS register.
+
 ## Technical Details
 
 ### MPU-6050 Register Configuration
@@ -162,10 +199,13 @@ platformio device monitor -b 115200
 - PWR_MGMT_2 (0x6C) = 0x00 (all axes enabled)
 
 **Before Sleep:**
+- ACCEL_CONFIG (0x1C) = 0x01 (5Hz digital high-pass filter)
+- INT_PIN_CFG (0x37) = 0xA0 (active-low, latch, clear only on INT_STATUS read)
 - INT_ENABLE (0x38) = 0x40 (motion detection interrupt enabled)
-- MOT_THR (0x1F) = 8 (16mg threshold)
-- MOT_DUR (0x20) = 5 (5ms duration)
-- PWR_MGMT_1 (0x6B) = 0x08 (temp sensor disabled)
+- MOT_THR (0x1F) = 64 (128mg threshold)
+- MOT_DUR (0x20) = 20 (20ms duration)
+- MOT_DETECT_CTRL (0x69) = 0x15 (optimized motion detection settings)
+- PWR_MGMT_1 (0x6B) = 0x48 (sleep mode, temp sensor disabled)
 - PWR_MGMT_2 (0x6C) = 0x07 (gyro disabled, accel enabled)
 
 **After Wake:**
@@ -192,15 +232,22 @@ The current 20-second timeout is only for easier testing.
 - [x] Motion interrupt is disabled during normal operation
 - [x] Motion interrupt is enabled before sleep
 - [x] Wake-up sequence properly restores normal operation
+- [x] INT_PIN_CFG updated to 0xA0 to fix immediate wake-up issue
+- [x] Digital high-pass filter configured for better motion detection
+- [x] MOT_DETECT_CTRL optimized with Stack Exchange solution (0x15)
+- [ ] Physical device testing confirms device stays asleep until motion
 - [ ] Physical device testing confirms rep detection works after wake
 - [ ] BLE connection and data transmission verified after wake
 
 ## Files Modified
 - `Firmware/src/esp1/main.cpp`: All changes in this single file
   - Line 24: Changed IDLE_TIMEOUT_MS to 20000
-  - Line 477-509: Modified putMPUToSleep() to configure interrupt before sleep
-  - Line 537: Explicitly reset repCount
-  - Line 547-582: Enhanced wakeMPUFromSleep() with interrupt disable
-  - Line 664-666: Removed configureMPUMotionInterrupt() from setup
+  - Line 433-500: Modified configureMPUMotionInterrupt() with new wake system
+    - Added ACCEL_CONFIG (0x1C) = 0x01 for digital high-pass filter
+    - Changed INT_PIN_CFG from 0xB0 to 0xA0 (critical fix for immediate wake-up)
+    - Changed MOT_DETECT_CTRL from 0x50 to 0x15 per Stack Exchange solution
+  - Line 494-537: Modified putMPUToSleep() to configure interrupt before sleep
+  - Line 541-611: Enhanced wakeMPUFromSleep() with interrupt disable
+  - Line 755-850: Removed configureMPUMotionInterrupt() from setup
   - Line 677: Fixed BLE device name
   - Line 735-761: Added periodic diagnostic output
