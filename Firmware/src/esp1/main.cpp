@@ -522,19 +522,8 @@ void putMPUToSleep() {
   // NOW configure motion detection interrupt (after sensor is stable)
   configureMPUMotionInterrupt();
   
-  // CRITICAL: Put MPU into SLEEP mode AFTER configuring motion detection
-  // This prevents the accelerometer from continuously generating DATA_RDY flags
-  // The motion detection hardware works independently and will still trigger interrupts
-  // PWR_MGMT_1: Bit 6 = SLEEP (1), Bit 3 = TEMP_DIS (1)
-  // 0x48 = 0b01001000 (sleep mode with temp sensor disabled)
-  mpu.writeMPU6050(MPU6050_PWR_MGMT_1, 0x48);
-  Serial.println("  - Enabled SLEEP mode to stop continuous DATA_RDY generation");
-  
-  // Wait for sleep mode to take effect
-  delay(10);
-  
-  Serial.println("MPU-6050 in sleep mode with motion detection active");
-  Serial.println("(Motion detection hardware remains active and will trigger wake-up)");
+  Serial.println("MPU-6050 motion detection configured and ready");
+  Serial.println("(Delaying SLEEP mode to allow sensor to fully stabilize)");
 }
 
 // Reset all state variables to prepare for motion tracking
@@ -624,72 +613,33 @@ void enterDeepSleep() {
   // Put MPU-6050 into low power mode before sleeping
   putMPUToSleep();
   
-  // Wait for MPU-6050 to enter low power mode and fully stabilize
-  // Longer delay ensures any transient motion from configuration is settled
-  delay(200);
+  // CRITICAL: Long stabilization delay after configuring motion detection
+  // This allows the sensor to fully settle and prevents spurious wake-ups
+  // from transient readings during power mode transitions
+  Serial.println("Waiting for MPU-6050 to fully stabilize (1 second)...");
+  delay(1000);
   
-  // Read and display motion detection configuration for debugging
-  // IMPORTANT: Do this BEFORE the clearing loop to avoid triggering new DATA_RDY flags
-  Serial.println("Motion detection configuration:");
-  Serial.print("  MOT_THR (0x1F): ");
-  Serial.println(mpu.readMPU6050(0x1F));
-  Serial.print("  MOT_DUR (0x20): ");
-  Serial.println(mpu.readMPU6050(0x20));
-  Serial.print("  INT_ENABLE (0x38): 0x");
-  Serial.println(mpu.readMPU6050(0x38), HEX);
-  Serial.print("  INT_STATUS (0x3A) before clearing: 0x");
+  // Clear any interrupts that occurred during stabilization
   const uint8_t MPU6050_INT_STATUS = 0x3A;
-  Serial.println(mpu.readMPU6050(MPU6050_INT_STATUS), HEX);
+  mpu.readMPU6050(MPU6050_INT_STATUS);
+  Serial.println("Cleared interrupt status after stabilization");
   
-  // CRITICAL: Aggressively clear ALL interrupt flags before sleep
-  // The INT pin latches LOW if ANY flag is set in INT_STATUS, even disabled ones
-  // We must loop until INT_STATUS reads 0x00
-  // Do NOT read any MPU registers after this point to avoid triggering DATA_RDY
-  int clearAttempts = 0;
-  uint8_t intStatus;
-  do {
-    intStatus = mpu.readMPU6050(MPU6050_INT_STATUS);
-    if (intStatus != 0x00) {
-      Serial.print("INT_STATUS not clear (0x");
-      Serial.print(intStatus, HEX);
-      Serial.print("), clearing attempt ");
-      Serial.println(clearAttempts + 1);
-      delay(50);  // Longer delay to let sensor fully settle
-    }
-    clearAttempts++;
-  } while (intStatus != 0x00 && clearAttempts < 20);  // Increased to 20 attempts
+  // Final delay to ensure no new data is generated
+  delay(100);
   
-  if (intStatus == 0x00) {
-    Serial.println("INT_STATUS successfully cleared (0x00)");
-  } else {
-    Serial.print("WARNING: INT_STATUS still has flags after ");
-    Serial.print(clearAttempts);
-    Serial.print(" attempts: 0x");
-    Serial.println(intStatus, HEX);
-    Serial.println("This may be persistent DATA_RDY from accelerometer readings");
-    Serial.println("INT pin state is more important than INT_STATUS for wake-up");
-  }
+  // Now put MPU into SLEEP mode to stop continuous sensor readings
+  // The motion detection hardware remains active and will trigger wake-up
+  // PWR_MGMT_1: Bit 6 = SLEEP (1), Bit 3 = TEMP_DIS (1)
+  // 0x48 = 0b01001000 (sleep mode with temp sensor disabled)
+  mpu.writeMPU6050(MPU6050_PWR_MGMT_1, 0x48);
+  Serial.println("MPU-6050 entered SLEEP mode (motion detection remains active)");
   
-  delay(100);  // Final long delay to ensure no new data is generated
+  // Wait for SLEEP mode to take effect
+  delay(50);
   
-  // Verify interrupt pin is HIGH (inactive) before sleeping
-  int intPinState = digitalRead(MPU_INT_PIN);
-  Serial.print("MPU INT pin state before sleep: ");
-  Serial.println(intPinState == HIGH ? "HIGH (inactive - good)" : "LOW (active - WARNING!)");
-  if (intPinState == LOW) {
-    Serial.println("WARNING: Interrupt pin is LOW before sleep - may cause immediate wake-up");
-    Serial.println("Attempting additional clears...");
-    for (int i = 0; i < 10; i++) {
-      mpu.readMPU6050(MPU6050_INT_STATUS);
-      delay(20);
-    }
-    intPinState = digitalRead(MPU_INT_PIN);
-    Serial.print("MPU INT pin state after additional clears: ");
-    Serial.println(intPinState == HIGH ? "HIGH (inactive - good)" : "LOW (still active - may wake immediately)");
-  }
-  
-  // DO NOT READ ANY MPU REGISTERS AFTER THIS POINT
-  Serial.println("NOTE: INT pin is HIGH - device should sleep properly even if INT_STATUS shows DATA_RDY");
+  // Single final interrupt clear after entering SLEEP mode
+  mpu.readMPU6050(MPU6050_INT_STATUS);
+  Serial.println("Final interrupt clear completed");
   Serial.flush();
   
   // Disable BLE and wait for clean shutdown
@@ -702,11 +652,9 @@ void enterDeepSleep() {
   esp_wifi_deinit();
   
   // Wait for all radio shutdowns to complete before configuring sleep
-  // Power transitions can cause GPIO glitches
-  delay(200);
-  Serial.println("BLE and WiFi shut down, waiting for power to stabilize...");
-  Serial.flush();
   delay(100);
+  Serial.println("BLE and WiFi shut down");
+  Serial.flush();
   
   // Disable unused peripherals
   // Turn off ADC, DAC, and other peripherals to minimize power consumption
@@ -714,39 +662,15 @@ void enterDeepSleep() {
   esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_SLOW_MEM, ESP_PD_OPTION_OFF);
   esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_FAST_MEM, ESP_PD_OPTION_OFF);
   
-  // Final check of INT pin right before configuring wake-up
-  int finalIntCheck = digitalRead(MPU_INT_PIN);
-  Serial.print("Final INT pin check before wake config: ");
-  Serial.println(finalIntCheck == HIGH ? "HIGH" : "LOW");
-  Serial.flush();
-  
   // Configure GPIO18 (MPU_INT_PIN) as wake-up source
   // The interrupt is active low, so wake on low level (0)
   esp_sleep_enable_ext0_wakeup((gpio_num_t)MPU_INT_PIN, 0);
-  
-  Serial.println("Wake-up source configured, waiting for final stabilization...");
+  Serial.println("Wake-up source configured on GPIO18");
   Serial.flush();
-  
-  // CRITICAL: Long delay after configuring wake source to let everything stabilize
-  // Power transitions during deep sleep entry can cause brief GPIO glitches
-  delay(500);
-  
-  // Absolute final check of INT pin state right before sleep
-  int absoluteFinalCheck = digitalRead(MPU_INT_PIN);
-  Serial.print("FINAL INT pin check (right before sleep): ");
-  Serial.println(absoluteFinalCheck == HIGH ? "HIGH" : "LOW");
-  
-  if (absoluteFinalCheck == LOW) {
-    Serial.println("CRITICAL WARNING: INT pin is LOW right before sleep!");
-    Serial.println("Device will wake immediately. Aborting sleep.");
-    Serial.flush();
-    // Don't enter sleep if INT pin is LOW
-    return;
-  }
   
   Serial.println("Entering deep sleep NOW...");
   Serial.flush();
-  delay(100);  // Extra delay to ensure serial output completes and system stabilizes
+  delay(100);  // Final delay to ensure serial output completes
   
   // Enter deep sleep
   esp_deep_sleep_start();
