@@ -96,7 +96,7 @@ The idle timeout can be adjusted by modifying the constant in `main.cpp`:
 // For production use: #define IDLE_TIMEOUT_MS 300000  // 5 minutes
 ```
 
-**Note**: The current configuration uses 20 seconds for testing purposes. For production deployment, increase this to 300000 (5 minutes) or longer.
+**Note**: The current configuration uses 20 seconds for testing purposes. For production deployment, change this to 300000 (5 minutes) or longer.
 
 ### Motion Detection Sensitivity
 
@@ -214,7 +214,10 @@ Assuming a 500 mAh battery:
 - **Fixed in latest version**: Interrupt status is cleared on wake-up to prevent stuck interrupts
 
 ### Rep detection doesn't work after wake from sleep
-- **Fixed in latest version**: All motion tracking state variables (velocity, position, AHRS quaternion, filter states, and rep detection state machine) are now properly reset after wake-up
+- **Fixed in latest version**: Motion detection interrupt is now ONLY enabled before entering sleep, not during normal operation
+- During normal operation, the MPU-6050 operates in standard mode with all interrupts disabled
+- When waking from sleep, the motion interrupt is explicitly disabled to ensure normal sensor operation
+- All motion tracking state variables (velocity, position, AHRS quaternion, filter states, and rep detection state machine) are properly reset after wake-up
 - The `resetStateVariables()` function ensures clean state initialization for accurate rep detection
 - Note: Rep count resets to 0 after deep sleep (device performs full reset). To preserve rep count would require storing it in persistent storage.
 
