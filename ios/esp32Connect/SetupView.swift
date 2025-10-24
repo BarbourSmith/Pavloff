@@ -91,7 +91,8 @@ struct SetupView: View {
                                     
                                     // Show selected apps count
                                     if !screenTimeManager.selectedApps.applicationTokens.isEmpty || 
-                                       !screenTimeManager.selectedApps.categoryTokens.isEmpty {
+                                       !screenTimeManager.selectedApps.categoryTokens.isEmpty ||
+                                       screenTimeManager.hasAppsSelected {
                                         HStack {
                                             Image(systemName: "checkmark.circle.fill")
                                                 .foregroundColor(.green)
@@ -133,6 +134,14 @@ struct SetupView: View {
             }
             .navigationBarTitleDisplayMode(.inline)
             .familyActivityPicker(isPresented: $showingAppPicker, selection: $screenTimeManager.selectedApps)
+            .onChange(of: showingAppPicker) { isPresented in
+                // When app picker is dismissed and apps are selected, apply shields immediately
+                if !isPresented && workoutSettings.screenTimeEnabled && screenTimeManager.isAuthorized {
+                    if !screenTimeManager.selectedApps.applicationTokens.isEmpty || !screenTimeManager.selectedApps.categoryTokens.isEmpty {
+                        screenTimeManager.enableAppBlocking()
+                    }
+                }
+            }
         }
     }
 }

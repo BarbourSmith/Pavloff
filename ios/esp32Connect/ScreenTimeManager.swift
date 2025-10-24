@@ -16,7 +16,13 @@ class ScreenTimeManager: ObservableObject {
     static let shared = ScreenTimeManager()
     
     @Published var isAuthorized = false
-    @Published var selectedApps: FamilyActivitySelection = FamilyActivitySelection()
+    @Published var selectedApps: FamilyActivitySelection = FamilyActivitySelection() {
+        didSet {
+            // Save the fact that we have a selection
+            let hasSelection = !selectedApps.applicationTokens.isEmpty || !selectedApps.categoryTokens.isEmpty
+            UserDefaults.standard.set(hasSelection, forKey: "hasAppSelection")
+        }
+    }
     
     private let store = ManagedSettingsStore()
     private let center = AuthorizationCenter.shared
@@ -56,25 +62,18 @@ class ScreenTimeManager: ObservableObject {
             return
         }
         
+        guard !selectedApps.applicationTokens.isEmpty || !selectedApps.categoryTokens.isEmpty else {
+            print("[ScreenTime] No apps selected for blocking")
+            return
+        }
+        
         // Shield the selected apps
         store.shield.applications = selectedApps.applicationTokens
         if !selectedApps.categoryTokens.isEmpty {
             store.shield.applicationCategories = .specific(selectedApps.categoryTokens)
         }
         
-        // Set up the schedule from midnight to midnight next day (blocks until cleared)
-        let schedule = DeviceActivitySchedule(
-            intervalStart: DateComponents(hour: 0, minute: 0),
-            intervalEnd: DateComponents(hour: 23, minute: 59),
-            repeats: true
-        )
-        
-        do {
-            try activityCenter.startMonitoring(scheduleId, during: schedule)
-            print("[ScreenTime] App blocking enabled from midnight")
-        } catch {
-            print("[ScreenTime] Failed to start monitoring: \(error)")
-        }
+        print("[ScreenTime] App blocking enabled with \(selectedApps.applicationTokens.count) apps and \(selectedApps.categoryTokens.count) categories")
     }
     
     // Disable app blocking when workout is completed
@@ -88,9 +87,6 @@ class ScreenTimeManager: ObservableObject {
         store.shield.applications = nil
         store.shield.applicationCategories = nil
         
-        // Stop monitoring
-        activityCenter.stopMonitoring([scheduleId])
-        
         print("[ScreenTime] App blocking disabled - workout completed!")
     }
     
@@ -99,9 +95,16 @@ class ScreenTimeManager: ObservableObject {
         return store.shield.applications != nil || store.shield.applicationCategories != nil
     }
     
+    // Check if we have apps selected
+    var hasAppsSelected: Bool {
+        return UserDefaults.standard.bool(forKey: "hasAppSelection")
+    }
+    
     // Clear all selected apps
     func clearSelection() {
         selectedApps = FamilyActivitySelection()
         disableAppBlocking()
+        UserDefaults.standard.set(false, forKey: "hasAppSelection")
     }
 }
+
