@@ -71,7 +71,7 @@ struct SetupView: View {
                                     .cornerRadius(8)
                                 }
                                 
-                                // Show selected apps count
+                                // Show selected apps count and clear button
                                 if !screenTimeManager.selectedApps.applicationTokens.isEmpty || 
                                    !screenTimeManager.selectedApps.categoryTokens.isEmpty ||
                                    screenTimeManager.hasAppsSelected {
@@ -81,6 +81,23 @@ struct SetupView: View {
                                         Text("Apps selected for blocking")
                                             .font(.subheadline)
                                             .foregroundColor(.green)
+                                        Spacer()
+                                    }
+                                    
+                                    // Clear selection button
+                                    Button(action: {
+                                        screenTimeManager.clearSelection()
+                                    }) {
+                                        HStack {
+                                            Image(systemName: "xmark.circle.fill")
+                                            Text("Clear Selection")
+                                        }
+                                        .fontWeight(.semibold)
+                                        .frame(maxWidth: .infinity)
+                                        .padding()
+                                        .background(Color.red.opacity(0.1))
+                                        .foregroundColor(.red)
+                                        .cornerRadius(8)
                                     }
                                 }
                             } else {
