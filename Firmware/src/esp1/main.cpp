@@ -523,7 +523,7 @@ void putMPUToSleep() {
   configureMPUMotionInterrupt();
   
   Serial.println("MPU-6050 motion detection configured and ready");
-  Serial.println("(Delaying SLEEP mode to allow sensor to fully stabilize)");
+  Serial.println("(SLEEP mode will be entered after stabilization delay in enterDeepSleep())");
 }
 
 // Reset all state variables to prepare for motion tracking
