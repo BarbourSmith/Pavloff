@@ -32,9 +32,11 @@ Comprehensive power optimization for battery operation:
 - **Active Power Optimization**: Reduced CPU frequency (80 MHz), automatic light sleep, and optimized BLE power
 - **Automatic Deep Sleep**: Enters ultra-low power mode (< 50 μA) after 5 minutes of inactivity
 - **Wake-on-Motion**: MPU-6050 motion detection interrupt wakes device from deep sleep
+- **Reliable Sleep/Wake Cycle**: Proper stabilization delays prevent spurious wake-ups
 - **Extended Battery Life**: Up to 14 days on a 500 mAh battery with typical usage
 
 See [POWER_MANAGEMENT.md](POWER_MANAGEMENT.md) for detailed information.
+See [IMMEDIATE_WAKE_FIX.md](IMMEDIATE_WAKE_FIX.md) for details on the sleep stabilization fix.
 
 ### Workout Rep Detection
 Automatically counts workout repetitions using orientation-independent motion analysis:
