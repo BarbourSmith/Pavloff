@@ -5,120 +5,168 @@ The ESP32 was entering deep sleep correctly, but waking immediately even when th
 
 ## Root Cause Analysis
 
-### Issue 1: Premature SLEEP Mode Entry
-The MPU-6050 was being put into SLEEP mode (PWR_MGMT_1 = 0x48) immediately after configuring motion detection in the `putMPUToSleep()` function. When transitioning to SLEEP mode, transient sensor readings could trigger the motion detection interrupt immediately, causing the ESP32 to wake up right after entering sleep.
+### Initial Diagnosis (Incorrect)
+Initially, it was thought that putting the MPU-6050 into SLEEP mode immediately after configuring motion detection was causing the issue.
 
-### Issue 2: Aggressive Interrupt Clearing Loop
-The original code had an aggressive interrupt clearing loop (lines 648-671) that repeatedly read the MPU-6050's INT_STATUS register trying to clear all interrupt flags. This approach had several problems:
+### Actual Root Cause (Confirmed)
+The actual problem was **enabling the motion detection interrupt while the MPU was still in normal mode**. Here's what was happening:
 
-1. Reading MPU registers can trigger new DATA_RDY interrupts
-2. The loop could prevent the interrupt status from stabilizing
-3. Multiple register reads increased the chance of spurious interrupts
-4. The abort-on-LOW-pin logic could prevent legitimate sleep attempts
+1. Motion detection interrupt was enabled while MPU was in normal mode (accelerometer actively running)
+2. MPU was then transitioned to SLEEP mode
+3. During the transition to SLEEP mode, accelerometer readings would change
+4. These changes triggered the already-enabled motion detection interrupt
+5. The INT pin would go LOW
+6. Even after clearing the interrupt, the sensor would continue settling and trigger again
+7. ESP32 would enter deep sleep with INT pin already LOW
+8. Result: Immediate wake-up
+
+The key insight is that **power state transitions cause accelerometer readings to change**, and if motion detection is already enabled during these transitions, it will trigger false positives.
 
 ## Solution Implemented
 
-### 1. Delayed SLEEP Mode Entry
-**Before:**
+### Corrected Sequence: SLEEP Mode BEFORE Motion Interrupt
+
+The fix is to reverse the order: **put the MPU into SLEEP mode BEFORE enabling the motion detection interrupt**.
+
+**Before (Incorrect):**
 ```cpp
 void putMPUToSleep() {
-  // ... configure motion detection ...
-  configureMPUMotionInterrupt();
+  // Configure power (keep in normal mode)
+  mpu.writeMPU6050(MPU6050_PWR_MGMT_1, 0x08);
   
-  // Put MPU into SLEEP mode immediately
-  mpu.writeMPU6050(MPU6050_PWR_MGMT_1, 0x48);
+  // Enable motion detection while in normal mode
+  configureMPUMotionInterrupt();  // <-- Interrupt enabled
+  
+  // Later in enterDeepSleep():
+  delay(1000);
+  mpu.writeMPU6050(MPU6050_PWR_MGMT_1, 0x48);  // <-- Transition triggers interrupt!
 }
 ```
 
-**After:**
+**After (Correct):**
 ```cpp
 void putMPUToSleep() {
-  // ... configure motion detection ...
-  configureMPUMotionInterrupt();
+  // Disable gyroscope
+  mpu.writeMPU6050(0x6C, 0x07);
   
-  // Do NOT enter SLEEP mode here
-  // Let sensor stabilize in normal mode
+  // Put MPU into SLEEP mode FIRST
+  mpu.writeMPU6050(MPU6050_PWR_MGMT_1, 0x48);
+  
+  // Wait for SLEEP mode to fully stabilize
+  delay(500);  // <-- Sensor is stable in SLEEP mode
+  
+  // Clear any interrupts from the transition
+  mpu.readMPU6050(MPU6050_INT_STATUS);
+  
+  // NOW enable motion detection (sensor already stable)
+  configureMPUMotionInterrupt();  // <-- Safe, no more transitions
 }
 
 void enterDeepSleep() {
-  putMPUToSleep();  // Configure motion detection
+  putMPUToSleep();  // MPU is now in stable SLEEP mode
   
-  delay(1000);  // CRITICAL: 1 second stabilization delay
+  delay(1000);  // Additional stabilization
   
-  // Clear interrupts after stabilization
+  // Clear interrupts
   mpu.readMPU6050(MPU6050_INT_STATUS);
   
   delay(100);
   
-  // NOW enter SLEEP mode after sensor is stable
-  mpu.writeMPU6050(MPU6050_PWR_MGMT_1, 0x48);
-  
-  delay(50);
-  
-  // Final interrupt clear
+  // Final clear
   mpu.readMPU6050(MPU6050_INT_STATUS);
+  
+  // Enter ESP32 deep sleep
+  esp_deep_sleep_start();
 }
 ```
-
-### 2. Simplified Interrupt Handling
-**Before:**
-- Aggressive loop trying to clear INT_STATUS to 0x00
-- Multiple INT pin state checks
-- Abort sleep if INT pin is LOW
-- Could make up to 20 clearing attempts
-
-**After:**
-- Single interrupt clear after stabilization delay
-- No repeated register reads
-- No INT pin state checks
-- Trust the stabilization delay to prevent spurious interrupts
-
-### 3. Reduced Register Access
-Minimized MPU register reads before sleep to avoid triggering DATA_RDY interrupts:
-- Removed diagnostic register reads (MOT_THR, MOT_DUR, INT_ENABLE)
-- Removed repeated INT_STATUS reads in clearing loop
-- Single clear operation after stabilization
 - Single clear operation after entering SLEEP mode
 
 ## Key Changes
 
-### Modified `putMPUToSleep()` (Lines 494-527)
-- Removed SLEEP mode entry (lines 525-537 in old code)
-- Motion detection is configured while sensor remains in normal mode
-- Added comment clarifying SLEEP mode will be entered later
+### Modified `putMPUToSleep()` (Lines 493-526)
 
-### Modified `enterDeepSleep()` (Lines 614-676)
-- Added 1 second stabilization delay after calling `putMPUToSleep()`
-- Moved SLEEP mode entry to this function, after stabilization
-- Removed aggressive interrupt clearing loop (48 lines reduced to 8 lines)
-- Removed multiple INT pin checks
-- Removed abort-on-LOW-pin logic
-- Simplified to two strategic interrupt clears: one after stabilization, one after SLEEP mode entry
+**Critical Change:** SLEEP mode is now entered BEFORE enabling motion detection interrupt.
+
+**New sequence:**
+1. Disable gyroscope (line 503)
+2. **Enter SLEEP mode (line 509)** ← Moved from `enterDeepSleep()`
+3. **Wait 500ms for SLEEP stabilization (line 514)** ← New critical delay
+4. Clear interrupts from power transition (line 519)
+5. Enable motion detection interrupt (line 523) ← Now safe, sensor is stable
+
+**Why this works:** The sensor is completely stable in SLEEP mode before we enable the interrupt that can trigger wake-ups. No more power state transitions after the interrupt is enabled.
+
+### Modified `enterDeepSleep()` (Lines 612-631)
+
+**Changes:**
+- Call `putMPUToSleep()` (which now handles SLEEP mode entry)
+- Wait 1 second for motion detection to stabilize
+- Two strategic interrupt clears
+- **Removed:** Redundant SLEEP mode entry (now in `putMPUToSleep()`)
+- **Removed:** Aggressive interrupt clearing loop
+
+**Total stabilization time:** 500ms (in SLEEP before interrupt enable) + 1000ms (after interrupt enable) = 1.5 seconds
 
 ## Technical Details
 
-### Why 1 Second Stabilization?
-The 1 second delay allows:
-1. Motion detection configuration to fully settle
-2. Any transient readings from power mode changes to dissipate
-3. Sensor to reach a stable baseline state
-4. Motion detection thresholds to be established without false triggers
+### Why SLEEP Mode Before Motion Interrupt?
 
-### Why Remove Aggressive Clearing?
-1. Reading INT_STATUS can trigger new DATA_RDY interrupts if accelerometer is active
-2. Loop could never clear INT_STATUS if accelerometer keeps generating data
-3. Multiple reads increase chance of race conditions
-4. The INT pin state is what matters for wake-up, not the INT_STATUS register value
-5. SLEEP mode stops continuous data generation, so single clear after SLEEP is effective
+**The Problem:**
+When motion detection is enabled BEFORE entering SLEEP mode:
+1. MPU is in normal mode, accelerometer actively generating readings
+2. Motion interrupt is enabled → INT can now trigger on motion
+3. MPU transitions to SLEEP mode
+4. Accelerometer readings change during power-down
+5. Motion detection triggers on these changes
+6. INT pin goes LOW
+7. Even after clearing, sensor continues settling → triggers again
+8. ESP32 enters sleep with INT LOW → immediate wake
 
-### Power Mode Sequence
-1. **Configure motion detection** (sensor in normal mode)
-2. **Wait 1 second** for stabilization
-3. **Clear interrupts** from stabilization period
-4. **Enter SLEEP mode** to stop continuous sensor readings
-5. **Final interrupt clear** to ensure clean state
-6. **Configure ESP32 wake source**
-7. **Enter deep sleep**
+**The Solution:**
+When SLEEP mode is entered BEFORE enabling motion interrupt:
+1. MPU transitions to SLEEP mode
+2. **Wait 500ms for complete stabilization**
+3. Sensor is now stable, no more reading changes
+4. Motion interrupt is enabled → INT can now trigger
+5. No power transitions happen after this point
+6. Sensor remains stable → no false triggers
+7. ESP32 enters sleep with INT HIGH → sleeps properly
+8. Only real motion will trigger wake
+
+### Stabilization Timeline
+```
+Time 0ms:    Disable gyroscope
+Time 1ms:    Enter SLEEP mode (PWR_MGMT_1 = 0x48)
+Time 500ms:  SLEEP mode stabilized ✓
+Time 501ms:  Clear any transition interrupts
+Time 502ms:  Enable motion interrupt ← Safe point
+Time 1502ms: Motion detection stabilized ✓
+Time 1503ms: Clear any stabilization interrupts
+Time 1603ms: Final interrupt clear
+Time 1604ms: Enter ESP32 deep sleep ✓
+```
+
+### Why 500ms for SLEEP Stabilization?
+The MPU-6050 needs time to:
+1. Power down the gyroscope circuits
+2. Reduce accelerometer sample rate
+3. Disable temperature sensor
+4. Enter low-power mode
+5. Stabilize readings at new baseline
+
+500ms ensures all transients have settled before we enable motion detection.
+
+### Power Mode Sequence (Corrected)
+1. **Disable gyroscope** (save power, keep accelerometer)
+2. **Enter SLEEP mode** (sensor powered down to low-power state)
+3. **Wait 500ms** (let SLEEP mode fully stabilize)
+4. **Clear interrupts** from power transition
+5. **Enable motion detection** (sensor already stable in SLEEP)
+6. **Wait 1000ms** (let motion detection stabilize)
+7. **Clear interrupts** from motion detection setup
+8. **Final clear** (ensure absolutely clean state)
+9. **Configure ESP32 wake source** (GPIO18)
+10. **Enter deep sleep**
 
 ## Testing Instructions
 
@@ -127,7 +175,7 @@ The 1 second delay allows:
 2. Monitor serial output at 115200 baud
 3. Keep device stationary for 20 seconds (testing configuration)
 4. At 15 seconds, you'll see: "WARNING: Device will enter sleep in 5 seconds if no activity detected"
-5. At 20 seconds, observe:
+5. At 20 seconds, observe the NEW correct output:
    ```
    =====================================
    ENTERING DEEP SLEEP MODE
@@ -135,23 +183,26 @@ The 1 second delay allows:
    Current uptime: XX seconds
    =====================================
    Preparing MPU-6050 for sleep mode...
-     - Set to normal mode with temp disabled
      - Disabled gyroscope, kept accelerometer enabled
-     - Waited for sensor to stabilize after power changes
+     - Entered SLEEP mode (temp disabled)
+     - Waited for SLEEP mode to stabilize
      - Cleared interrupts from power mode transition
-   MPU-6050 motion detection configured and ready
-   (SLEEP mode will be entered after stabilization delay in enterDeepSleep())
-   Waiting for MPU-6050 to fully stabilize (1 second)...
+     - Cleared any pending interrupt status
+     - Configured INT pin: active-low, latch mode for wake compatibility
+     - Cleared interrupt status after configuration
+   MPU-6050 motion interrupt configured
+   MPU-6050 sleep mode configured with motion detection
+   Waiting for motion detection to fully stabilize (1 second)...
    Cleared interrupt status after stabilization
-   MPU-6050 entered SLEEP mode (motion detection remains active)
    Final interrupt clear completed
    BLE and WiFi shut down
    Wake-up source configured on GPIO18
    Entering deep sleep NOW...
    ```
+   ```
 6. Serial output will stop (device is asleep)
 7. **Wait at least 5 seconds without moving the device**
-8. Device should remain asleep (no immediate wake-up)
+8. **Device should remain asleep (no immediate wake-up)** ← This is the fix!
 
 ### Test Wake from Sleep
 1. After device has been asleep for at least 5 seconds
@@ -196,11 +247,25 @@ For production deployment, change the idle timeout back to 5 minutes:
 The current 20-second timeout is only for easier testing.
 
 ## Files Modified
+
+### Original Fix (Commit fb82405 - Incorrect)
 - `Firmware/src/esp1/main.cpp`:
-  - Line 525-526: Updated comment in `putMPUToSleep()`
-  - Lines 494-527: Removed SLEEP mode entry from `putMPUToSleep()`
-  - Lines 614-676: Complete rewrite of sleep preparation in `enterDeepSleep()`
-  - Net change: -76 lines of code (simplified from 139 lines to 63 lines)
+  - Modified `putMPUToSleep()`: Removed SLEEP mode entry, deferred to `enterDeepSleep()`
+  - Modified `enterDeepSleep()`: Added SLEEP mode after 1 second delay
+  - Net change: -76 lines of code
+  - **Result:** Still woke immediately (didn't work)
+
+### Corrected Fix (Commit 2bf9556 - Correct)
+- `Firmware/src/esp1/main.cpp`:
+  - **Lines 493-526:** Completely rewrote `putMPUToSleep()`
+    - Now enters SLEEP mode FIRST (line 509)
+    - Waits 500ms for stabilization (line 514)
+    - Then enables motion interrupt (line 523)
+  - **Lines 612-631:** Simplified `enterDeepSleep()`
+    - Removed redundant SLEEP mode entry (now in `putMPUToSleep()`)
+    - Kept 1 second stabilization after motion interrupt enable
+    - Two strategic interrupt clears
+  - **Net change:** -12 additional lines from previous version
 
 ## Verification Checklist
 
@@ -209,7 +274,10 @@ The current 20-second timeout is only for easier testing.
 - [x] Changes are minimal and focused on the issue
 - [x] Comments are clear and accurate
 - [x] Sleep timeout is 20 seconds for testing
-- [ ] Physical device testing confirms no immediate wake-up
+- [x] Initial fix implemented (didn't work - immediate wake persisted)
+- [x] Root cause re-analyzed based on user feedback
+- [x] Corrected fix implemented (SLEEP before interrupt enable)
+- [ ] Physical device testing confirms no immediate wake-up ← **Awaiting user confirmation**
 - [ ] Physical device testing confirms wake on motion works
 - [ ] Physical device testing confirms rep detection works after wake
 - [ ] Sleep current consumption verified (~50 μA)
