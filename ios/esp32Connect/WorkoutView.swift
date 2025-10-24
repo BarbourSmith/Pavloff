@@ -11,6 +11,7 @@ import UIKit
 
 struct WorkoutView: View {
     @StateObject private var bleManager = BLEManager()
+    @StateObject private var screenTimeManager = ScreenTimeManager.shared
     @State private var workoutSettings = WorkoutSettings()
     @State private var currentExerciseIndex = 0
     @State private var connectionStatus: String = "Scanning for device..."
@@ -21,6 +22,7 @@ struct WorkoutView: View {
     @State private var showingSetup = false
     @State private var showingCongratulations = false
     @State private var lastRepCount = 0
+    @State private var workoutStartedToday = false
     
     // Accept both old and new device names for backward compatibility
     private let targetDeviceNames = ["Pavloff Workout Sensor", "ESP32_IMU_Stream"]
@@ -59,6 +61,22 @@ struct WorkoutView: View {
                             .font(.subheadline)
                             .foregroundColor(isConnected ? Color.white.opacity(0.9) : Color.white.opacity(0.8))
                             .font(isConnected ? .subheadline.weight(.semibold) : .subheadline.weight(.regular))
+                    }
+                    
+                    // Screen Time Status Indicator
+                    if screenTimeManager.isAuthorized && screenTimeManager.hasAppsSelected {
+                        HStack(spacing: 6) {
+                            Image(systemName: workoutStartedToday ? "lock.open.fill" : "lock.fill")
+                                .font(.caption)
+                            Text(workoutStartedToday ? "Apps Unlocked" : "Apps Blocked")
+                                .font(.caption)
+                                .fontWeight(.semibold)
+                        }
+                        .foregroundColor(.white.opacity(0.9))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(workoutStartedToday ? Color.green.opacity(0.3) : Color.orange.opacity(0.3))
+                        .cornerRadius(12)
                     }
                 }
                 .padding()
@@ -251,6 +269,7 @@ struct WorkoutView: View {
             }
             .onAppear {
                 startAutoConnect()
+                checkAndEnableScreenTimeBlocking()
             }
             .onDisappear {
                 cleanup()
@@ -302,6 +321,7 @@ struct WorkoutView: View {
         } else {
             // All exercises completed
             print("[WORKOUT] All exercises completed!")
+            workoutCompletedToday()
             showingCongratulations = true
         }
     }
@@ -317,6 +337,39 @@ struct WorkoutView: View {
         currentExerciseIndex = 0
         resetCurrentExercise()
         showingCongratulations = false
+        checkAndEnableScreenTimeBlocking()
+    }
+    
+    private func checkAndEnableScreenTimeBlocking() {
+        // Check if workout was completed today
+        let lastCompletionDate = UserDefaults.standard.object(forKey: "lastWorkoutCompletion") as? Date
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        
+        if let lastDate = lastCompletionDate {
+            let lastCompletionDay = calendar.startOfDay(for: lastDate)
+            workoutStartedToday = calendar.isDate(lastCompletionDay, inSameDayAs: today)
+        } else {
+            workoutStartedToday = false
+        }
+        
+        // Enable blocking if workout not completed today
+        if !workoutStartedToday {
+            print("[WORKOUT] Workout not completed today, enabling app blocking")
+            screenTimeManager.enableAppBlocking()
+        } else {
+            print("[WORKOUT] Workout already completed today, apps remain unblocked")
+        }
+    }
+    
+    private func workoutCompletedToday() {
+        // Save completion time
+        UserDefaults.standard.set(Date(), forKey: "lastWorkoutCompletion")
+        workoutStartedToday = true
+        
+        // Disable app blocking for the rest of the day
+        print("[WORKOUT] Workout completed! Disabling app blocking")
+        screenTimeManager.disableAppBlocking()
     }
     
     private func handleDisconnection() {

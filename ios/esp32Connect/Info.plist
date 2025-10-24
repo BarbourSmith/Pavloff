@@ -53,6 +53,8 @@
 	<string>This app needs Bluetooth access to connect to your ESP32 device and monitor IMU sensor data.</string>
 	<key>NSBluetoothPeripheralUsageDescription</key>
 	<string>We need Bluetooth to communicate with your ESP32 device and stream accelerometer and gyroscope data.</string>
+	<key>NSFamilyControlsUsageDescription</key>
+	<string>This app uses Screen Time to help you stay focused by blocking selected apps until you complete your daily workout.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
