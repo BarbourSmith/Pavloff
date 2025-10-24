@@ -494,36 +494,35 @@ void configureMPUMotionInterrupt() {
 void putMPUToSleep() {
   Serial.println("Preparing MPU-6050 for sleep mode...");
   
-  // CRITICAL: Configure power management FIRST, before enabling motion detection
-  // This prevents sensor fluctuations from power mode changes from triggering false interrupts
+  // CRITICAL: Put MPU into SLEEP mode BEFORE enabling motion detection
+  // This prevents the transition to SLEEP mode from triggering motion detection
   
-  // Step 1: Keep device in normal mode (no SLEEP, no CYCLE), disable TEMP for power savings
-  // PWR_MGMT_1: Bit 6 = SLEEP (0), Bit 5 = CYCLE (0), Bit 3 = TEMP_DIS (1)
-  // 0x08 = 0b00001000 (normal mode with temp sensor disabled)
-  mpu.writeMPU6050(MPU6050_PWR_MGMT_1, 0x08);
-  Serial.println("  - Set to normal mode with temp disabled");
-  
-  // Step 2: Disable gyroscope to save power, keep accelerometer enabled
+  // Step 1: Disable gyroscope to save power, keep accelerometer enabled
   // PWR_MGMT_2: Bits 2-0 = 111 to disable gyroscope axes
   // Bits 5-3 = 000 to enable all accelerometer axes (required for motion detection)
   mpu.writeMPU6050(0x6C, 0x07);
   Serial.println("  - Disabled gyroscope, kept accelerometer enabled");
   
-  // Wait for power mode changes to fully settle
-  // Sensor needs time to stabilize after changing power configuration
-  delay(100);
-  Serial.println("  - Waited for sensor to stabilize after power changes");
+  // Step 2: Put MPU into SLEEP mode with temp sensor disabled
+  // PWR_MGMT_1: Bit 6 = SLEEP (1), Bit 3 = TEMP_DIS (1)
+  // 0x48 = 0b01001000 (sleep mode with temp sensor disabled)
+  mpu.writeMPU6050(MPU6050_PWR_MGMT_1, 0x48);
+  Serial.println("  - Entered SLEEP mode (temp disabled)");
   
-  // Clear any interrupts that occurred during power mode transition
+  // Step 3: Wait for SLEEP mode to fully stabilize
+  // This is critical - the sensor must be completely stable before enabling motion detection
+  delay(500);
+  Serial.println("  - Waited for SLEEP mode to stabilize");
+  
+  // Step 4: Clear any interrupts that occurred during power mode transition
   const uint8_t MPU6050_INT_STATUS = 0x3A;
   mpu.readMPU6050(MPU6050_INT_STATUS);
   Serial.println("  - Cleared interrupts from power mode transition");
   
-  // NOW configure motion detection interrupt (after sensor is stable)
+  // Step 5: NOW configure motion detection interrupt (after sensor is in stable SLEEP mode)
   configureMPUMotionInterrupt();
   
-  Serial.println("MPU-6050 motion detection configured and ready");
-  Serial.println("(SLEEP mode will be entered after stabilization delay in enterDeepSleep())");
+  Serial.println("MPU-6050 sleep mode configured with motion detection");
 }
 
 // Reset all state variables to prepare for motion tracking
@@ -613,10 +612,9 @@ void enterDeepSleep() {
   // Put MPU-6050 into low power mode before sleeping
   putMPUToSleep();
   
-  // CRITICAL: Long stabilization delay after configuring motion detection
-  // This allows the sensor to fully settle and prevents spurious wake-ups
-  // from transient readings during power mode transitions
-  Serial.println("Waiting for MPU-6050 to fully stabilize (1 second)...");
+  // CRITICAL: Long stabilization delay after enabling motion detection
+  // This allows the motion detection hardware to fully stabilize and prevents spurious wake-ups
+  Serial.println("Waiting for motion detection to fully stabilize (1 second)...");
   delay(1000);
   
   // Clear any interrupts that occurred during stabilization
@@ -624,20 +622,10 @@ void enterDeepSleep() {
   mpu.readMPU6050(MPU6050_INT_STATUS);
   Serial.println("Cleared interrupt status after stabilization");
   
-  // Final delay to ensure no new data is generated
+  // Final delay and check to ensure clean state before sleep
   delay(100);
   
-  // Now put MPU into SLEEP mode to stop continuous sensor readings
-  // The motion detection hardware remains active and will trigger wake-up
-  // PWR_MGMT_1: Bit 6 = SLEEP (1), Bit 3 = TEMP_DIS (1)
-  // 0x48 = 0b01001000 (sleep mode with temp sensor disabled)
-  mpu.writeMPU6050(MPU6050_PWR_MGMT_1, 0x48);
-  Serial.println("MPU-6050 entered SLEEP mode (motion detection remains active)");
-  
-  // Wait for SLEEP mode to take effect
-  delay(50);
-  
-  // Single final interrupt clear after entering SLEEP mode
+  // Final interrupt clear to ensure absolutely clean state
   mpu.readMPU6050(MPU6050_INT_STATUS);
   Serial.println("Final interrupt clear completed");
   Serial.flush();
