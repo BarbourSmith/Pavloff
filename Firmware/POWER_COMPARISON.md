@@ -69,9 +69,9 @@ Assuming mixed usage (mostly idle with periodic workouts):
 - **Battery life: ~14 days**
 
 **Polling wake (2s interval):**
-- 23 hours/day idle @ 2.72 mA = 62.6 mAh
+- 23 hours/day idle @ 2.7 mA = 62.1 mAh
 - 1 hour/day active @ 34 mA = 34 mAh
-- Total per day: ~97 mAh
+- Total per day: ~96 mAh
 - **Battery life: ~5 days** (2.8× worse)
 
 ## Optimization Opportunities for Polling System
