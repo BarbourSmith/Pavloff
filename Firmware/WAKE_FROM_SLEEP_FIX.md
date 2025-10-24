@@ -184,12 +184,14 @@ Based on the proven solution from [Arduino Stack Exchange](https://arduino.stack
      - Bit 0 = 1: Free-fall detection decrement
    - Optimized settings for better wake-up reliability
 
-4. **CRITICAL FIX: Use CYCLE mode instead of SLEEP mode**
-   - **Previous (INCORRECT):** PWR_MGMT_1 = 0x48 (SLEEP mode)
-   - **Current (CORRECT):** PWR_MGMT_1 = 0x28 (CYCLE mode)
-   - **The Problem:** SLEEP mode (bit 6 = 1) completely disables the accelerometer, preventing motion detection from working. The INT_STATUS register showed 0x01 (DATA_RDY flag) before sleep, indicating the sensor was trying to generate interrupts even in SLEEP mode, causing immediate wake-ups.
-   - **The Solution:** CYCLE mode (bit 5 = 1) makes the accelerometer wake up periodically (40Hz) to sample and check for motion, while still consuming low power (~40 μA). The motion detection logic needs an active accelerometer to work.
-   - **Wake Frequency:** PWR_MGMT_2 bits 7-6 set to 0xC7 (11 in binary) = 40Hz wake frequency for responsive motion detection
+4. **CRITICAL FIX: Use NORMAL mode (not SLEEP, not CYCLE)**
+   - **Previous attempts:**
+     - SLEEP mode (0x48): Completely disables accelerometer - motion detection impossible
+     - CYCLE mode (0x28): Accelerometer samples periodically but generates continuous DATA_RDY interrupts that trigger immediate wake-up
+   - **Current (CORRECT):** PWR_MGMT_1 = 0x00 (NORMAL mode)
+   - **The Problem:** SLEEP mode disables the accelerometer. CYCLE mode generates periodic DATA_RDY interrupts (even with INT_ENABLE bit 0 disabled) that cause the INT pin to go LOW, triggering immediate wake-ups.
+   - **The Solution:** Keep the MPU6050 in NORMAL mode matching the Arduino Stack Exchange solution. The accelerometer stays active (~3-4mA), but motion detection works reliably. Only the ESP32 goes into deep sleep (~10 μA). Total sleep current is ~3-4mA instead of the ~50 μA hoped for with CYCLE mode, but this is acceptable for reliable operation.
+   - **Why this works:** In normal mode with only motion detection interrupt enabled (INT_ENABLE = 0x40), the MPU6050 doesn't generate spurious interrupts. The INT pin only goes LOW when actual motion exceeding the threshold is detected.
 
 ### Key Change Detail
 **INT_PIN_CFG Register (0x37):**
@@ -217,10 +219,10 @@ This ensures the INT pin remains stable and LOW during the entire sleep period, 
 - MOT_THR (0x1F) = 64 (128mg threshold)
 - MOT_DUR (0x20) = 20 (20ms duration)
 - MOT_DETECT_CTRL (0x69) = 0x15 (optimized motion detection settings)
-- PWR_MGMT_1 (0x6B) = 0x28 (CYCLE mode, temp sensor disabled)
-- PWR_MGMT_2 (0x6C) = 0xC7 (40Hz wake frequency, gyro disabled, accel enabled)
+- PWR_MGMT_1 (0x6B) = 0x00 (NORMAL mode - not SLEEP, not CYCLE)
+- PWR_MGMT_2 (0x6C) = 0x07 (gyro disabled, accelerometer enabled)
 
-**CRITICAL:** The MPU6050 uses CYCLE mode, NOT SLEEP mode. In CYCLE mode, the accelerometer wakes up periodically (40Hz) to check for motion. SLEEP mode would disable the accelerometer completely and prevent motion detection from working.
+**CRITICAL:** The MPU6050 stays in NORMAL mode (PWR_MGMT_1 = 0x00) with only the gyro disabled. This uses more power (~3-4mA) than CYCLE or SLEEP mode, but is the only reliable way to prevent spurious wake-ups. CYCLE mode generates periodic DATA_RDY interrupts that trigger immediate wake-ups even with INT_ENABLE configured correctly.
 
 **After Wake:**
 - First action: Read INT_STATUS (0x3A) to clear interrupt flag

@@ -533,29 +533,22 @@ void putMPUToSleep() {
   // NOW configure motion detection interrupt (after sensor is stable)
   configureMPUMotionInterrupt();
   
-  // CRITICAL: Use CYCLE mode for low-power motion detection
-  // SLEEP mode (bit 6) would disable the accelerometer and prevent motion detection
-  // CYCLE mode (bit 5) makes the accelerometer wake periodically to check for motion
-  // PWR_MGMT_1: Bit 6 = SLEEP (0), Bit 5 = CYCLE (1), Bit 3 = TEMP_DIS (1)
-  // 0x28 = 0b00101000 (cycle mode with temp sensor disabled)
-  // Note: In CYCLE mode, the wake frequency is controlled by LP_WAKE_CTRL register
-  mpu.writeMPU6050(MPU6050_PWR_MGMT_1, 0x28);
-  Serial.println("  - Enabled CYCLE mode for low-power motion detection");
+  // CRITICAL: Keep MPU6050 in NORMAL mode (not SLEEP, not CYCLE)
+  // Motion detection requires the accelerometer to be actively sampling
+  // The Stack Exchange solution keeps PWR_MGMT_1 = 0x00 (normal mode)
+  // This uses more power (~3-4mA) but ensures reliable motion detection
+  // PWR_MGMT_1: Bit 6 = SLEEP (0), Bit 5 = CYCLE (0), all other bits = 0
+  // 0x00 = normal operation mode (all clocks active)
+  mpu.writeMPU6050(MPU6050_PWR_MGMT_1, 0x00);
+  Serial.println("  - Keeping MPU in NORMAL mode for reliable motion detection");
   
-  // Set wake frequency for CYCLE mode
-  // LP_WAKE_CTRL (0x6C bits 7-6): 00=1.25Hz, 01=5Hz, 10=20Hz, 11=40Hz
-  // We want the fastest (40Hz) for responsive motion detection
-  // But we already set PWR_MGMT_2 to 0x07 (gyro disabled), so we need to preserve that
-  // and only set the wake frequency in the upper bits
-  // 0xC7 = 0b11000111 (40Hz wake frequency + gyro disabled)
-  mpu.writeMPU6050(0x6C, 0xC7);
-  Serial.println("  - Set CYCLE mode wake frequency to 40Hz");
+  // Keep gyro disabled, accel enabled (already set to 0x07 earlier)
+  // No need to change PWR_MGMT_2 again
   
-  // Wait for cycle mode to take effect
   delay(10);
   
-  Serial.println("MPU-6050 in low-power CYCLE mode with motion detection active");
-  Serial.println("(Accelerometer wakes at 40Hz to check for motion)");
+  Serial.println("MPU-6050 in normal mode with motion detection active");
+  Serial.println("(Gyro disabled, accelerometer active for motion detection)");
 }
 
 // Reset all state variables to prepare for motion tracking
