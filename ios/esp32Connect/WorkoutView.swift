@@ -375,7 +375,6 @@ struct WorkoutView: View {
             screenTimeManager.disableAppBlocking()
         }
     }
-    }
     
     private func handleDisconnection() {
         print("[WORKOUT] Device disconnected, resuming scan...")
