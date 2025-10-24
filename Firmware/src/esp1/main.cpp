@@ -522,15 +522,14 @@ void putMPUToSleep() {
   // NOW configure motion detection interrupt (after sensor is stable)
   configureMPUMotionInterrupt();
   
-  // CRITICAL: Enable CYCLE mode for low-power motion detection
-  // In cycle mode, the MPU wakes periodically to check for motion then goes back to sleep
-  // This reduces power consumption and prevents continuous DATA_RDY generation
-  // PWR_MGMT_1: Bit 5 = CYCLE (1), combined with existing 0x08 = 0x28
-  mpu.writeMPU6050(MPU6050_PWR_MGMT_1, 0x28);
-  Serial.println("  - Enabled CYCLE mode for low-power motion detection");
+  // Keep MPU in normal mode (not CYCLE mode) for reliable motion detection
+  // Cycle mode can cause spurious wake-ups due to periodic sampling combined with latch mode
+  // With gyroscope disabled (PWR_MGMT_2 = 0x07), power consumption is still low
+  // The accelerometer remains active only for motion detection
+  // Already set above: PWR_MGMT_1 = 0x08 (normal mode with temp disabled)
   
   Serial.println("MPU-6050 in low-power mode with motion detection enabled");
-  Serial.println("(Gyroscope disabled, temperature sensor disabled, cycle mode active)");
+  Serial.println("(Gyroscope disabled, temperature sensor disabled, normal mode for stable detection)");
 }
 
 // Reset all state variables to prepare for motion tracking
