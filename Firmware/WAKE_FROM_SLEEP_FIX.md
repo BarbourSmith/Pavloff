@@ -177,6 +177,11 @@ Based on the proven solution from [Arduino Stack Exchange](https://arduino.stack
 3. **Updated Motion Detection Control**
    - MOT_DETECT_CTRL changed from 0x50 to 0x15
    - 0x15 = 0b00010101
+     - Bits 7-6 = 00: Motion detection decrement = 1 count
+     - Bits 5-4 = 01: ACCEL_ON_DELAY = 5ms (startup delay)
+     - Bits 3-2 = 01: Additional motion detection settings
+     - Bit 1 = 0: Reserved
+     - Bit 0 = 1: Free-fall detection decrement
    - Optimized settings for better wake-up reliability
 
 ### Key Change Detail
