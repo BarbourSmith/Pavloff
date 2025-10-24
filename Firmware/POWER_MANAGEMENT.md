@@ -73,7 +73,7 @@ Activity is detected from:
 - Gyroscope disabled
 - Temperature sensor disabled
 - Accelerometer in standby mode for quick wake
-- Power consumption: ~500 μA
+- Power consumption: ~500 μA (MPU6050 only)
 
 **Active Mode**:
 - Sample rate: 100 Hz

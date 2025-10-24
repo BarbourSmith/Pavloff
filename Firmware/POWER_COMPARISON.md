@@ -28,20 +28,20 @@ This document compares the power consumption of two different wake-from-sleep ap
 | Component | Polling (2s interval) | Interrupt-based |
 |-----------|----------------------|-----------------|
 | ESP32-S3 (sleep) | ~10 μA | ~10 μA |
-| ESP32-S3 (wake cycles) | ~2.5 mA average* | 0 μA |
-| MPU6050 (gyro disabled) | ~500 μA** | ~40 μA |
-| **Total average*** | ~3 mA | ~50 μA |
+| ESP32-S3 (wake cycles) | ~2.5 mA average[1] | 0 μA |
+| MPU6050 (gyro disabled) | ~500 μA[2] | ~40 μA |
+| **Total average[3]** | ~3 mA | ~50 μA |
 
-\* Averaged over 2-second polling interval (assumes 150ms wake time @ 30mA)  
-\*\* MPU6050 kept in standby mode with accelerometer active for quick wake  
-\*\*\* During periods with no motion
+[1] Averaged over 2-second polling interval (assumes 150ms wake time @ 30mA)  
+[2] MPU6050 kept in standby mode with accelerometer active for quick wake  
+[3] During periods with no motion
 
 ### Calculation Details
 
 #### Polling System (2-second interval):
 - Sleep time: 1.85s @ 0.51 mA (ESP32 10μA + MPU6050 500μA)
 - Wake time: 0.15s @ 30 mA (ESP32 active + MPU6050 active)
-- Average current: (1.85s × 0.51mA + 0.15s × 30mA) / 2s = **2.72 mA**
+- Average current: (1.85s × 0.51mA + 0.15s × 30mA) / 2s = **2.7 mA**
 
 #### Interrupt System:
 - Continuous sleep: 0.05 mA (ESP32 10μA + MPU6050 40μA in motion detection mode)
@@ -54,8 +54,8 @@ Assuming a 500 mAh battery in idle/stationary mode:
 | System | Average Current | Battery Life | Comparison |
 |--------|----------------|--------------|------------|
 | Interrupt-based | 0.05 mA | ~10,000 hours (~417 days) | Baseline |
-| Polling (2s) | 2.72 mA | ~184 hours (~7.7 days) | **54× worse** |
-| Polling (5s) | 1.20 mA | ~417 hours (~17.4 days) | **24× worse** |
+| Polling (2s) | 2.7 mA | ~185 hours (~7.7 days) | **54× worse** |
+| Polling (5s) | 1.2 mA | ~417 hours (~17.4 days) | **24× worse** |
 | Polling (10s) | 0.65 mA | ~769 hours (~32 days) | **13× worse** |
 
 ### Real-World Usage Scenario
@@ -79,8 +79,8 @@ Assuming mixed usage (mostly idle with periodic workouts):
 If stuck with polling approach, here are ways to reduce power consumption:
 
 ### 1. Increase Polling Interval
-- **2 seconds** (current): 2.72 mA average → ~5 days battery life
-- **5 seconds**: 1.20 mA average → ~11 days battery life
+- **2 seconds** (current): 2.7 mA average → ~5 days battery life
+- **5 seconds**: 1.2 mA average → ~11 days battery life
 - **10 seconds**: 0.65 mA average → ~23 days battery life
 - **30 seconds**: 0.27 mA average → ~52 days battery life
 
