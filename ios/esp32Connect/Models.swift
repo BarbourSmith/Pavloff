@@ -138,7 +138,6 @@ struct Exercise: Identifiable, Equatable {
 
 struct WorkoutSettings {
     var exercises: [Exercise]
-    var screenTimeEnabled: Bool
     
     static let defaultExercises = [
         Exercise(name: "Bicep Curls", targetReps: 10),
@@ -146,8 +145,7 @@ struct WorkoutSettings {
         Exercise(name: "Lateral Raises", targetReps: 10)
     ]
     
-    init(exercises: [Exercise] = defaultExercises, screenTimeEnabled: Bool = false) {
+    init(exercises: [Exercise] = defaultExercises) {
         self.exercises = exercises
-        self.screenTimeEnabled = screenTimeEnabled
     }
 }

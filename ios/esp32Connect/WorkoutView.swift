@@ -64,7 +64,7 @@ struct WorkoutView: View {
                     }
                     
                     // Screen Time Status Indicator
-                    if workoutSettings.screenTimeEnabled && screenTimeManager.isAuthorized {
+                    if screenTimeManager.isAuthorized && screenTimeManager.hasAppsSelected {
                         HStack(spacing: 6) {
                             Image(systemName: workoutStartedToday ? "lock.open.fill" : "lock.fill")
                                 .font(.caption)
@@ -341,8 +341,6 @@ struct WorkoutView: View {
     }
     
     private func checkAndEnableScreenTimeBlocking() {
-        guard workoutSettings.screenTimeEnabled else { return }
-        
         // Check if workout was completed today
         let lastCompletionDate = UserDefaults.standard.object(forKey: "lastWorkoutCompletion") as? Date
         let calendar = Calendar.current
@@ -370,10 +368,8 @@ struct WorkoutView: View {
         workoutStartedToday = true
         
         // Disable app blocking for the rest of the day
-        if workoutSettings.screenTimeEnabled {
-            print("[WORKOUT] Workout completed! Disabling app blocking")
-            screenTimeManager.disableAppBlocking()
-        }
+        print("[WORKOUT] Workout completed! Disabling app blocking")
+        screenTimeManager.disableAppBlocking()
     }
     
     private func handleDisconnection() {

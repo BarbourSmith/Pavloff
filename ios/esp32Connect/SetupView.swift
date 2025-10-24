@@ -45,66 +45,61 @@ struct SetupView: View {
                                 .fontWeight(.bold)
                                 .padding(.top, 10)
                             
-                            Text("Block selected apps from midnight until you complete your workout")
+                            Text("Block selected apps until you complete your workout")
                                 .font(.subheadline)
                                 .foregroundColor(.gray)
                                 .fixedSize(horizontal: false, vertical: true)
                             
-                            // Toggle for enabling screen time
-                            Toggle(isOn: $workoutSettings.screenTimeEnabled) {
-                                Text("Enable App Blocking")
-                                    .font(.body)
-                            }
-                            .tint(.blue)
-                            .onChange(of: workoutSettings.screenTimeEnabled) { enabled in
-                                if enabled && !screenTimeManager.isAuthorized {
-                                    Task {
-                                        await screenTimeManager.requestAuthorization()
-                                        if !screenTimeManager.isAuthorized {
-                                            workoutSettings.screenTimeEnabled = false
-                                        }
+                            // Show app selection button
+                            if screenTimeManager.isAuthorized {
+                                Button(action: {
+                                    showingAppPicker = true
+                                }) {
+                                    HStack {
+                                        Image(systemName: "hand.raised.fill")
+                                        Text("Select Apps to Block")
+                                        Spacer()
+                                        Image(systemName: "chevron.right")
+                                            .font(.caption)
+                                            .foregroundColor(.gray)
+                                    }
+                                    .fontWeight(.semibold)
+                                    .frame(maxWidth: .infinity)
+                                    .padding()
+                                    .background(Color.blue.opacity(0.1))
+                                    .foregroundColor(.blue)
+                                    .cornerRadius(8)
+                                }
+                                
+                                // Show selected apps count
+                                if !screenTimeManager.selectedApps.applicationTokens.isEmpty || 
+                                   !screenTimeManager.selectedApps.categoryTokens.isEmpty ||
+                                   screenTimeManager.hasAppsSelected {
+                                    HStack {
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .foregroundColor(.green)
+                                        Text("Apps selected for blocking")
+                                            .font(.subheadline)
+                                            .foregroundColor(.green)
                                     }
                                 }
-                            }
-                            
-                            // Show app selection button when enabled
-                            if workoutSettings.screenTimeEnabled {
-                                if screenTimeManager.isAuthorized {
-                                    Button(action: {
-                                        showingAppPicker = true
-                                    }) {
-                                        HStack {
-                                            Image(systemName: "hand.raised.fill")
-                                            Text("Select Apps to Block")
-                                            Spacer()
-                                            Image(systemName: "chevron.right")
-                                                .font(.caption)
-                                                .foregroundColor(.gray)
-                                        }
+                            } else {
+                                Text("⚠️ Screen Time authorization required")
+                                    .font(.subheadline)
+                                    .foregroundColor(.orange)
+                                
+                                Button(action: {
+                                    Task {
+                                        await screenTimeManager.requestAuthorization()
+                                    }
+                                }) {
+                                    Text("Request Authorization")
                                         .fontWeight(.semibold)
                                         .frame(maxWidth: .infinity)
                                         .padding()
-                                        .background(Color.blue.opacity(0.1))
-                                        .foregroundColor(.blue)
+                                        .background(Color.blue)
+                                        .foregroundColor(.white)
                                         .cornerRadius(8)
-                                    }
-                                    
-                                    // Show selected apps count
-                                    if !screenTimeManager.selectedApps.applicationTokens.isEmpty || 
-                                       !screenTimeManager.selectedApps.categoryTokens.isEmpty ||
-                                       screenTimeManager.hasAppsSelected {
-                                        HStack {
-                                            Image(systemName: "checkmark.circle.fill")
-                                                .foregroundColor(.green)
-                                            Text("Apps selected for blocking")
-                                                .font(.subheadline)
-                                                .foregroundColor(.green)
-                                        }
-                                    }
-                                } else {
-                                    Text("⚠️ Screen Time authorization required")
-                                        .font(.subheadline)
-                                        .foregroundColor(.orange)
                                 }
                             }
                         }
@@ -136,9 +131,17 @@ struct SetupView: View {
             .familyActivityPicker(isPresented: $showingAppPicker, selection: $screenTimeManager.selectedApps)
             .onChange(of: showingAppPicker) { isPresented in
                 // When app picker is dismissed and apps are selected, apply shields immediately
-                if !isPresented && workoutSettings.screenTimeEnabled && screenTimeManager.isAuthorized {
+                if !isPresented && screenTimeManager.isAuthorized {
                     if !screenTimeManager.selectedApps.applicationTokens.isEmpty || !screenTimeManager.selectedApps.categoryTokens.isEmpty {
                         screenTimeManager.enableAppBlocking()
+                    }
+                }
+            }
+            .onAppear {
+                // Request authorization on appear if not already authorized
+                if !screenTimeManager.isAuthorized {
+                    Task {
+                        await screenTimeManager.requestAuthorization()
                     }
                 }
             }
