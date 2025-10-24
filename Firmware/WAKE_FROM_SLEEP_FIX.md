@@ -184,6 +184,13 @@ Based on the proven solution from [Arduino Stack Exchange](https://arduino.stack
      - Bit 0 = 1: Free-fall detection decrement
    - Optimized settings for better wake-up reliability
 
+4. **CRITICAL FIX: Use CYCLE mode instead of SLEEP mode**
+   - **Previous (INCORRECT):** PWR_MGMT_1 = 0x48 (SLEEP mode)
+   - **Current (CORRECT):** PWR_MGMT_1 = 0x28 (CYCLE mode)
+   - **The Problem:** SLEEP mode (bit 6 = 1) completely disables the accelerometer, preventing motion detection from working. The INT_STATUS register showed 0x01 (DATA_RDY flag) before sleep, indicating the sensor was trying to generate interrupts even in SLEEP mode, causing immediate wake-ups.
+   - **The Solution:** CYCLE mode (bit 5 = 1) makes the accelerometer wake up periodically (40Hz) to sample and check for motion, while still consuming low power (~40 μA). The motion detection logic needs an active accelerometer to work.
+   - **Wake Frequency:** PWR_MGMT_2 bits 7-6 set to 0xC7 (11 in binary) = 40Hz wake frequency for responsive motion detection
+
 ### Key Change Detail
 **INT_PIN_CFG Register (0x37):**
 - Bit 7 = 1: Active LOW interrupt
@@ -210,8 +217,10 @@ This ensures the INT pin remains stable and LOW during the entire sleep period, 
 - MOT_THR (0x1F) = 64 (128mg threshold)
 - MOT_DUR (0x20) = 20 (20ms duration)
 - MOT_DETECT_CTRL (0x69) = 0x15 (optimized motion detection settings)
-- PWR_MGMT_1 (0x6B) = 0x48 (sleep mode, temp sensor disabled)
-- PWR_MGMT_2 (0x6C) = 0x07 (gyro disabled, accel enabled)
+- PWR_MGMT_1 (0x6B) = 0x28 (CYCLE mode, temp sensor disabled)
+- PWR_MGMT_2 (0x6C) = 0xC7 (40Hz wake frequency, gyro disabled, accel enabled)
+
+**CRITICAL:** The MPU6050 uses CYCLE mode, NOT SLEEP mode. In CYCLE mode, the accelerometer wakes up periodically (40Hz) to check for motion. SLEEP mode would disable the accelerometer completely and prevent motion detection from working.
 
 **After Wake:**
 - First action: Read INT_STATUS (0x3A) to clear interrupt flag

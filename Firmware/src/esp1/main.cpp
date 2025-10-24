@@ -533,19 +533,29 @@ void putMPUToSleep() {
   // NOW configure motion detection interrupt (after sensor is stable)
   configureMPUMotionInterrupt();
   
-  // CRITICAL: Put MPU into SLEEP mode AFTER configuring motion detection
-  // This prevents the accelerometer from continuously generating DATA_RDY flags
-  // The motion detection hardware works independently and will still trigger interrupts
-  // PWR_MGMT_1: Bit 6 = SLEEP (1), Bit 3 = TEMP_DIS (1)
-  // 0x48 = 0b01001000 (sleep mode with temp sensor disabled)
-  mpu.writeMPU6050(MPU6050_PWR_MGMT_1, 0x48);
-  Serial.println("  - Enabled SLEEP mode to stop continuous DATA_RDY generation");
+  // CRITICAL: Use CYCLE mode for low-power motion detection
+  // SLEEP mode (bit 6) would disable the accelerometer and prevent motion detection
+  // CYCLE mode (bit 5) makes the accelerometer wake periodically to check for motion
+  // PWR_MGMT_1: Bit 6 = SLEEP (0), Bit 5 = CYCLE (1), Bit 3 = TEMP_DIS (1)
+  // 0x28 = 0b00101000 (cycle mode with temp sensor disabled)
+  // Note: In CYCLE mode, the wake frequency is controlled by LP_WAKE_CTRL register
+  mpu.writeMPU6050(MPU6050_PWR_MGMT_1, 0x28);
+  Serial.println("  - Enabled CYCLE mode for low-power motion detection");
   
-  // Wait for sleep mode to take effect
+  // Set wake frequency for CYCLE mode
+  // LP_WAKE_CTRL (0x6C bits 7-6): 00=1.25Hz, 01=5Hz, 10=20Hz, 11=40Hz
+  // We want the fastest (40Hz) for responsive motion detection
+  // But we already set PWR_MGMT_2 to 0x07 (gyro disabled), so we need to preserve that
+  // and only set the wake frequency in the upper bits
+  // 0xC7 = 0b11000111 (40Hz wake frequency + gyro disabled)
+  mpu.writeMPU6050(0x6C, 0xC7);
+  Serial.println("  - Set CYCLE mode wake frequency to 40Hz");
+  
+  // Wait for cycle mode to take effect
   delay(10);
   
-  Serial.println("MPU-6050 in sleep mode with motion detection active");
-  Serial.println("(Motion detection hardware remains active and will trigger wake-up)");
+  Serial.println("MPU-6050 in low-power CYCLE mode with motion detection active");
+  Serial.println("(Accelerometer wakes at 40Hz to check for motion)");
 }
 
 // Reset all state variables to prepare for motion tracking
