@@ -456,14 +456,15 @@ void configureMPUMotionInterrupt() {
   Serial.println("  - Configured INT pin: active-low, latch mode for wake compatibility");
   
   // Set motion detection threshold (0-255, LSB = 2mg)
-  // Setting to 64 = 128mg threshold to reduce spurious wake-ups and save power
-  // Higher threshold prevents wake-ups from minor vibrations/bumps
-  mpu.writeMPU6050(MPU6050_MOT_THR, 64);
+  // CRITICAL: Increased to 128 (256mg) to prevent spurious wake-ups from settling/vibration
+  // This is high enough to avoid false triggers but low enough to detect intentional movement
+  // Testing showed lower thresholds cause immediate wake due to sensor settling in SLEEP mode
+  mpu.writeMPU6050(MPU6050_MOT_THR, 128);
   
   // Set motion detection duration (1-255, LSB = 1ms)
-  // Setting to 20 = 20ms of continuous motion required
-  // Longer duration helps filter out brief vibrations
-  mpu.writeMPU6050(MPU6050_MOT_DUR, 20);
+  // CRITICAL: Increased to 40ms to require sustained motion, filtering out brief spikes
+  // This helps prevent wake-ups from momentary vibrations or sensor noise
+  mpu.writeMPU6050(MPU6050_MOT_DUR, 40);
   
   // Enable motion detection logic
   // MOT_DETECT_CTRL (0x69): Bits 7-6 = 01 for motion detection decrement (1 count)
@@ -511,7 +512,8 @@ void putMPUToSleep() {
   
   // Step 3: Wait for SLEEP mode to fully stabilize
   // This is critical - the sensor must be completely stable before enabling motion detection
-  delay(500);
+  // INCREASED to 1 second to ensure complete settling of accelerometer in low-power mode
+  delay(1000);
   Serial.println("  - Waited for SLEEP mode to stabilize");
   
   // Step 4: Clear any interrupts that occurred during power mode transition
@@ -612,10 +614,11 @@ void enterDeepSleep() {
   // Put MPU-6050 into low power mode before sleeping
   putMPUToSleep();
   
-  // CRITICAL: Long stabilization delay after enabling motion detection
+  // CRITICAL: Extended stabilization delay after enabling motion detection
   // This allows the motion detection hardware to fully stabilize and prevents spurious wake-ups
-  Serial.println("Waiting for motion detection to fully stabilize (1 second)...");
-  delay(1000);
+  // INCREASED to 2 seconds to ensure motion detection circuitry has completely settled
+  Serial.println("Waiting for motion detection to fully stabilize (2 seconds)...");
+  delay(2000);
   
   // Clear any interrupts that occurred during stabilization
   const uint8_t MPU6050_INT_STATUS = 0x3A;
@@ -628,6 +631,42 @@ void enterDeepSleep() {
   // Final interrupt clear to ensure absolutely clean state
   mpu.readMPU6050(MPU6050_INT_STATUS);
   Serial.println("Final interrupt clear completed");
+  
+  // CRITICAL: Wait and verify INT pin is HIGH before proceeding
+  // If pin is LOW, the device will wake immediately
+  delay(200);  // Give time for pin to settle after interrupt clear
+  
+  int intPinState = digitalRead(MPU_INT_PIN);
+  Serial.print("INT pin state after clearing: ");
+  Serial.println(intPinState == HIGH ? "HIGH (good)" : "LOW (bad - will wake immediately!)");
+  
+  // If INT pin is LOW, try aggressive clearing
+  if (intPinState == LOW) {
+    Serial.println("WARNING: INT pin is LOW, attempting aggressive recovery...");
+    
+    // Try disabling and re-enabling motion interrupt
+    mpu.writeMPU6050(0x38, 0x00);  // Disable all interrupts
+    delay(100);
+    mpu.readMPU6050(MPU6050_INT_STATUS);  // Clear status
+    delay(100);
+    mpu.writeMPU6050(0x38, 0x40);  // Re-enable motion interrupt
+    delay(100);
+    mpu.readMPU6050(MPU6050_INT_STATUS);  // Clear again
+    delay(200);
+    
+    intPinState = digitalRead(MPU_INT_PIN);
+    Serial.print("INT pin state after recovery: ");
+    Serial.println(intPinState == HIGH ? "HIGH (recovered)" : "LOW (still bad)");
+    
+    if (intPinState == LOW) {
+      Serial.println("CRITICAL: Cannot clear INT pin, aborting sleep to prevent immediate wake");
+      Serial.println("Device will retry sleep on next idle timeout");
+      Serial.flush();
+      return;  // Abort sleep, will try again after next idle timeout
+    }
+  }
+  
+  Serial.println("INT pin verified HIGH, safe to enter deep sleep");
   Serial.flush();
   
   // Disable BLE and wait for clean shutdown
