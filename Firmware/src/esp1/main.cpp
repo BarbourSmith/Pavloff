@@ -439,21 +439,29 @@ void configureMPUMotionInterrupt() {
   const uint8_t MPU6050_MOT_THR = 0x1F;
   const uint8_t MPU6050_MOT_DUR = 0x20;
   const uint8_t MPU6050_MOT_DETECT_CTRL = 0x69;
+  const uint8_t ACCEL_CONFIG_REG = 0x1C;  // Using different name to avoid library conflict
   
   // CRITICAL: Clear any pending interrupts FIRST before configuring
   // This prevents spurious wake-ups from stale interrupt flags
   mpu.readMPU6050(MPU6050_INT_STATUS);
   Serial.println("  - Cleared any pending interrupt status");
   
+  // Configure digital high-pass filter for accelerometer
+  // ACCEL_CONFIG (0x1C): Bits 2-0 control DHPF, 0x01 = 5Hz cutoff
+  // This filters out DC offset and improves motion detection accuracy
+  mpu.writeMPU6050(ACCEL_CONFIG_REG, 0x01);
+  Serial.println("  - Configured digital high-pass filter (5Hz)");
+  
   // Configure interrupt pin
-  // Bit 7 = 1 (active low), Bit 6 = 0 (push-pull), Bit 5 = 1 (latch until cleared), Bit 4 = 1 (clear on any read)
+  // Bit 7 = 1 (active low), Bit 6 = 0 (push-pull), Bit 5 = 1 (latch until INT_STATUS read), Bit 4 = 0 (clear only on INT_STATUS read)
+  // CRITICAL: Bit 4 = 0 means INT is cleared ONLY when reading INT_STATUS, not on any register read
+  // This prevents sensor data reads from clearing the interrupt before sleep
   // CRITICAL: Must use LATCH mode for ESP32 ext0 wake to work reliably
   // ESP32 ext0 wake requires a sustained LOW level, not a 50us pulse
   // The INT pin will latch LOW on motion detection and stay LOW until INT_STATUS is read
-  // This is safe because we explicitly disable DATA_RDY interrupt (bit 0 of INT_ENABLE)
-  // Only the ENABLED motion interrupt (bit 6) will trigger the latch
-  mpu.writeMPU6050(MPU6050_INT_PIN_CFG, 0xB0);
-  Serial.println("  - Configured INT pin: active-low, latch mode for wake compatibility");
+  // 0xA0 = 0b10100000 (active-low, push-pull, latch mode, clear only on INT_STATUS read)
+  mpu.writeMPU6050(MPU6050_INT_PIN_CFG, 0xA0);
+  Serial.println("  - Configured INT pin: active-low, latch mode, clear only on INT_STATUS read");
   
   // Set motion detection threshold (0-255, LSB = 2mg)
   // Setting to 64 = 128mg threshold to reduce spurious wake-ups and save power
@@ -466,9 +474,12 @@ void configureMPUMotionInterrupt() {
   mpu.writeMPU6050(MPU6050_MOT_DUR, 20);
   
   // Enable motion detection logic
-  // MOT_DETECT_CTRL (0x69): Bits 7-6 = 01 for motion detection decrement (1 count)
-  // Bits 5-4 = 01 for ACCEL_ON_DELAY (4ms delay)
-  mpu.writeMPU6050(MPU6050_MOT_DETECT_CTRL, 0x50);
+  // MOT_DETECT_CTRL (0x69): Bits 7-6 = 00 for motion detection decrement (1 count)
+  // Bits 5-4 = 01 for ACCEL_ON_DELAY (5ms total startup delay by adding 1ms)
+  // Bits 2-0 = 101 for additional free-fall and motion settings
+  // 0x15 = 0b00010101 per Arduino Stack Exchange solution
+  mpu.writeMPU6050(MPU6050_MOT_DETECT_CTRL, 0x15);
+  Serial.println("  - Configured motion detection control");
   
   // CRITICAL: Disable ALL interrupts first, then enable ONLY motion detection
   // This prevents DATA_RDY interrupt (bit 0) from interfering
