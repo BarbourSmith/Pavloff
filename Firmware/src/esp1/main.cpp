@@ -522,14 +522,19 @@ void putMPUToSleep() {
   // NOW configure motion detection interrupt (after sensor is stable)
   configureMPUMotionInterrupt();
   
-  // Keep MPU in normal mode (not CYCLE mode) for reliable motion detection
-  // Cycle mode can cause spurious wake-ups due to periodic sampling combined with latch mode
-  // With gyroscope disabled (PWR_MGMT_2 = 0x07), power consumption is still low
-  // The accelerometer remains active only for motion detection
-  // Already set above: PWR_MGMT_1 = 0x08 (normal mode with temp disabled)
+  // CRITICAL: Put MPU into SLEEP mode AFTER configuring motion detection
+  // This prevents the accelerometer from continuously generating DATA_RDY flags
+  // The motion detection hardware works independently and will still trigger interrupts
+  // PWR_MGMT_1: Bit 6 = SLEEP (1), Bit 3 = TEMP_DIS (1)
+  // 0x48 = 0b01001000 (sleep mode with temp sensor disabled)
+  mpu.writeMPU6050(MPU6050_PWR_MGMT_1, 0x48);
+  Serial.println("  - Enabled SLEEP mode to stop continuous DATA_RDY generation");
   
-  Serial.println("MPU-6050 in low-power mode with motion detection enabled");
-  Serial.println("(Gyroscope disabled, temperature sensor disabled, normal mode for stable detection)");
+  // Wait for sleep mode to take effect
+  delay(10);
+  
+  Serial.println("MPU-6050 in sleep mode with motion detection active");
+  Serial.println("(Motion detection hardware remains active and will trigger wake-up)");
 }
 
 // Reset all state variables to prepare for motion tracking
