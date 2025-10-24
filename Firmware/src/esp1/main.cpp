@@ -446,13 +446,14 @@ void configureMPUMotionInterrupt() {
   Serial.println("  - Cleared any pending interrupt status");
   
   // Configure interrupt pin
-  // Bit 7 = 1 (active low), Bit 6 = 0 (push-pull), Bit 5 = 0 (50us pulse), Bit 4 = 1 (clear on any read)
-  // CRITICAL: Use pulse mode (bit 5 = 0) NOT latch mode
-  // In latch mode, INT pin goes LOW for ANY flag in INT_STATUS, even disabled ones like DATA_RDY
-  // In pulse mode, INT pin only pulses for ENABLED interrupts (motion detection)
-  // This prevents DATA_RDY flag from triggering spurious wake-ups
-  mpu.writeMPU6050(MPU6050_INT_PIN_CFG, 0x90);
-  Serial.println("  - Configured INT pin: active-low, 50us pulse mode");
+  // Bit 7 = 1 (active low), Bit 6 = 0 (push-pull), Bit 5 = 1 (latch until cleared), Bit 4 = 1 (clear on any read)
+  // CRITICAL: Must use LATCH mode for ESP32 ext0 wake to work reliably
+  // ESP32 ext0 wake requires a sustained LOW level, not a 50us pulse
+  // The INT pin will latch LOW on motion detection and stay LOW until INT_STATUS is read
+  // This is safe because we explicitly disable DATA_RDY interrupt (bit 0 of INT_ENABLE)
+  // Only the ENABLED motion interrupt (bit 6) will trigger the latch
+  mpu.writeMPU6050(MPU6050_INT_PIN_CFG, 0xB0);
+  Serial.println("  - Configured INT pin: active-low, latch mode for wake compatibility");
   
   // Set motion detection threshold (0-255, LSB = 2mg)
   // Setting to 64 = 128mg threshold to reduce spurious wake-ups and save power
@@ -521,8 +522,15 @@ void putMPUToSleep() {
   // NOW configure motion detection interrupt (after sensor is stable)
   configureMPUMotionInterrupt();
   
+  // CRITICAL: Enable CYCLE mode for low-power motion detection
+  // In cycle mode, the MPU wakes periodically to check for motion then goes back to sleep
+  // This reduces power consumption and prevents continuous DATA_RDY generation
+  // PWR_MGMT_1: Bit 5 = CYCLE (1), combined with existing 0x08 = 0x28
+  mpu.writeMPU6050(MPU6050_PWR_MGMT_1, 0x28);
+  Serial.println("  - Enabled CYCLE mode for low-power motion detection");
+  
   Serial.println("MPU-6050 in low-power mode with motion detection enabled");
-  Serial.println("(Gyroscope disabled, temperature sensor disabled for power savings)");
+  Serial.println("(Gyroscope disabled, temperature sensor disabled, cycle mode active)");
 }
 
 // Reset all state variables to prepare for motion tracking
