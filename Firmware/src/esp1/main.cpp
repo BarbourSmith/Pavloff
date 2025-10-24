@@ -560,9 +560,18 @@ void enterDeepSleep() {
   delay(100);  // Allow time for BLE to fully power down
   
   // Explicitly disable WiFi radio to save power (can consume 20-100mA if left on)
-  // Note: These may fail if WiFi was never started, which is expected
-  esp_wifi_stop();
-  esp_wifi_deinit();
+  // Note: These may fail if WiFi was never started, which is expected and harmless
+  esp_err_t wifi_err = esp_wifi_stop();
+  if (wifi_err != ESP_OK && wifi_err != ESP_ERR_WIFI_NOT_INIT) {
+    Serial.print("WiFi stop warning: ");
+    Serial.println(wifi_err);
+  }
+  
+  wifi_err = esp_wifi_deinit();
+  if (wifi_err != ESP_OK && wifi_err != ESP_ERR_WIFI_NOT_INIT) {
+    Serial.print("WiFi deinit warning: ");
+    Serial.println(wifi_err);
+  }
   
   // Wait for all radio shutdowns to complete
   delay(200);
