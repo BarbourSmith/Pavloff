@@ -84,21 +84,17 @@ struct SetupView: View {
                                         Spacer()
                                     }
                                     
-                                    // Clear selection button
-                                    Button(action: {
+                                    // Clear selection button - requires 30 second hold
+                                    HoldToConfirmButton(
+                                        title: "Hold to Clear Selection",
+                                        holdDuration: 30.0,
+                                        backgroundColor: Color.red.opacity(0.15),
+                                        foregroundColor: .red,
+                                        icon: "xmark.circle.fill"
+                                    ) {
                                         screenTimeManager.clearSelection()
-                                    }) {
-                                        HStack {
-                                            Image(systemName: "xmark.circle.fill")
-                                            Text("Clear Selection")
-                                        }
-                                        .fontWeight(.semibold)
-                                        .frame(maxWidth: .infinity)
-                                        .padding()
-                                        .background(Color.red.opacity(0.1))
-                                        .foregroundColor(.red)
-                                        .cornerRadius(8)
                                     }
+                                    .padding(.horizontal, 0)
                                 }
                             } else {
                                 Text("⚠️ Screen Time authorization required")
