@@ -20,7 +20,7 @@ struct HoldToConfirmButton: View {
     @State private var timer: Timer?
     @State private var elapsedTime: TimeInterval = 0.0
     
-    private let updateInterval: TimeInterval = 0.1 // Update 10 times per second for smooth countdown
+    private let updateInterval: TimeInterval = 0.5 // Update twice per second for smooth countdown with minimal overhead
     
     init(
         title: String,
@@ -96,13 +96,17 @@ struct HoldToConfirmButton: View {
         elapsedTime = 0.0
         holdProgress = 0.0
         
-        timer = Timer.scheduledTimer(withTimeInterval: updateInterval, repeats: true) { _ in
-            elapsedTime += updateInterval
-            holdProgress = min(elapsedTime / holdDuration, 1.0)
-            
-            if elapsedTime >= holdDuration {
-                completeHold()
+        DispatchQueue.main.async {
+            self.timer = Timer.scheduledTimer(withTimeInterval: self.updateInterval, repeats: true) { _ in
+                self.elapsedTime += self.updateInterval
+                self.holdProgress = min(self.elapsedTime / self.holdDuration, 1.0)
+                
+                if self.elapsedTime >= self.holdDuration {
+                    self.completeHold()
+                }
             }
+            // Ensure timer runs on the main run loop
+            RunLoop.main.add(self.timer!, forMode: .common)
         }
     }
     
