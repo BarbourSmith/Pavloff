@@ -96,13 +96,17 @@ struct HoldToConfirmButton: View {
         elapsedTime = 0.0
         holdProgress = 0.0
         
-        timer = Timer.scheduledTimer(withTimeInterval: updateInterval, repeats: true) { [weak self] _ in
+        // Ensure timer is scheduled on main thread for UI updates
+        DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
-            self.elapsedTime += self.updateInterval
-            self.holdProgress = min(self.elapsedTime / self.holdDuration, 1.0)
-            
-            if self.elapsedTime >= self.holdDuration {
-                self.completeHold()
+            self.timer = Timer.scheduledTimer(withTimeInterval: self.updateInterval, repeats: true) { [weak self] _ in
+                guard let self = self else { return }
+                self.elapsedTime += self.updateInterval
+                self.holdProgress = min(self.elapsedTime / self.holdDuration, 1.0)
+                
+                if self.elapsedTime >= self.holdDuration {
+                    self.completeHold()
+                }
             }
         }
     }
