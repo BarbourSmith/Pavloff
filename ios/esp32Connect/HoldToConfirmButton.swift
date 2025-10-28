@@ -116,6 +116,10 @@ struct HoldToConfirmButton: View {
     }
     
     private func completeHold() {
+        // Only execute the action if the user is still holding
+        // This prevents race conditions where the timer fires just as the user releases
+        guard isHolding else { return }
+        
         stopHolding()
         action()
     }
