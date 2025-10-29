@@ -20,8 +20,10 @@ This is a complete native Swift rewrite of the original React Native application
 - **🎉 Celebration Screen**: Congratulations display when workout is complete
 - **⚙️ Mid-Workout Adjustments**: Change targets without losing progress
 - **🔄 Quick Reset**: Restart current exercise with one tap
+- **🔥 Streak Tracking**: Duolingo-style streak feature tracks consecutive workout days with milestone celebrations
 
 See [WORKOUT_FEATURE.md](WORKOUT_FEATURE.md) for complete feature guide.
+See [STREAK_FEATURE.md](STREAK_FEATURE.md) for streak tracking details.
 
 ## Core Features
 
@@ -283,8 +285,9 @@ This app replaces the previous React Native implementation with a native Swift a
 
 ## Documentation
 
-### Workout Tracking Feature
+### Workout Tracking Features
 - **[WORKOUT_FEATURE.md](WORKOUT_FEATURE.md)**: Complete user guide with quick start, tips, and troubleshooting
+- **[STREAK_FEATURE.md](STREAK_FEATURE.md)**: Streak tracking feature guide with logic and milestones
 - **[TEST_PLAN.md](TEST_PLAN.md)**: Comprehensive testing guide with test cases and workflows
 - **[WORKOUT_SCREENS.md](WORKOUT_SCREENS.md)**: Visual mockups and screen flow diagrams
 - **[IMPLEMENTATION_SUMMARY.md](IMPLEMENTATION_SUMMARY.md)**: Technical architecture and implementation details
