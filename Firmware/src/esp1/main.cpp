@@ -1047,6 +1047,12 @@ void loop() {
     if (!isStationary) {
       lastActivityTime = currentTime;
     }
+    
+    // Also update activity timer if stationary and waiting for calibration
+    // This prevents sleep while accumulating stillness time for calibration
+    if (isStationary && !calibrationComplete && wasStationary) {
+      lastActivityTime = currentTime;
+    }
   }
 
   // Only send data if a client is connected and report interval has elapsed
