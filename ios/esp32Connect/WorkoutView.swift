@@ -29,6 +29,10 @@ struct WorkoutView: View {
     private let targetDeviceNames = ["Pavloff Workout Sensor", "ESP32_IMU_Stream"]
     private let scanInterval: TimeInterval = 5.0
     
+    // Notification observers
+    @State private var scenePhaseObserver: NSObjectProtocol?
+    @State private var timeChangeObserver: NSObjectProtocol?
+    
     private var currentExercise: Exercise {
         workoutSettings.exercises[currentExerciseIndex]
     }
@@ -287,9 +291,11 @@ struct WorkoutView: View {
             .onAppear {
                 startAutoConnect()
                 checkAndEnableScreenTimeBlocking()
+                setupNotificationObservers()
             }
             .onDisappear {
                 cleanup()
+                removeNotificationObservers()
             }
             .onChange(of: bleManager.connectionStatuses) { _ in
                 // Monitor for disconnections
@@ -390,6 +396,40 @@ struct WorkoutView: View {
         // Disable app blocking for the rest of the day
         print("[WORKOUT] Workout completed! Disabling app blocking")
         screenTimeManager.disableAppBlocking()
+    }
+    
+    private func setupNotificationObservers() {
+        // Listen for when app becomes active (returns from background or launches)
+        scenePhaseObserver = NotificationCenter.default.addObserver(
+            forName: UIScene.willEnterForegroundNotification,
+            object: nil,
+            queue: .main
+        ) { [self] _ in
+            print("[WORKOUT] App entering foreground, rechecking app blocking status")
+            checkAndEnableScreenTimeBlocking()
+        }
+        
+        // Listen for significant time changes (like passing midnight)
+        timeChangeObserver = NotificationCenter.default.addObserver(
+            forName: UIApplication.significantTimeChangeNotification,
+            object: nil,
+            queue: .main
+        ) { [self] _ in
+            print("[WORKOUT] Significant time change detected (midnight crossed), rechecking app blocking status")
+            checkAndEnableScreenTimeBlocking()
+        }
+    }
+    
+    private func removeNotificationObservers() {
+        if let observer = scenePhaseObserver {
+            NotificationCenter.default.removeObserver(observer)
+            scenePhaseObserver = nil
+        }
+        
+        if let observer = timeChangeObserver {
+            NotificationCenter.default.removeObserver(observer)
+            timeChangeObserver = nil
+        }
     }
     
     private func handleDisconnection() {
