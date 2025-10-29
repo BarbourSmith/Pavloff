@@ -202,6 +202,7 @@ void saveGyroOffsets(float offsetX, float offsetY, float offsetZ) {
   preferences.putFloat("gyroOffsetY", offsetY);
   preferences.putFloat("gyroOffsetZ", offsetZ);
   preferences.putBool("hasOffsets", true);
+  preferences.putInt("calVersion", 2);  // Version 2 = ElectronicCats library with software offsets
   preferences.end();
   Serial.println("Gyro offsets saved to persistent storage");
   Serial.print("Offsets: X=");
@@ -215,9 +216,13 @@ void saveGyroOffsets(float offsetX, float offsetY, float offsetZ) {
 // Load gyro calibration offsets from persistent storage
 bool loadGyroOffsets(float* offsetX, float* offsetY, float* offsetZ) {
   preferences.begin("mpu6050", true);  // Open in read-only mode
+  
+  // Check calibration version to ensure compatibility
+  // Version 2 = ElectronicCats library with software offsets
+  int calVersion = preferences.getInt("calVersion", 0);
   bool hasOffsets = preferences.getBool("hasOffsets", false);
   
-  if (hasOffsets) {
+  if (hasOffsets && calVersion == 2) {
     *offsetX = preferences.getFloat("gyroOffsetX", 0.0f);
     *offsetY = preferences.getFloat("gyroOffsetY", 0.0f);
     *offsetZ = preferences.getFloat("gyroOffsetZ", 0.0f);
@@ -233,7 +238,11 @@ bool loadGyroOffsets(float* offsetX, float* offsetY, float* offsetZ) {
   }
   
   preferences.end();
-  Serial.println("No stored gyro offsets found");
+  if (hasOffsets && calVersion != 2) {
+    Serial.println("Old calibration format detected - will recalibrate");
+  } else {
+    Serial.println("No stored gyro offsets found");
+  }
   return false;
 }
 
@@ -674,6 +683,10 @@ void setup() {
     Wire.begin(SDA_PIN, SCL_PIN);
     wakeMPUFromSleep();
     mpu.initialize();
+    
+    // Set ranges to match tockn library (critical on wake from sleep)
+    mpu.setFullScaleAccelRange(MPU6050_ACCEL_FS_2);
+    mpu.setFullScaleGyroRange(MPU6050_GYRO_FS_500);
     
     // Check for motion
     bool motionDetected = checkForMotion();
