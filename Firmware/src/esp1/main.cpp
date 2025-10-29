@@ -53,6 +53,11 @@ MPU6050 mpu;
 #define ACCEL_SCALE (1.0f / 16384.0f)  // Convert to g's
 #define GYRO_SCALE (1.0f / 65.5f)      // Convert to degrees/s
 
+// Gyroscope offset values (in degrees/s) for software calibration
+float gyroXoffset = 0.0f;
+float gyroYoffset = 0.0f;
+float gyroZoffset = 0.0f;
+
 // Preferences object for storing calibration data
 Preferences preferences;
 
@@ -232,53 +237,48 @@ bool loadGyroOffsets(float* offsetX, float* offsetY, float* offsetZ) {
   return false;
 }
 
-// Perform gyro calibration and save results
+// Perform gyro calibration and save results (matches tockn library behavior)
 void performCalibration() {
+  Serial.println();
+  Serial.println("========================================");
   Serial.println("Starting gyroscope calibration...");
-  Serial.println("Device is stationary - calibrating gyro offsets");
+  Serial.println("DO NOT MOVE MPU6050");
   
-  // Calculate gyro offsets by averaging readings
-  const int numSamples = 1000;
-  int32_t sumX = 0, sumY = 0, sumZ = 0;
+  // Calculate gyro offsets by averaging readings (same as tockn library: 3000 samples)
+  float x = 0.0f, y = 0.0f, z = 0.0f;
+  int16_t rx, ry, rz;
   
-  Serial.println("Collecting samples...");
   delay(1000);  // Wait for device to settle
   
-  for (int i = 0; i < numSamples; i++) {
-    int16_t gx, gy, gz;
-    mpu.getRotation(&gx, &gy, &gz);
-    sumX += gx;
-    sumY += gy;
-    sumZ += gz;
-    delay(3);  // 3ms delay between samples for ~3 second calibration
+  for (int i = 0; i < 3000; i++) {
+    if (i % 1000 == 0) {
+      Serial.print(".");
+    }
+    mpu.getRotation(&rx, &ry, &rz);
+    
+    // Convert to degrees/s and accumulate (matching tockn library)
+    x += ((float)rx) * GYRO_SCALE;
+    y += ((float)ry) * GYRO_SCALE;
+    z += ((float)rz) * GYRO_SCALE;
   }
   
-  // Calculate average offsets (in raw units)
-  int16_t offsetX = sumX / numSamples;
-  int16_t offsetY = sumY / numSamples;
-  int16_t offsetZ = sumZ / numSamples;
+  // Calculate average offsets (in degrees/s)
+  gyroXoffset = x / 3000.0f;
+  gyroYoffset = y / 3000.0f;
+  gyroZoffset = z / 3000.0f;
   
-  // Set the offsets in the MPU6050
-  mpu.setXGyroOffset(-offsetX / 4);  // Offset registers use different scaling
-  mpu.setYGyroOffset(-offsetY / 4);
-  mpu.setZGyroOffset(-offsetZ / 4);
+  Serial.println();
+  Serial.println("Done!");
+  Serial.print("X : "); Serial.println(gyroXoffset);
+  Serial.print("Y : "); Serial.println(gyroYoffset);
+  Serial.print("Z : "); Serial.println(gyroZoffset);
   
-  Serial.print("Calculated offsets (raw): X=");
-  Serial.print(offsetX);
-  Serial.print(", Y=");
-  Serial.print(offsetY);
-  Serial.print(", Z=");
-  Serial.println(offsetZ);
-  
-  // Convert to degrees/s for storage
-  float offsetXdeg = offsetX * GYRO_SCALE;
-  float offsetYdeg = offsetY * GYRO_SCALE;
-  float offsetZdeg = offsetZ * GYRO_SCALE;
-  
-  saveGyroOffsets(offsetXdeg, offsetYdeg, offsetZdeg);
+  saveGyroOffsets(gyroXoffset, gyroYoffset, gyroZoffset);
   calibrationComplete = true;
   
-  Serial.println("Calibration complete!");
+  Serial.println("Program will start after 3 seconds");
+  Serial.println("========================================");
+  delay(3000);
 }
 
 // Mahony AHRS algorithm update (IMU version without magnetometer)
@@ -723,24 +723,19 @@ void setup() {
     Serial.println("MPU-6050 initialized");
   }
   
-  // Try to load stored calibration offsets
-  float offsetX, offsetY, offsetZ;
-  if (loadGyroOffsets(&offsetX, &offsetY, &offsetZ)) {
-    // Convert from degrees/s to raw offset register values
-    // Offset registers use different scaling (divide by 4)
-    int16_t rawOffsetX = (int16_t)(offsetX / GYRO_SCALE / 4);
-    int16_t rawOffsetY = (int16_t)(offsetY / GYRO_SCALE / 4);
-    int16_t rawOffsetZ = (int16_t)(offsetZ / GYRO_SCALE / 4);
-    
-    mpu.setXGyroOffset(rawOffsetX);
-    mpu.setYGyroOffset(rawOffsetY);
-    mpu.setZGyroOffset(rawOffsetZ);
-    
+  // Try to load stored calibration offsets (software offsets in degrees/s)
+  if (loadGyroOffsets(&gyroXoffset, &gyroYoffset, &gyroZoffset)) {
     calibrationComplete = true;
     Serial.println("Using stored calibration offsets");
+    Serial.print("X : "); Serial.println(gyroXoffset);
+    Serial.print("Y : "); Serial.println(gyroYoffset);
+    Serial.print("Z : "); Serial.println(gyroZoffset);
   } else {
     // No stored offsets - calibration will happen when device is still for 4 minutes
     calibrationComplete = false;
+    gyroXoffset = 0.0f;
+    gyroYoffset = 0.0f;
+    gyroZoffset = 0.0f;
     Serial.println("No stored calibration - will calibrate when device is still for 4 minutes");
   }
   
@@ -885,9 +880,15 @@ void loop() {
   rawAccelY = filteredY;
   rawAccelZ = filteredZ;
   
-  float rawGyroX = gx * GYRO_SCALE * (PI / 180.0f);  // Convert to radians/s
-  float rawGyroY = gy * GYRO_SCALE * (PI / 180.0f);
-  float rawGyroZ = gz * GYRO_SCALE * (PI / 180.0f);
+  // Convert gyro to degrees/s and subtract software offsets (matching tockn library)
+  float gyroXdeg = gx * GYRO_SCALE - gyroXoffset;
+  float gyroYdeg = gy * GYRO_SCALE - gyroYoffset;
+  float gyroZdeg = gz * GYRO_SCALE - gyroZoffset;
+  
+  // Convert to radians/s for AHRS algorithm
+  float rawGyroX = gyroXdeg * (PI / 180.0f);
+  float rawGyroY = gyroYdeg * (PI / 180.0f);
+  float rawGyroZ = gyroZdeg * (PI / 180.0f);
 
   // Debug: Print raw sensor values every 100ms
   static unsigned long lastDebugTime = 0;
