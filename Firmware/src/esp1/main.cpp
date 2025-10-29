@@ -49,9 +49,9 @@ MPU6050 mpu;
 
 // Conversion factors for MPU6050 raw values
 // Accelerometer: ±2g range -> 16384 LSB/g
-// Gyroscope: ±250°/s range -> 131 LSB/(°/s)
+// Gyroscope: ±500°/s range -> 65.5 LSB/(°/s)
 #define ACCEL_SCALE (1.0f / 16384.0f)  // Convert to g's
-#define GYRO_SCALE (1.0f / 131.0f)     // Convert to degrees/s
+#define GYRO_SCALE (1.0f / 65.5f)      // Convert to degrees/s
 
 // Preferences object for storing calibration data
 Preferences preferences;
@@ -716,9 +716,9 @@ void setup() {
       Serial.println("MPU-6050 connection failed");
     }
     
-    // Set ranges: ±2g for accelerometer, ±250°/s for gyroscope
+    // Set ranges: ±2g for accelerometer, ±500°/s for gyroscope (matching tockn library)
     mpu.setFullScaleAccelRange(MPU6050_ACCEL_FS_2);
-    mpu.setFullScaleGyroRange(MPU6050_GYRO_FS_250);
+    mpu.setFullScaleGyroRange(MPU6050_GYRO_FS_500);
     
     Serial.println("MPU-6050 initialized");
   }
