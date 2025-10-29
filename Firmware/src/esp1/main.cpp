@@ -19,10 +19,12 @@
 #error "SCL_PIN must be defined in platformio.ini build_flags"
 #endif
 
+// IMU interrupt pin configuration
+#define INT_PIN 18  // MPU6050 INT pin connected to ESP32 GPIO 18
+
 // Power management constants
 #define IDLE_TIMEOUT_MS 20000  // 20 seconds in milliseconds (for testing)
 #define CALIBRATION_STILLNESS_MS 240000  // 4 minutes in milliseconds
-#define POLL_INTERVAL_SECONDS 2  // Wake up every 2 seconds to check for motion
 
 // Power optimization settings
 void configurePowerOptimizations() {
@@ -391,6 +393,57 @@ void filterAndClampAccel(float rawX, float rawY, float rawZ, float* outX, float*
   *outZ = filteredAccelZ;
 }
 
+// Configure MPU6050 motion detection interrupt for wake-up
+void configureMPUMotionInterrupt() {
+  Serial.println("Configuring MPU6050 motion detection interrupt...");
+  
+  // Reset all interrupt registers to known state
+  mpu.setIntEnabled(0x00);  // Disable all interrupts
+  mpu.setIntFreefallEnabled(false);
+  mpu.setIntMotionEnabled(false);
+  mpu.setIntZeroMotionEnabled(false);
+  Serial.println("  - Cleared all interrupts");
+  
+  // Configure interrupt pin behavior
+  // Active HIGH, push-pull, held until interrupt is cleared, cleared on any read
+  mpu.setInterruptMode(false);      // false = active high
+  mpu.setInterruptDrive(false);     // false = push-pull
+  mpu.setInterruptLatch(true);      // true = held until cleared
+  mpu.setInterruptLatchClear(true); // true = cleared on any read
+  Serial.println("  - Configured INT pin: active HIGH, push-pull, latched");
+  
+  // Configure motion detection
+  // Motion threshold: 1-255 (1 LSB = 2mg @ 2g range, so value of 32 = 64mg = 0.064g)
+  // For sensitive wake: 16 = 32mg = 0.032g
+  // For normal wake: 32 = 64mg = 0.064g  
+  // For less sensitive: 64 = 128mg = 0.128g
+  mpu.setMotionDetectionThreshold(32);  // 64mg threshold
+  Serial.println("  - Motion threshold: 64mg (0.064g)");
+  
+  // Motion duration: 0-255 (1 LSB = 1ms @ 1kHz ODR)
+  // Setting to 5ms to avoid false triggers from vibration
+  mpu.setMotionDetectionDuration(5);  // 5ms duration
+  Serial.println("  - Motion duration: 5ms");
+  
+  // Configure Digital High Pass Filter (DHPF) for motion detection
+  // DHPF reset to remove DC bias from accelerometer
+  mpu.setDHPFMode(MPU6050_DHPF_RESET);
+  delay(10);  // Allow DHPF to reset
+  mpu.setDHPFMode(MPU6050_DHPF_5);  // Use 5Hz high-pass filter
+  Serial.println("  - DHPF: 5Hz high-pass filter");
+  
+  // Enable motion detection interrupt
+  mpu.setIntMotionEnabled(true);
+  Serial.println("  - Motion interrupt enabled");
+  
+  // Verify interrupt is configured
+  uint8_t intStatus = mpu.getIntStatus();
+  Serial.print("  - Initial interrupt status: 0x");
+  Serial.println(intStatus, HEX);
+  
+  Serial.println("MPU6050 motion interrupt configured successfully");
+}
+
 // Rep detection using velocity magnitude and direction changes
 void detectRep(float velX, float velY, float velZ, float linearAccelMag, unsigned long currentTime) {
   // Calculate total velocity magnitude
@@ -473,56 +526,37 @@ void detectRep(float velX, float velY, float velZ, float linearAccelMag, unsigne
   }
 }
 
-// Check if MPU-6050 detects motion by reading accelerometer
-bool checkForMotion() {
-  // Read accelerometer values
-  int16_t ax, ay, az;
-  mpu.getAcceleration(&ax, &ay, &az);
-  
-  // Convert to g's
-  float accelX = ax * ACCEL_SCALE;
-  float accelY = ay * ACCEL_SCALE;
-  float accelZ = az * ACCEL_SCALE;
-  
-  // Calculate acceleration magnitude
-  float accelMag = sqrt(accelX*accelX + accelY*accelY + accelZ*accelZ);
-  
-  // Check if deviation from 1g (gravity) exceeds threshold
-  // Motion threshold: 0.15g deviation from rest
-  bool motionDetected = abs(accelMag - 1.0f) > 0.15f;
-  
-  Serial.print("Motion check - Accel magnitude: ");
-  Serial.print(accelMag, 3);
-  Serial.print("g, Motion: ");
-  Serial.println(motionDetected ? "YES" : "NO");
-  
-  return motionDetected;
-}
-
 // Put MPU-6050 into low power mode for sleep
 void putMPUToSleep() {
   Serial.println("Preparing MPU-6050 for sleep mode...");
   
-  // Step 1: Keep device awake but disable temp sensor for power savings
-  mpu.setSleepEnabled(false);
-  mpu.setWakeCycleEnabled(false);
-  mpu.setTempSensorEnabled(false);
-  Serial.println("  - Set to normal mode with temp disabled");
+  // Configure motion detection interrupt for wake-up
+  configureMPUMotionInterrupt();
   
-  // Step 2: Disable gyroscope to save power, keep accelerometer enabled for motion check
+  // Disable temperature sensor to save power
+  mpu.setTempSensorEnabled(false);
+  Serial.println("  - Temperature sensor disabled");
+  
+  // Disable gyroscope to save power, keep accelerometer enabled for motion detection
   mpu.setStandbyXGyroEnabled(true);
   mpu.setStandbyYGyroEnabled(true);
   mpu.setStandbyZGyroEnabled(true);
   mpu.setStandbyXAccelEnabled(false);
   mpu.setStandbyYAccelEnabled(false);
   mpu.setStandbyZAccelEnabled(false);
-  Serial.println("  - Disabled gyroscope, kept accelerometer enabled");
+  Serial.println("  - Gyroscope disabled, accelerometer enabled for motion detection");
   
-  // Wait for power mode changes to fully settle
+  // Use Cycle Mode for lowest power consumption
+  // In cycle mode, the device cycles between sleep and accelerometer sampling
+  // Wake frequency: 1.25 Hz (wake every 800ms to sample accelerometer)
+  mpu.setWakeCycleEnabled(true);
+  mpu.setWakeFrequency(MPU6050_WAKE_FREQ_1P25);  // 1.25 Hz wake frequency
+  Serial.println("  - Cycle mode enabled: 1.25 Hz wake frequency");
+  
+  // Wait for power mode changes to settle
   delay(100);
-  Serial.println("  - Sensor stabilized after power changes");
   
-  Serial.println("MPU-6050 ready for low power operation (accel only)");
+  Serial.println("MPU-6050 ready for low power operation with motion interrupt");
 }
 
 // Reset all state variables to prepare for motion tracking
@@ -573,9 +607,17 @@ void resetStateVariables() {
 void wakeMPUFromSleep() {
   Serial.println("Waking MPU-6050 from low power mode...");
   
-  // Wake up MPU-6050 by enabling sleep mode off
-  mpu.setSleepEnabled(false);
+  // Clear any pending motion interrupt
+  uint8_t intStatus = mpu.getIntStatus();
+  Serial.print("  - Interrupt status on wake: 0x");
+  Serial.println(intStatus, HEX);
+  if (intStatus & 0x40) {
+    Serial.println("  - Motion interrupt was triggered");
+  }
+  
+  // Disable cycle mode and wake up MPU-6050
   mpu.setWakeCycleEnabled(false);
+  mpu.setSleepEnabled(false);
   Serial.println("  - Set to normal mode");
   
   // Enable all sensors (gyroscope and accelerometer)
@@ -587,28 +629,30 @@ void wakeMPUFromSleep() {
   mpu.setStandbyZAccelEnabled(false);
   Serial.println("  - Enabled all sensors");
   
+  // Disable motion detection interrupt during normal operation
+  mpu.setIntMotionEnabled(false);
+  Serial.println("  - Motion interrupt disabled for normal operation");
+  
   delay(100);  // Wait for sensor to stabilize
   
   Serial.println("MPU-6050 woken up and ready for normal operation");
 }
 
-// Enter deep sleep mode with timer wake
+// Enter deep sleep mode with interrupt wake
 void enterDeepSleep() {
   Serial.println("=====================================");
   Serial.println("ENTERING DEEP SLEEP MODE");
-  Serial.print("Device will wake every ");
-  Serial.print(POLL_INTERVAL_SECONDS);
-  Serial.println(" seconds to check for motion");
+  Serial.println("Device will wake on motion detection");
   Serial.print("Current uptime: ");
   Serial.print(millis() / 1000);
   Serial.println(" seconds");
   Serial.println("=====================================");
   Serial.flush();  // Ensure all serial data is sent
   
-  // Put MPU-6050 into low power mode before sleeping
+  // Put MPU-6050 into low power mode with motion interrupt configured
   putMPUToSleep();
   
-  // Wait for MPU-6050 to enter low power mode
+  // Wait for MPU-6050 to enter low power mode and interrupt to be ready
   delay(200);
   
   // Disable BLE and wait for clean shutdown
@@ -639,13 +683,14 @@ void enterDeepSleep() {
   esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_SLOW_MEM, ESP_PD_OPTION_OFF);
   esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_FAST_MEM, ESP_PD_OPTION_OFF);
   
-  // Configure timer wake-up
-  uint64_t sleep_time_us = POLL_INTERVAL_SECONDS * 1000000ULL;
-  esp_sleep_enable_timer_wakeup(sleep_time_us);
+  // Configure GPIO interrupt wake-up on INT_PIN (GPIO 18)
+  // Motion interrupt from MPU6050 will wake the ESP32
+  // Using HIGH level trigger since MPU6050 interrupt is active HIGH and latched
+  esp_sleep_enable_ext0_wakeup((gpio_num_t)INT_PIN, 1);  // 1 = HIGH level
   
-  Serial.print("Timer wake configured for ");
-  Serial.print(POLL_INTERVAL_SECONDS);
-  Serial.println(" seconds");
+  Serial.print("GPIO wake configured on pin ");
+  Serial.print(INT_PIN);
+  Serial.println(" (MPU6050 INT pin)");
   Serial.println("Entering deep sleep NOW...");
   Serial.flush();
   delay(100);  // Ensure serial output completes
@@ -673,34 +718,16 @@ void setup() {
   
   // Check wake-up reason
   esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
-  if (wakeup_reason == ESP_SLEEP_WAKEUP_TIMER) {
+  if (wakeup_reason == ESP_SLEEP_WAKEUP_EXT0) {
     Serial.println("=====================================");
     Serial.println("WOKE UP FROM DEEP SLEEP");
-    Serial.println("Reason: Timer wake (motion polling)");
+    Serial.println("Reason: Motion detected (GPIO interrupt)");
+    Serial.print("Woke from GPIO pin: ");
+    Serial.println(INT_PIN);
     Serial.println("=====================================");
-    
-    // Initialize I2C and MPU for motion check
-    Wire.begin(SDA_PIN, SCL_PIN);
-    wakeMPUFromSleep();
-    mpu.initialize();
-    
-    // Set ranges to match tockn library (critical on wake from sleep)
-    mpu.setFullScaleAccelRange(MPU6050_ACCEL_FS_2);
-    mpu.setFullScaleGyroRange(MPU6050_GYRO_FS_500);
-    
-    // Check for motion
-    bool motionDetected = checkForMotion();
-    
-    if (!motionDetected) {
-      // No motion detected - go back to sleep
-      Serial.println("No motion detected - returning to sleep");
-      enterDeepSleep();
-      // Never reaches here as enterDeepSleep() resets the device
-    }
     
     // Motion detected - continue with normal startup
     Serial.println("Motion detected - resuming normal operation...");
-    Serial.println("=====================================");
   } else if (wakeup_reason == ESP_SLEEP_WAKEUP_UNDEFINED) {
     Serial.println("=====================================");
     Serial.println("DEVICE STARTING");
@@ -717,24 +744,26 @@ void setup() {
   // --- MPU-6050 Setup ---
   Wire.begin(SDA_PIN, SCL_PIN); // SDA, SCL
   
-  // If waking from timer (and motion was detected), MPU is already initialized
-  // Otherwise, initialize it now
-  if (wakeup_reason != ESP_SLEEP_WAKEUP_TIMER) {
-    mpu.initialize();
-    
-    // Test connection
-    if (mpu.testConnection()) {
-      Serial.println("MPU-6050 connection successful");
-    } else {
-      Serial.println("MPU-6050 connection failed");
-    }
-    
-    // Set ranges: ±2g for accelerometer, ±500°/s for gyroscope (matching tockn library)
-    mpu.setFullScaleAccelRange(MPU6050_ACCEL_FS_2);
-    mpu.setFullScaleGyroRange(MPU6050_GYRO_FS_500);
-    
-    Serial.println("MPU-6050 initialized");
+  // Initialize MPU-6050
+  mpu.initialize();
+  
+  // Test connection
+  if (mpu.testConnection()) {
+    Serial.println("MPU-6050 connection successful");
+  } else {
+    Serial.println("MPU-6050 connection failed");
   }
+  
+  // Set ranges: ±2g for accelerometer, ±500°/s for gyroscope (matching tockn library)
+  mpu.setFullScaleAccelRange(MPU6050_ACCEL_FS_2);
+  mpu.setFullScaleGyroRange(MPU6050_GYRO_FS_500);
+  
+  // If waking from interrupt, clear it and restore normal operation
+  if (wakeup_reason == ESP_SLEEP_WAKEUP_EXT0) {
+    wakeMPUFromSleep();
+  }
+  
+  Serial.println("MPU-6050 initialized");
   
   // Try to load stored calibration offsets (software offsets in degrees/s)
   if (loadGyroOffsets(&gyroXoffset, &gyroYoffset, &gyroZoffset)) {
