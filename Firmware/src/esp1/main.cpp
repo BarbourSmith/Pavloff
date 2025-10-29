@@ -744,12 +744,15 @@ void setup() {
     Serial.print("Y : "); Serial.println(gyroYoffset);
     Serial.print("Z : "); Serial.println(gyroZoffset);
   } else {
-    // No stored offsets - calibration will happen when device is still for 4 minutes
+    // No stored offsets - perform calibration immediately on startup
     calibrationComplete = false;
     gyroXoffset = 0.0f;
     gyroYoffset = 0.0f;
     gyroZoffset = 0.0f;
-    Serial.println("No stored calibration - will calibrate when device is still for 4 minutes");
+    Serial.println("No stored calibration found - performing calibration now");
+    Serial.println("IMPORTANT: Keep device completely still during calibration!");
+    delay(2000);  // Give user time to read message and stabilize device
+    performCalibration();
   }
   
   Serial.println("------------------------------------");
