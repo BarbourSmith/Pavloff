@@ -12,6 +12,7 @@ import UIKit
 struct WorkoutView: View {
     @StateObject private var bleManager = BLEManager()
     @StateObject private var screenTimeManager = ScreenTimeManager.shared
+    @StateObject private var streakManager = StreakManager.shared
     @State private var workoutSettings = WorkoutSettings()
     @State private var currentExerciseIndex = 0
     @State private var connectionStatus: String = "Scanning for device..."
@@ -61,6 +62,22 @@ struct WorkoutView: View {
                             .font(.subheadline)
                             .foregroundColor(isConnected ? Color.white.opacity(0.9) : Color.white.opacity(0.8))
                             .font(isConnected ? .subheadline.weight(.semibold) : .subheadline.weight(.regular))
+                    }
+                    
+                    // Streak Indicator
+                    if streakManager.currentStreak > 0 {
+                        HStack(spacing: 6) {
+                            Text("🔥")
+                                .font(.system(size: 16))
+                            Text("\(streakManager.currentStreak) day streak")
+                                .font(.caption)
+                                .fontWeight(.semibold)
+                        }
+                        .foregroundColor(.white.opacity(0.9))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Color.orange.opacity(0.3))
+                        .cornerRadius(12)
                     }
                     
                     // Screen Time Status Indicator
@@ -366,6 +383,9 @@ struct WorkoutView: View {
         // Save completion time
         UserDefaults.standard.set(Date(), forKey: "lastWorkoutCompletion")
         workoutStartedToday = true
+        
+        // Update streak
+        streakManager.checkAndUpdateStreak()
         
         // Disable app blocking for the rest of the day
         print("[WORKOUT] Workout completed! Disabling app blocking")

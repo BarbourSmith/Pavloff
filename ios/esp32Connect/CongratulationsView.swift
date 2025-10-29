@@ -11,6 +11,7 @@ struct CongratulationsView: View {
     let workoutSettings: WorkoutSettings
     let onRestart: () -> Void
     @Environment(\.dismiss) var dismiss
+    @StateObject private var streakManager = StreakManager.shared
     
     var body: some View {
         VStack(spacing: 30) {
@@ -38,6 +39,45 @@ struct CongratulationsView: View {
                     .font(.title3)
                     .foregroundColor(.gray)
                     .multilineTextAlignment(.center)
+            }
+            
+            // Streak Information
+            VStack(spacing: 12) {
+                HStack(spacing: 8) {
+                    Text("🔥")
+                        .font(.system(size: 40))
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("\(streakManager.currentStreak) Day Streak")
+                            .font(.title2)
+                            .fontWeight(.bold)
+                            .foregroundColor(.orange)
+                        
+                        if streakManager.currentStreak == streakManager.longestStreak && streakManager.currentStreak > 1 {
+                            Text("New Personal Record! 🎉")
+                                .font(.caption)
+                                .foregroundColor(.green)
+                                .fontWeight(.semibold)
+                        } else if streakManager.longestStreak > 0 {
+                            Text("Best: \(streakManager.longestStreak) days")
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                        }
+                    }
+                }
+                .padding()
+                .frame(maxWidth: .infinity)
+                .background(Color.orange.opacity(0.1))
+                .cornerRadius(12)
+                .padding(.horizontal)
+                
+                // Milestone message if applicable
+                if let milestone = streakManager.getMilestoneMessage(streakManager.currentStreak) {
+                    Text(milestone)
+                        .font(.headline)
+                        .foregroundColor(.orange)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                }
             }
             
             // Workout summary
