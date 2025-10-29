@@ -34,45 +34,47 @@ Activity is detected from:
 5. ESP32 enters deep sleep (consuming only ~10 μA)
 6. All state is lost; wake-up is like a fresh boot
 
-### 3. Wake-on-Motion (Timer-based Polling)
+### 3. Wake-on-Motion (Interrupt-based)
 
-**Polling System**:
-- ESP32 wakes from deep sleep periodically using internal RTC timer (every 2 seconds by default)
-- On wake, MPU-6050 accelerometer is read to check for motion
-- Motion threshold: 0.15g deviation from gravity (1g)
-- If motion detected, device stays awake and continues normal operation
-- If no motion detected, device immediately returns to deep sleep
+**Interrupt System**:
+- ESP32 wakes from deep sleep via hardware interrupt from MPU-6050 INT pin (GPIO 18)
+- MPU-6050 continuously monitors for motion using hardware motion detection
+- Motion threshold: 64mg (0.064g) with 5ms duration to avoid false triggers
+- When motion is detected, MPU-6050 triggers interrupt to wake ESP32
+- Device stays awake and continues normal operation
 
 **Wake-up Process**:
-1. ESP32 wakes from timer interrupt
-2. MPU-6050 is briefly powered up and accelerometer is read
-3. If motion detected:
-   - Motion tracking state variables are reset (velocity, position, AHRS quaternion, filters)
-   - Rep detection state machine is reset to IDLE (rep count resets to 0)
-   - System loads stored gyroscope calibration offsets
-   - BLE advertising restarts
-   - Normal operation resumes
-4. If no motion detected:
-   - Device immediately returns to deep sleep without full initialization
+1. MPU-6050 detects motion exceeding threshold using hardware motion detection
+2. MPU-6050 INT pin goes HIGH, triggering ESP32 wake from deep sleep
+3. ESP32 wakes from GPIO interrupt
+4. Motion tracking state variables are reset (velocity, position, AHRS quaternion, filters)
+5. Rep detection state machine is reset to IDLE (rep count resets to 0)
+6. System loads stored gyroscope calibration offsets
+7. BLE advertising restarts
+8. Normal operation resumes
 
 ## Hardware Configuration
 
 ### Pin Assignments
 - **GPIO 8**: I2C SDA
 - **GPIO 9**: I2C SCL
+- **GPIO 18**: MPU-6050 INT pin (motion detection interrupt)
 
 ### MPU-6050 Configuration
 
-**Motion Detection (Polling)**:
-- Threshold: 0.15g deviation from gravity
-- Polling interval: 2 seconds (configurable)
-- On wake: Accelerometer is read and checked for motion
-- Power consumption during sleep: ~500 μA (accelerometer in standby mode)
+**Motion Detection (Hardware Interrupt)**:
+- Threshold: 64mg (0.064g) acceleration
+- Duration: 5ms minimum to avoid false triggers from vibration
+- Digital High-Pass Filter: 5Hz to remove DC bias
+- Interrupt output: Active HIGH, push-pull, latched until cleared
+- Wake-up: Instant response to motion (no polling delay)
+- Power consumption during sleep: ~500 μA (accelerometer in cycle mode)
 
-**Low Power Mode**:
+**Low Power Mode (Cycle Mode)**:
 - Gyroscope disabled
 - Temperature sensor disabled
-- Accelerometer in standby mode for quick wake
+- Accelerometer in cycle mode (wakes internally at 1.25 Hz to sample)
+- Motion detection interrupt enabled
 - Power consumption: ~500 μA (MPU6050 only)
 
 **Active Mode**:
@@ -84,9 +86,7 @@ Activity is detected from:
 
 | Mode | ESP32-S3 | MPU-6050 | Total | Notes |
 |------|----------|----------|-------|-------|
-| Deep Sleep (polling) | ~10 μA | ~500 μA | ~0.51 mA | Between wake cycles |
-| Wake cycle (polling) | ~30 mA | ~3.6 mA | ~34 mA | 100-200ms per cycle |
-| Average (2s polling) | - | - | **~2.7 mA** | See POWER_COMPARISON.md |
+| Deep Sleep (interrupt) | ~10 μA | ~500 μA | **~0.51 mA** | Waiting for interrupt |
 | Active (BLE connected) | ~30 mA | ~3.6 mA | ~34 mA | 80 MHz, BLE active |
 | Active (BLE idle) | ~20 mA | ~3.6 mA | ~24 mA | 80 MHz, no BLE TX |
 
@@ -103,32 +103,32 @@ The idle timeout can be adjusted by modifying the constant in `main.cpp`:
 
 **Note**: The current configuration uses 20 seconds for testing purposes. For production deployment, change this to 300000 (5 minutes) or longer.
 
-### Polling Interval
-
-The polling interval can be adjusted by modifying the constant in `main.cpp`:
-
-```cpp
-#define POLL_INTERVAL_SECONDS 2  // Wake up every 2 seconds to check for motion
-```
-
-**Power vs Responsiveness Trade-off**:
-- 2 seconds: ~2.7 mA average, max 2s motion detection delay
-- 5 seconds: ~1.2 mA average, max 5s motion detection delay
-- 10 seconds: ~0.65 mA average, max 10s motion detection delay
-
-See `POWER_COMPARISON.md` for detailed analysis.
-
 ### Motion Detection Sensitivity
 
-Adjust motion detection threshold in `checkForMotion()`:
+Adjust motion detection threshold in `configureMPUMotionInterrupt()`:
 
 ```cpp
-// Motion threshold: deviation from 1g gravity
-bool motionDetected = abs(accelMag - 1.0f) > 0.15f;  // 0.15g threshold
+// Motion threshold: 1-255 (1 LSB = 2mg @ 2g range)
+// 32 = 64mg = 0.064g
+mpu.setMotionDetectionThreshold(32);  // 64mg threshold
 ```
 
-Lower threshold = more sensitive (may wake on small movements)
-Higher threshold = less sensitive (requires more motion to wake)
+Lower threshold = more sensitive (may wake on small movements):
+- 16 = 32mg (very sensitive)
+
+Higher threshold = less sensitive (requires more motion to wake):
+- 64 = 128mg (less sensitive)
+
+### Motion Detection Duration
+
+Adjust minimum motion duration to avoid false triggers:
+
+```cpp
+// Motion duration: 0-255 (1 LSB = 1ms)
+mpu.setMotionDetectionDuration(5);  // 5ms duration
+```
+
+Increase this value to require longer sustained motion before triggering wake-up.
 
 ### CPU Frequency
 
@@ -164,25 +164,25 @@ esp_wifi_deinit();
 
 ## Battery Life Estimates
 
-Assuming a 500 mAh battery with timer-based polling (2-second interval):
+Assuming a 500 mAh battery with interrupt-based wake:
 
-### Scenario 1: Mostly Idle (with polling)
-- 23 hours/day in deep sleep: 2.7 mA × 23 = 62.1 mAh
+### Scenario 1: Mostly Idle (interrupt-based)
+- 23 hours/day in deep sleep: 0.51 mA × 23 = 11.7 mAh
 - 1 hour/day active: 34 mA × 1 = 34 mAh
-- **Total per day**: ~96 mAh
-- **Battery life**: ~5 days
+- **Total per day**: ~46 mAh
+- **Battery life**: ~11 days
 
 ### Scenario 2: Active Use
-- 8 hours/day in deep sleep: 2.7 mA × 8 = 21.6 mAh
+- 8 hours/day in deep sleep: 0.51 mA × 8 = 4.1 mAh
 - 16 hours/day active: 34 mA × 16 = 544 mAh
-- **Total per day**: ~566 mAh
-- **Battery life**: ~21 hours
+- **Total per day**: ~548 mAh
+- **Battery life**: ~22 hours
 
 ### Scenario 3: Continuous Use
 - 24 hours/day active: 34 mA × 24 = 816 mAh
 - **Battery life**: ~15 hours (with 500 mAh battery)
 
-**Note**: See `POWER_COMPARISON.md` for detailed comparison with interrupt-based wake system and optimization strategies.
+**Note**: Interrupt-based wake system provides significantly better battery life compared to timer-based polling, especially for idle scenarios (11 days vs 5 days).
 
 ## Testing
 
@@ -201,58 +201,51 @@ Assuming a 500 mAh battery with timer-based polling (2-second interval):
    ```
 6. Serial output will stop (device is asleep)
 
-### Test Wake-on-Motion (Timer-based Polling)
+### Test Wake-on-Motion (Interrupt-based)
 1. After device enters deep sleep
-2. Device will wake every 2 seconds automatically
-3. On wake without motion, you will see:
+2. Device remains asleep until motion is detected
+3. Move or shake the device
+4. Observe serial output showing motion detected:
    ```
    =====================================
    WOKE UP FROM DEEP SLEEP
-   Reason: Timer wake (motion polling)
+   Reason: Motion detected (GPIO interrupt)
+   Woke from GPIO pin: 18
    =====================================
-   Motion check - Accel magnitude: 1.000g, Motion: NO
-   No motion detected - returning to sleep
-   ```
-4. Move or shake the device and wait up to 2 seconds
-5. Observe serial output showing motion detected:
-   ```
-   =====================================
-   WOKE UP FROM DEEP SLEEP
-   Reason: Timer wake (motion polling)
-   =====================================
-   Motion check - Accel magnitude: 1.350g, Motion: YES
    Motion detected - resuming normal operation...
-   =====================================
    ```
-6. Device returns to normal operation
+5. Device returns to normal operation
+6. No more output until motion stops and idle timeout is reached again
 
 **Note**: The current firmware is configured with a 20-second idle timeout for testing. For production use, change `IDLE_TIMEOUT_MS` to 300000 (5 minutes).
 
 ### Measure Current Consumption
 - Use a multimeter or power profiler in series with power supply
 - Monitor current during active operation, idle, and deep sleep
-- Expected values with 2-second polling:
-  - Deep sleep: ~0.5 mA between wake cycles
-  - Wake cycle: ~30-34 mA for 100-200ms
-  - Average: ~2.7 mA
+- Expected values with interrupt-based wake:
+  - Deep sleep: ~0.51 mA (constant while waiting for interrupt)
+  - Active operation: ~30-34 mA
 - Verify values match estimates above
 
 ## Troubleshooting
 
-### Device wakes too frequently
-- This is expected with timer-based polling (every 2 seconds)
-- Increase `POLL_INTERVAL_SECONDS` to reduce wake frequency
-- Trade-off: Longer interval = slower motion detection response
-
 ### Motion detection too sensitive
-- Adjust threshold in `checkForMotion()` function
-- Increase threshold from 0.15g to 0.20g or higher
+- Adjust threshold in `configureMPUMotionInterrupt()` function
+- Increase threshold from 32 (64mg) to 64 (128mg) or higher
+- Increase motion duration from 5ms to 10ms or more
 - Higher threshold requires more motion to wake
 
 ### Motion detection not sensitive enough
-- Decrease threshold in `checkForMotion()` function
-- Lower threshold from 0.15g to 0.10g or lower
+- Decrease threshold in `configureMPUMotionInterrupt()` function
+- Lower threshold from 32 (64mg) to 16 (32mg) or lower
 - Be careful: too low may cause false wake-ups from vibrations
+- Consider decreasing motion duration from 5ms to 3ms
+
+### Device doesn't wake on motion
+- Verify GPIO 18 is properly connected to MPU-6050 INT pin
+- Check serial output for interrupt configuration messages
+- Verify MPU-6050 interrupt status shows motion detection enabled
+- Try increasing motion sensitivity (lower threshold)
 
 ### Enters sleep too quickly
 - Increase `IDLE_TIMEOUT_MS` value
@@ -264,17 +257,15 @@ Assuming a 500 mAh battery with timer-based polling (2-second interval):
 - Ensure automatic light sleep is enabled
 - WiFi radio is explicitly disabled, saving 20-100mA
 
-### High power consumption in deep sleep (polling mode)
-- Expected: ~2.7 mA average with 2-second polling interval
-- This is normal for timer-based polling system
-- To reduce power consumption:
-  - Increase `POLL_INTERVAL_SECONDS` (e.g., 5 or 10 seconds)
-  - See `POWER_COMPARISON.md` for optimization strategies
-  - Consider fixing interrupt-based wake system for better efficiency
-- Verify WiFi radio is disabled (check serial output at startup)
-- Ensure BLE shutdown completes before entering sleep
-- Check that unused RTC peripherals are powered off
-- Use multimeter to measure actual current consumption
+### High power consumption in deep sleep (interrupt mode)
+- Expected: ~0.51 mA with interrupt-based wake
+- If consumption is higher:
+  - Verify WiFi radio is disabled (check serial output at startup)
+  - Ensure BLE shutdown completes before entering sleep
+  - Check that unused RTC peripherals are powered off
+  - Verify MPU-6050 is in cycle mode (check serial output)
+  - Use multimeter to measure actual current consumption
+  - Check for any other peripherals drawing power
 
 ## References
 
