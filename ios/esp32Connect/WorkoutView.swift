@@ -291,6 +291,14 @@ struct WorkoutView: View {
             .onDisappear {
                 cleanup()
             }
+            .onReceive(NotificationCenter.default.publisher(for: UIScene.willEnterForegroundNotification)) { _ in
+                print("[WORKOUT] App entering foreground, rechecking app blocking status")
+                checkAndEnableScreenTimeBlocking()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: UIApplication.significantTimeChangeNotification)) { _ in
+                print("[WORKOUT] Significant time change detected (midnight crossed), rechecking app blocking status")
+                checkAndEnableScreenTimeBlocking()
+            }
             .onChange(of: bleManager.connectionStatuses) { _ in
                 // Monitor for disconnections
                 if isConnected, let device = connectedDevice {
