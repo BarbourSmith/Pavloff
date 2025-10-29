@@ -64,7 +64,7 @@ This document describes the visual changes made to the app to support the streak
 ```
 
 **Streak Display Details**:
-- Large fire emoji (40pt)
+- Large fire emoji (using `.font(.system(size: 40))` in SwiftUI)
 - Current streak in bold orange text (title2 font)
 - Shows "New Personal Record! 🎉" in green when current = longest and > 1
 - Shows "Best: X days" in gray when not a new record
@@ -114,7 +114,7 @@ When reaching specific milestones, an additional message appears:
 ## 4. Typography
 
 **Streak Display**:
-- Fire emoji: System font, size 16 (header) / 40 (congratulations)
+- Fire emoji: Unicode character rendered with `.font(.system(size: 16))` (header) / `.font(.system(size: 40))` (congratulations)
 - Streak count: Title2, bold (congratulations) / Caption, semibold (header)
 - Milestone messages: Headline, orange
 - Personal record: Caption, semibold, green
@@ -203,9 +203,9 @@ Logic prevents gaming the system
 - Font sizes are readable
 
 **Works Well With**:
-- VoiceOver: Reads "fire emoji, X day streak"
-- Dynamic Type: Text scales appropriately
-- Dark Mode: Colors adapt automatically (SwiftUI default)
+- VoiceOver: The fire emoji (🔥) is announced as "fire", followed by the streak text. For improved accessibility, consider adding `.accessibilityLabel("Current workout streak: \(streakManager.currentStreak) days")` to the streak indicator.
+- Dynamic Type: Text scales appropriately with system text size settings
+- Dark Mode: Colors adapt automatically (SwiftUI default behavior)
 
 ---
 
