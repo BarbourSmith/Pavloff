@@ -63,7 +63,7 @@ Activity is detected from:
 ### MPU-6050 Configuration
 
 **Motion Detection (Hardware Interrupt)**:
-- Threshold: 64mg (0.064g) acceleration
+- Threshold: 64mg (0.064g) acceleration at ±2g range (32 LSB, where 1 LSB = 2mg)
 - Duration: 5ms minimum to avoid false triggers from vibration
 - Digital High-Pass Filter: 5Hz to remove DC bias
 - Interrupt output: Active HIGH, push-pull, latched until cleared
@@ -73,8 +73,9 @@ Activity is detected from:
 **Low Power Mode (Cycle Mode)**:
 - Gyroscope disabled
 - Temperature sensor disabled
-- Accelerometer in cycle mode (wakes internally at 1.25 Hz to sample)
+- Accelerometer in cycle mode (MPU-6050 wakes internally at 1.25 Hz to sample for motion)
 - Motion detection interrupt enabled
+- ESP32 remains in deep sleep until MPU-6050 triggers interrupt
 - Power consumption: ~500 μA (MPU6050 only)
 
 **Active Mode**:
@@ -108,16 +109,18 @@ The idle timeout can be adjusted by modifying the constant in `main.cpp`:
 Adjust motion detection threshold in `configureMPUMotionInterrupt()`:
 
 ```cpp
-// Motion threshold: 1-255 (1 LSB = 2mg @ 2g range)
-// 32 = 64mg = 0.064g
+// Motion threshold: 1-255 LSB (1 LSB = 2mg at ±2g accelerometer range)
+// Current setting: 32 LSB = 64mg = 0.064g
 mpu.setMotionDetectionThreshold(32);  // 64mg threshold
 ```
 
+**Note**: The threshold calculation depends on the accelerometer range setting (±2g, ±4g, ±8g, ±16g). Current firmware uses ±2g range where 1 LSB = 2mg.
+
 Lower threshold = more sensitive (may wake on small movements):
-- 16 = 32mg (very sensitive)
+- 16 LSB = 32mg (very sensitive)
 
 Higher threshold = less sensitive (requires more motion to wake):
-- 64 = 128mg (less sensitive)
+- 64 LSB = 128mg (less sensitive)
 
 ### Motion Detection Duration
 
@@ -164,25 +167,25 @@ esp_wifi_deinit();
 
 ## Battery Life Estimates
 
-Assuming a 500 mAh battery with interrupt-based wake:
+All estimates assume a 500 mAh battery capacity. Battery life scales linearly with capacity (e.g., 1000 mAh battery = 2× the estimated life).
 
 ### Scenario 1: Mostly Idle (interrupt-based)
 - 23 hours/day in deep sleep: 0.51 mA × 23 = 11.7 mAh
 - 1 hour/day active: 34 mA × 1 = 34 mAh
 - **Total per day**: ~46 mAh
-- **Battery life**: ~11 days
+- **Battery life**: ~11 days (500 mAh battery)
 
 ### Scenario 2: Active Use
 - 8 hours/day in deep sleep: 0.51 mA × 8 = 4.1 mAh
 - 16 hours/day active: 34 mA × 16 = 544 mAh
 - **Total per day**: ~548 mAh
-- **Battery life**: ~22 hours
+- **Battery life**: ~22 hours (500 mAh battery)
 
 ### Scenario 3: Continuous Use
 - 24 hours/day active: 34 mA × 24 = 816 mAh
-- **Battery life**: ~15 hours (with 500 mAh battery)
+- **Battery life**: ~15 hours (500 mAh battery)
 
-**Note**: Interrupt-based wake system provides significantly better battery life compared to timer-based polling, especially for idle scenarios (11 days vs 5 days).
+**Note**: Interrupt-based wake system provides significantly better battery life compared to timer-based polling, especially for idle scenarios (11 days vs 5 days with 500 mAh battery).
 
 ## Testing
 
