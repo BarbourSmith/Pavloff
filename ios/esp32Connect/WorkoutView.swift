@@ -404,9 +404,9 @@ struct WorkoutView: View {
             forName: UIScene.willEnterForegroundNotification,
             object: nil,
             queue: .main
-        ) { [self] _ in
+        ) { [weak self] _ in
             print("[WORKOUT] App entering foreground, rechecking app blocking status")
-            checkAndEnableScreenTimeBlocking()
+            self?.checkAndEnableScreenTimeBlocking()
         }
         
         // Listen for significant time changes (like passing midnight)
@@ -414,9 +414,9 @@ struct WorkoutView: View {
             forName: UIApplication.significantTimeChangeNotification,
             object: nil,
             queue: .main
-        ) { [self] _ in
+        ) { [weak self] _ in
             print("[WORKOUT] Significant time change detected (midnight crossed), rechecking app blocking status")
-            checkAndEnableScreenTimeBlocking()
+            self?.checkAndEnableScreenTimeBlocking()
         }
     }
     
