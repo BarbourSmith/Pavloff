@@ -149,3 +149,78 @@ struct WorkoutSettings {
         self.exercises = exercises
     }
 }
+
+// MARK: - Streak Tracking
+class StreakManager: ObservableObject {
+    static let shared = StreakManager()
+    
+    @Published private(set) var currentStreak: Int = 0
+    
+    private let currentStreakKey = "currentWorkoutStreak"
+    private let lastWorkoutDateKey = "lastWorkoutDate"
+    
+    private init() {
+        loadStreakData()
+    }
+    
+    private func loadStreakData() {
+        currentStreak = UserDefaults.standard.integer(forKey: currentStreakKey)
+    }
+    
+    func checkAndUpdateStreak() {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        
+        // Get last workout date
+        if let lastWorkoutDate = UserDefaults.standard.object(forKey: lastWorkoutDateKey) as? Date {
+            let lastWorkoutDay = calendar.startOfDay(for: lastWorkoutDate)
+            
+            // Check if workout was already done today
+            if calendar.isDate(lastWorkoutDay, inSameDayAs: today) {
+                print("[STREAK] Workout already completed today, streak unchanged: \(currentStreak)")
+                return
+            }
+            
+            // Check if yesterday (consecutive day)
+            if let yesterday = calendar.date(byAdding: .day, value: -1, to: today),
+               calendar.isDate(lastWorkoutDay, inSameDayAs: yesterday) {
+                // Consecutive day - increment streak
+                currentStreak += 1
+                print("[STREAK] Consecutive day! Streak increased to: \(currentStreak)")
+            } else {
+                // Missed day(s) - reset streak
+                print("[STREAK] Missed day(s), streak reset from \(currentStreak) to 1")
+                currentStreak = 1
+            }
+        } else {
+            // First workout ever
+            currentStreak = 1
+            print("[STREAK] First workout! Streak started at: 1")
+        }
+        
+        // Save current streak and today's date
+        UserDefaults.standard.set(currentStreak, forKey: currentStreakKey)
+        UserDefaults.standard.set(today, forKey: lastWorkoutDateKey)
+    }
+    
+    func isMilestone(_ streak: Int) -> Bool {
+        return [7, 30, 50, 100, 365].contains(streak)
+    }
+    
+    func getMilestoneMessage(_ streak: Int) -> String? {
+        switch streak {
+        case 7:
+            return "🎉 7 Day Streak! One week strong!"
+        case 30:
+            return "🔥 30 Day Streak! A full month!"
+        case 50:
+            return "💪 50 Day Streak! Incredible!"
+        case 100:
+            return "🏆 100 Day Streak! You're unstoppable!"
+        case 365:
+            return "👑 365 Day Streak! A full year! Legendary!"
+        default:
+            return nil
+        }
+    }
+}
