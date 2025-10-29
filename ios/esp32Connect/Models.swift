@@ -155,10 +155,8 @@ class StreakManager: ObservableObject {
     static let shared = StreakManager()
     
     @Published private(set) var currentStreak: Int = 0
-    @Published private(set) var longestStreak: Int = 0
     
     private let currentStreakKey = "currentWorkoutStreak"
-    private let longestStreakKey = "longestWorkoutStreak"
     private let lastWorkoutDateKey = "lastWorkoutDate"
     
     private init() {
@@ -167,7 +165,6 @@ class StreakManager: ObservableObject {
     
     private func loadStreakData() {
         currentStreak = UserDefaults.standard.integer(forKey: currentStreakKey)
-        longestStreak = UserDefaults.standard.integer(forKey: longestStreakKey)
     }
     
     func checkAndUpdateStreak() {
@@ -201,20 +198,9 @@ class StreakManager: ObservableObject {
             print("[STREAK] First workout! Streak started at: 1")
         }
         
-        // Update longest streak if needed
-        if currentStreak > longestStreak {
-            longestStreak = currentStreak
-            UserDefaults.standard.set(longestStreak, forKey: longestStreakKey)
-            print("[STREAK] New longest streak: \(longestStreak)")
-        }
-        
         // Save current streak and today's date
         UserDefaults.standard.set(currentStreak, forKey: currentStreakKey)
         UserDefaults.standard.set(today, forKey: lastWorkoutDateKey)
-    }
-    
-    func getStreakStatus() -> (current: Int, longest: Int, isNewRecord: Bool) {
-        return (currentStreak, longestStreak, currentStreak == longestStreak && currentStreak > 1)
     }
     
     func isMilestone(_ streak: Int) -> Bool {

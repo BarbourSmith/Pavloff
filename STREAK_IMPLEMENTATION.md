@@ -8,15 +8,13 @@ Successfully implemented a Duolingo-style streak feature for the Pavloff workout
 ### Files Modified (3 Swift files)
 
 #### 1. `ios/esp32Connect/Models.swift`
-**Added**: StreakManager class (89 lines)
+**Added**: StreakManager class
 - Singleton pattern with `@Published` properties for reactive updates
 - `currentStreak`: Tracks consecutive workout days
-- `longestStreak`: Preserves personal best
 - `checkAndUpdateStreak()`: Core logic for streak calculation
 - `getMilestoneMessage()`: Returns celebration messages for milestones
 - Uses UserDefaults for persistence:
   - `currentWorkoutStreak`: Current streak count
-  - `longestWorkoutStreak`: Best streak ever
   - `lastWorkoutDate`: Last workout completion date
 
 **Logic Flow**:
@@ -24,8 +22,7 @@ Successfully implemented a Duolingo-style streak feature for the Pavloff workout
 1. First workout → streak = 1
 2. Same day workout → streak unchanged (prevents gaming)
 3. Consecutive day (yesterday) → streak += 1
-4. Missed day(s) → current streak = 1, longest preserved
-5. New record → longest = current
+4. Missed day(s) → current streak = 1
 ```
 
 #### 2. `ios/esp32Connect/WorkoutView.swift`
@@ -42,10 +39,8 @@ Successfully implemented a Duolingo-style streak feature for the Pavloff workout
 #### 3. `ios/esp32Connect/CongratulationsView.swift`
 **Changes**:
 - Added `@StateObject private var streakManager = StreakManager.shared`
-- Added streak information section (40 lines)
+- Added streak information section
   - Large streak display with fire emoji
-  - "New Personal Record! 🎉" badge when applicable
-  - Best streak comparison
   - Milestone celebration messages
 
 **Visual Impact**: Congratulations screen now celebrates streak achievements
@@ -75,15 +70,12 @@ Successfully implemented a Duolingo-style streak feature for the Pavloff workout
 ### Core Functionality
 ✅ Track consecutive workout days
 ✅ Detect and handle streak breaks
-✅ Preserve longest streak
 ✅ Prevent same-day gaming
 ✅ Persist data across app launches
 
 ### Visual Indicators
 ✅ Header badge with fire emoji (🔥)
 ✅ Current streak display
-✅ Longest streak display
-✅ New personal record badge
 ✅ Milestone celebration messages
 
 ### Milestones
@@ -100,7 +92,6 @@ Successfully implemented a Duolingo-style streak feature for the Pavloff workout
 - Same day multiple workouts: Streak unchanged
 - Consecutive days: Streak increments by 1
 - Missed days: Streak resets to 1
-- Longest streak: Preserved when current resets
 - Milestone detection: Correctly identifies milestone values
 
 ### Code Quality
@@ -166,7 +157,7 @@ The implementation follows the "minimal changes" principle:
 ## Performance Considerations
 
 - **Lazy loading**: StreakManager loads on first access
-- **Minimal storage**: Only 3 UserDefaults keys
+- **Minimal storage**: Only 2 UserDefaults keys
 - **Fast calculations**: Simple date comparisons
 - **No network calls**: Completely offline feature
 - **Reactive updates**: SwiftUI automatically re-renders on changes

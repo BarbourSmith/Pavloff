@@ -45,14 +45,6 @@ This document describes the visual changes made to the app to support the streak
 │                                         │
 │  ┌───────────────────────────────────┐ │
 │  │  🔥    5 Day Streak               │ │  ← NEW SECTION
-│  │        Best: 10 days              │ │
-│  └───────────────────────────────────┘ │
-│                                         │
-│  OR (when new record):                  │
-│                                         │
-│  ┌───────────────────────────────────┐ │
-│  │  🔥    15 Day Streak              │ │  ← NEW RECORD
-│  │        New Personal Record! 🎉    │ │
 │  └───────────────────────────────────┘ │
 │                                         │
 │       Workout Summary                   │
@@ -66,8 +58,6 @@ This document describes the visual changes made to the app to support the streak
 **Streak Display Details**:
 - Large fire emoji (using `.font(.system(size: 40))` in SwiftUI)
 - Current streak in bold orange text (title2 font)
-- Shows "New Personal Record! 🎉" in green when current = longest and > 1
-- Shows "Best: X days" in gray when not a new record
 - Light orange background (10% opacity)
 - Rounded corners
 - Full width with padding
@@ -131,7 +121,6 @@ See: "🔥 1 day streak" in header
        ↓
 Congratulations screen shows:
 "🔥 1 Day Streak"
-(No "Best" shown yet as it's the first)
 ```
 
 ### Consecutive Days
@@ -142,7 +131,6 @@ Header updates: "🔥 2 day streak"
        ↓
 Congratulations screen:
 "🔥 2 Day Streak"
-"New Personal Record! 🎉"
 ```
 
 ### Milestone Achievement
@@ -153,7 +141,6 @@ Header updates: "🔥 7 day streak"
        ↓
 Congratulations screen:
 "🔥 7 Day Streak"
-"New Personal Record! 🎉"
 "🎉 7 Day Streak! One week strong!"  ← Special message!
 ```
 
@@ -165,7 +152,6 @@ Header shows: "🔥 1 day streak"  ← Reset
        ↓
 Congratulations screen:
 "🔥 1 Day Streak"
-"Best: 7 days"  ← Previous record preserved
 ```
 
 ### Same Day Multiple Workouts

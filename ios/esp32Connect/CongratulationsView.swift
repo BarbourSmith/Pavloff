@@ -51,17 +51,6 @@ struct CongratulationsView: View {
                             .font(.title2)
                             .fontWeight(.bold)
                             .foregroundColor(.orange)
-                        
-                        if streakManager.currentStreak == streakManager.longestStreak && streakManager.currentStreak > 1 {
-                            Text("New Personal Record! 🎉")
-                                .font(.caption)
-                                .foregroundColor(.green)
-                                .fontWeight(.semibold)
-                        } else if streakManager.longestStreak > 0 {
-                            Text("Best: \(streakManager.longestStreak) days")
-                                .font(.caption)
-                                .foregroundColor(.gray)
-                        }
                     }
                 }
                 .padding()

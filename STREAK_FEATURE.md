@@ -14,7 +14,6 @@ The app now includes a Duolingo-style streak feature that tracks how many consec
 
 ### 🔥 Streak Tracking
 - **Current Streak**: Tracks consecutive days with completed workouts
-- **Longest Streak**: Remembers your personal best
 - **Automatic Updates**: Streak updates when you complete all exercises
 - **Smart Detection**: 
   - Multiple workouts on the same day don't affect your streak
@@ -31,8 +30,6 @@ The app now includes a Duolingo-style streak feature that tracks how many consec
 
 #### Congratulations Screen
 - **Large Streak Display**: Shows current streak with fire emoji
-- **Personal Record Badge**: "New Personal Record! 🎉" when you beat your longest streak
-- **Best Streak**: Shows your longest streak for comparison
 - **Milestone Messages**: Special celebrations for achievements:
   - 7 days: "🎉 7 Day Streak! One week strong!"
   - 30 days: "🔥 30 Day Streak! A full month!"
@@ -56,7 +53,6 @@ Day 5: Complete 2nd workout → Streak still = 2 (no change for same day)
 ### Data Persistence
 All streak data is saved locally using UserDefaults:
 - `currentWorkoutStreak`: Your current consecutive day count
-- `longestWorkoutStreak`: Your best streak ever
 - `lastWorkoutDate`: Last day you completed a workout
 
 The app automatically:
@@ -80,12 +76,10 @@ The `StreakManager` class handles all streak logic:
 **Consecutive Day**
 - Detects if last workout was yesterday
 - Increments streak by 1
-- Updates longest streak if new record
 
 **Missed Day(s)**
 - Detects if you skipped a day or more
 - Resets current streak to 1
-- Keeps longest streak preserved
 
 ## Technical Implementation
 
@@ -95,10 +89,8 @@ Location: `ios/esp32Connect/Models.swift`
 ```swift
 class StreakManager: ObservableObject {
     @Published private(set) var currentStreak: Int
-    @Published private(set) var longestStreak: Int
     
     func checkAndUpdateStreak()
-    func getStreakStatus() -> (current: Int, longest: Int, isNewRecord: Bool)
     func isMilestone(_ streak: Int) -> Bool
     func getMilestoneMessage(_ streak: Int) -> String?
 }
@@ -114,7 +106,6 @@ class StreakManager: ObservableObject {
 **CongratulationsView.swift**
 - Shows detailed streak information
 - Displays milestone messages
-- Shows personal record badge
 
 ## Tips for Users
 
