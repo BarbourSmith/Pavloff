@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <Wire.h>
-#include <MPU6050_tockn.h>
+#include "I2Cdev.h"
+#include "MPU6050.h"
 #include <BLEDevice.h>
 #include <BLEServer.h>
 #include <BLEUtils.h>
@@ -44,7 +45,13 @@ void configurePowerOptimizations() {
 }
 
 // Create an MPU6050 object
-MPU6050 mpu(Wire);
+MPU6050 mpu;
+
+// Conversion factors for MPU6050 raw values
+// Accelerometer: ±2g range -> 16384 LSB/g
+// Gyroscope: ±250°/s range -> 131 LSB/(°/s)
+#define ACCEL_SCALE (1.0f / 16384.0f)  // Convert to g's
+#define GYRO_SCALE (1.0f / 131.0f)     // Convert to degrees/s
 
 // Preferences object for storing calibration data
 Preferences preferences;
@@ -230,16 +237,45 @@ void performCalibration() {
   Serial.println("Starting gyroscope calibration...");
   Serial.println("Device is stationary - calibrating gyro offsets");
   
-  mpu.calcGyroOffsets(true);
+  // Calculate gyro offsets by averaging readings
+  const int numSamples = 1000;
+  int32_t sumX = 0, sumY = 0, sumZ = 0;
   
-  // Get the calculated offsets from the MPU6050 object
-  // Note: MPU6050_tockn library stores offsets internally
-  // We'll read them after calibration completes
-  float offsetX = mpu.getGyroXoffset();
-  float offsetY = mpu.getGyroYoffset();
-  float offsetZ = mpu.getGyroZoffset();
+  Serial.println("Collecting samples...");
+  delay(1000);  // Wait for device to settle
   
-  saveGyroOffsets(offsetX, offsetY, offsetZ);
+  for (int i = 0; i < numSamples; i++) {
+    int16_t gx, gy, gz;
+    mpu.getRotation(&gx, &gy, &gz);
+    sumX += gx;
+    sumY += gy;
+    sumZ += gz;
+    delay(3);  // 3ms delay between samples for ~3 second calibration
+  }
+  
+  // Calculate average offsets (in raw units)
+  int16_t offsetX = sumX / numSamples;
+  int16_t offsetY = sumY / numSamples;
+  int16_t offsetZ = sumZ / numSamples;
+  
+  // Set the offsets in the MPU6050
+  mpu.setXGyroOffset(-offsetX / 4);  // Offset registers use different scaling
+  mpu.setYGyroOffset(-offsetY / 4);
+  mpu.setZGyroOffset(-offsetZ / 4);
+  
+  Serial.print("Calculated offsets (raw): X=");
+  Serial.print(offsetX);
+  Serial.print(", Y=");
+  Serial.print(offsetY);
+  Serial.print(", Z=");
+  Serial.println(offsetZ);
+  
+  // Convert to degrees/s for storage
+  float offsetXdeg = offsetX * GYRO_SCALE;
+  float offsetYdeg = offsetY * GYRO_SCALE;
+  float offsetZdeg = offsetZ * GYRO_SCALE;
+  
+  saveGyroOffsets(offsetXdeg, offsetYdeg, offsetZdeg);
   calibrationComplete = true;
   
   Serial.println("Calibration complete!");
@@ -431,10 +467,13 @@ void detectRep(float velX, float velY, float velZ, float linearAccelMag, unsigne
 // Check if MPU-6050 detects motion by reading accelerometer
 bool checkForMotion() {
   // Read accelerometer values
-  mpu.update();
-  float accelX = mpu.getAccX();
-  float accelY = mpu.getAccY();
-  float accelZ = mpu.getAccZ();
+  int16_t ax, ay, az;
+  mpu.getAcceleration(&ax, &ay, &az);
+  
+  // Convert to g's
+  float accelX = ax * ACCEL_SCALE;
+  float accelY = ay * ACCEL_SCALE;
+  float accelZ = az * ACCEL_SCALE;
   
   // Calculate acceleration magnitude
   float accelMag = sqrt(accelX*accelX + accelY*accelY + accelZ*accelZ);
@@ -455,16 +494,19 @@ bool checkForMotion() {
 void putMPUToSleep() {
   Serial.println("Preparing MPU-6050 for sleep mode...");
   
-  // Step 1: Keep device in normal mode (no SLEEP, no CYCLE), disable TEMP for power savings
-  // PWR_MGMT_1: Bit 6 = SLEEP (0), Bit 5 = CYCLE (0), Bit 3 = TEMP_DIS (1)
-  // 0x08 = 0b00001000 (normal mode with temp sensor disabled)
-  mpu.writeMPU6050(MPU6050_PWR_MGMT_1, 0x08);
+  // Step 1: Keep device awake but disable temp sensor for power savings
+  mpu.setSleepEnabled(false);
+  mpu.setWakeCycleEnabled(false);
+  mpu.setTempSensorEnabled(false);
   Serial.println("  - Set to normal mode with temp disabled");
   
   // Step 2: Disable gyroscope to save power, keep accelerometer enabled for motion check
-  // PWR_MGMT_2: Bits 2-0 = 111 to disable gyroscope axes
-  // Bits 5-3 = 000 to enable all accelerometer axes
-  mpu.writeMPU6050(0x6C, 0x07);
+  mpu.setStandbyXGyroEnabled(true);
+  mpu.setStandbyYGyroEnabled(true);
+  mpu.setStandbyZGyroEnabled(true);
+  mpu.setStandbyXAccelEnabled(false);
+  mpu.setStandbyYAccelEnabled(false);
+  mpu.setStandbyZAccelEnabled(false);
   Serial.println("  - Disabled gyroscope, kept accelerometer enabled");
   
   // Wait for power mode changes to fully settle
@@ -522,14 +564,19 @@ void resetStateVariables() {
 void wakeMPUFromSleep() {
   Serial.println("Waking MPU-6050 from low power mode...");
   
-  // Wake up MPU-6050 by clearing SLEEP and CYCLE bits
-  mpu.writeMPU6050(MPU6050_PWR_MGMT_1, 0x00);
-  Serial.println("  - Set to normal mode (PWR_MGMT_1 = 0x00)");
+  // Wake up MPU-6050 by enabling sleep mode off
+  mpu.setSleepEnabled(false);
+  mpu.setWakeCycleEnabled(false);
+  Serial.println("  - Set to normal mode");
   
   // Enable all sensors (gyroscope and accelerometer)
-  // PWR_MGMT_2 register (0x6C): 0x00 enables all axes
-  mpu.writeMPU6050(0x6C, 0x00);
-  Serial.println("  - Enabled all sensors (PWR_MGMT_2 = 0x00)");
+  mpu.setStandbyXGyroEnabled(false);
+  mpu.setStandbyYGyroEnabled(false);
+  mpu.setStandbyZGyroEnabled(false);
+  mpu.setStandbyXAccelEnabled(false);
+  mpu.setStandbyYAccelEnabled(false);
+  mpu.setStandbyZAccelEnabled(false);
+  Serial.println("  - Enabled all sensors");
   
   delay(100);  // Wait for sensor to stabilize
   
@@ -626,7 +673,7 @@ void setup() {
     // Initialize I2C and MPU for motion check
     Wire.begin(SDA_PIN, SCL_PIN);
     wakeMPUFromSleep();
-    mpu.begin();
+    mpu.initialize();
     
     // Check for motion
     bool motionDetected = checkForMotion();
@@ -660,15 +707,35 @@ void setup() {
   // If waking from timer (and motion was detected), MPU is already initialized
   // Otherwise, initialize it now
   if (wakeup_reason != ESP_SLEEP_WAKEUP_TIMER) {
-    mpu.begin();
+    mpu.initialize();
+    
+    // Test connection
+    if (mpu.testConnection()) {
+      Serial.println("MPU-6050 connection successful");
+    } else {
+      Serial.println("MPU-6050 connection failed");
+    }
+    
+    // Set ranges: ±2g for accelerometer, ±250°/s for gyroscope
+    mpu.setFullScaleAccelRange(MPU6050_ACCEL_FS_2);
+    mpu.setFullScaleGyroRange(MPU6050_GYRO_FS_250);
+    
     Serial.println("MPU-6050 initialized");
   }
   
   // Try to load stored calibration offsets
   float offsetX, offsetY, offsetZ;
   if (loadGyroOffsets(&offsetX, &offsetY, &offsetZ)) {
-    // Set the loaded offsets
-    mpu.setGyroOffsets(offsetX, offsetY, offsetZ);
+    // Convert from degrees/s to raw offset register values
+    // Offset registers use different scaling (divide by 4)
+    int16_t rawOffsetX = (int16_t)(offsetX / GYRO_SCALE / 4);
+    int16_t rawOffsetY = (int16_t)(offsetY / GYRO_SCALE / 4);
+    int16_t rawOffsetZ = (int16_t)(offsetZ / GYRO_SCALE / 4);
+    
+    mpu.setXGyroOffset(rawOffsetX);
+    mpu.setYGyroOffset(rawOffsetY);
+    mpu.setZGyroOffset(rawOffsetZ);
+    
     calibrationComplete = true;
     Serial.println("Using stored calibration offsets");
   } else {
@@ -796,17 +863,18 @@ void loop() {
     }
   }
   
-  // Update sensor data
-  mpu.update();
-
   // Calculate delta time in seconds
   float dt = (currentTime - lastUpdateTime) / 1000.0;
   lastUpdateTime = currentTime;
 
-  // Get raw sensor values
-  float rawAccelX = mpu.getAccX();  // in g's
-  float rawAccelY = mpu.getAccY();
-  float rawAccelZ = mpu.getAccZ();
+  // Read sensor data
+  int16_t ax, ay, az, gx, gy, gz;
+  mpu.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
+  
+  // Convert to physical units
+  float rawAccelX = ax * ACCEL_SCALE;  // in g's
+  float rawAccelY = ay * ACCEL_SCALE;
+  float rawAccelZ = az * ACCEL_SCALE;
   
   // Apply low-pass filter and clamp acceleration
   float filteredX, filteredY, filteredZ;
@@ -817,9 +885,9 @@ void loop() {
   rawAccelY = filteredY;
   rawAccelZ = filteredZ;
   
-  float rawGyroX = mpu.getGyroX() * (PI / 180.0f);  // Convert to radians/s
-  float rawGyroY = mpu.getGyroY() * (PI / 180.0f);
-  float rawGyroZ = mpu.getGyroZ() * (PI / 180.0f);
+  float rawGyroX = gx * GYRO_SCALE * (PI / 180.0f);  // Convert to radians/s
+  float rawGyroY = gy * GYRO_SCALE * (PI / 180.0f);
+  float rawGyroZ = gz * GYRO_SCALE * (PI / 180.0f);
 
   // Debug: Print raw sensor values every 100ms
   static unsigned long lastDebugTime = 0;
