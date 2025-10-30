@@ -556,12 +556,12 @@ void putMPUToSleep() {
   mpu.setStandbyZAccelEnabled(false);
   Serial.println("  - Gyroscope disabled, accelerometer enabled for motion detection");
   
-  // Use Cycle Mode for lowest power consumption
-  // In cycle mode, the device cycles between sleep and accelerometer sampling
-  // Wake frequency: 1.25 Hz (wake every 800ms to sample accelerometer)
-  mpu.setWakeCycleEnabled(true);
-  mpu.setWakeFrequency(MPU6050_WAKE_FREQ_1P25);  // 1.25 Hz wake frequency
-  Serial.println("  - Cycle mode enabled: 1.25 Hz wake frequency");
+  // NOTE: Cycle mode disabled - testing showed it interferes with interrupt generation
+  // Keep MPU6050 in normal mode with motion detection interrupt enabled
+  // This uses more power (~3.6mA vs ~500μA in cycle mode) but interrupts work reliably
+  mpu.setWakeCycleEnabled(false);
+  mpu.setSleepEnabled(false);
+  Serial.println("  - Normal mode (cycle mode disabled for interrupt compatibility)");
   
   // Wait for power mode changes to settle
   delay(100);
@@ -693,139 +693,6 @@ void enterDeepSleep() {
   esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_SLOW_MEM, ESP_PD_OPTION_OFF);
   esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_FAST_MEM, ESP_PD_OPTION_OFF);
   
-  // ============================================================
-  // TESTING MODE: Instead of sleeping, test the interrupt
-  // ============================================================
-  Serial.println("=====================================");
-  Serial.println("INTERRUPT TESTING MODE");
-  Serial.println("NOT entering deep sleep - testing interrupt");
-  Serial.println("Move the device to trigger motion interrupt");
-  Serial.println("=====================================");
-  Serial.flush();
-  
-  // First, disable cycle mode since it may interfere with interrupt generation
-  Serial.println("Disabling cycle mode for interrupt testing...");
-  mpu.setWakeCycleEnabled(false);
-  mpu.setSleepEnabled(false);
-  delay(50);
-  
-  // Re-configure motion detection interrupt (without cycle mode)
-  Serial.println("Re-configuring motion interrupt for testing...");
-  configureMPUMotionInterrupt();
-  delay(50);
-  
-  // Read back MPU6050 interrupt configuration to verify
-  Serial.println("Reading back MPU6050 configuration:");
-  Serial.print("  INT_ENABLE register: 0x");
-  Serial.println(mpu.getIntEnabled(), HEX);
-  Serial.print("  INT_STATUS register: 0x");
-  Serial.println(mpu.getIntStatus(), HEX);
-  Serial.print("  MOT_THR register: ");
-  Serial.println(mpu.getMotionDetectionThreshold());
-  Serial.print("  MOT_DUR register: ");
-  Serial.println(mpu.getMotionDetectionDuration());
-  Serial.print("  Sleep enabled: ");
-  Serial.println(mpu.getSleepEnabled());
-  Serial.print("  Cycle enabled: ");
-  Serial.println(mpu.getWakeCycleEnabled());
-  Serial.flush();
-  
-  // Configure GPIO 18 as input with pull-down
-  gpio_config_t io_conf = {};
-  io_conf.pin_bit_mask = (1ULL << INT_PIN);
-  io_conf.mode = GPIO_MODE_INPUT;
-  io_conf.pull_up_en = GPIO_PULLUP_DISABLE;
-  io_conf.pull_down_en = GPIO_PULLDOWN_ENABLE;
-  io_conf.intr_type = GPIO_INTR_POSEDGE;  // Trigger on rising edge for testing
-  gpio_config(&io_conf);
-  
-  // Attach interrupt handler
-  attachInterrupt(digitalPinToInterrupt(INT_PIN), mpuInterruptISR, RISING);
-  
-  Serial.println("Interrupt handler attached to GPIO 18");
-  Serial.print("Current GPIO 18 level: ");
-  Serial.println(digitalRead(INT_PIN));
-  Serial.println("Waiting for interrupt... (will monitor for 60 seconds)");
-  Serial.flush();
-  
-  // Monitor for interrupts for 60 seconds
-  unsigned long startTime = millis();
-  unsigned long lastPrint = millis();
-  unsigned long lastStatusCheck = millis();
-  while (millis() - startTime < 60000) {
-    // Check if interrupt was triggered
-    if (interruptTriggered) {
-      Serial.println("*** INTERRUPT TRIGGERED! ***");
-      Serial.print("Interrupt count: ");
-      Serial.println(interruptCount);
-      Serial.print("GPIO 18 level: ");
-      Serial.println(digitalRead(INT_PIN));
-      
-      // Read and print MPU6050 interrupt status
-      uint8_t intStatus = mpu.getIntStatus();
-      Serial.print("MPU6050 interrupt status: 0x");
-      Serial.println(intStatus, HEX);
-      if (intStatus & 0x40) {
-        Serial.println("  - Motion interrupt bit is SET");
-      } else {
-        Serial.println("  - Motion interrupt bit is NOT set");
-      }
-      
-      interruptTriggered = false;  // Reset flag
-      Serial.println("Waiting for next interrupt...");
-      Serial.flush();
-    }
-    
-    // Check MPU6050 interrupt status register every 2 seconds (non-destructive read first)
-    if (millis() - lastStatusCheck >= 2000) {
-      lastStatusCheck = millis();
-      uint8_t intStatus = mpu.getIntStatus();
-      if (intStatus != 0) {
-        Serial.print("MPU6050 INT_STATUS (periodic check): 0x");
-        Serial.print(intStatus, HEX);
-        if (intStatus & 0x40) {
-          Serial.println(" - Motion bit SET (but no GPIO interrupt!)");
-        } else {
-          Serial.println();
-        }
-        Serial.flush();
-      }
-    }
-    
-    // Print status every 5 seconds
-    if (millis() - lastPrint >= 5000) {
-      lastPrint = millis();
-      Serial.print("Still monitoring... GPIO 18: ");
-      Serial.print(digitalRead(INT_PIN));
-      Serial.print(", Total interrupts: ");
-      Serial.print(interruptCount);
-      
-      // Read accelerometer to show motion is being detected
-      int16_t ax, ay, az;
-      mpu.getAcceleration(&ax, &ay, &az);
-      float accelMag = sqrt((ax*ax + ay*ay + az*az) / (16384.0*16384.0));
-      Serial.print(", Accel mag: ");
-      Serial.print(accelMag, 3);
-      Serial.println("g");
-      Serial.flush();
-    }
-    
-    delay(10);
-  }
-  
-  Serial.println("=====================================");
-  Serial.println("Testing complete. Check results above.");
-  Serial.println("System will now loop normally.");
-  Serial.println("=====================================");
-  Serial.flush();
-  
-  // Detach interrupt and restore normal operation
-  detachInterrupt(digitalPinToInterrupt(INT_PIN));
-  
-  // Don't actually enter deep sleep - just return
-  return;
-  
-  /* ORIGINAL DEEP SLEEP CODE - DISABLED FOR TESTING
   // Configure GPIO interrupt wake-up on INT_PIN (GPIO 18) for ESP32-S3
   // Motion interrupt from MPU6050 will wake the ESP32
   // ESP32-S3 uses gpio_wakeup_enable() + esp_sleep_enable_gpio_wakeup()
@@ -839,7 +706,7 @@ void enterDeepSleep() {
   io_conf.intr_type = GPIO_INTR_DISABLE;
   gpio_config(&io_conf);
   
-  // Enable GPIO wakeup on rising edge (LOW to HIGH transition)
+  // Enable GPIO wakeup on HIGH level
   // Since we have pull-down enabled, the pin is normally LOW
   // When MPU6050 triggers interrupt, it goes HIGH and wakes ESP32
   gpio_wakeup_enable((gpio_num_t)INT_PIN, GPIO_INTR_HIGH_LEVEL);
@@ -854,7 +721,6 @@ void enterDeepSleep() {
   
   // Enter deep sleep
   esp_deep_sleep_start();
-  */
 }
 
 void setup() {
