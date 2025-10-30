@@ -35,26 +35,40 @@ The MPU-6050 sensor initialization sequence was incorrect when waking from deep 
 
 ## Solutions
 
-### Fix 1: USB CDC Serial Timeout (Lines 732-744)
-Added a timeout after `Serial.begin()` to prevent blocking when no USB host is connected:
+### Fix 1: Safe Serial Output System (Lines 23-38, 740-748)
+Implemented a conditional Serial output system to prevent USB CDC blocking:
 
+**Global flag and macros (lines 23-38)**:
+```cpp
+// Global flag to track if Serial is available and won't block
+bool serialAvailable = false;
+
+// Safe Serial macros that only output when Serial is confirmed available
+#define SAFE_SERIAL_PRINT(x) if (serialAvailable) Serial.print(x)
+#define SAFE_SERIAL_PRINTLN(x) if (serialAvailable) Serial.println(x)
+#define SAFE_SERIAL_PRINTF(...) if (serialAvailable) Serial.printf(__VA_ARGS__)
+```
+
+**Detection logic in setup() (lines 740-748)**:
 ```cpp
 Serial.begin(115200);
 
-// Wait briefly for USB CDC to initialize (ESP32-S3 with ARDUINO_USB_CDC_ON_BOOT=1)
-// Without this, Serial operations can block when no USB host is connected,
-// causing timing issues with MPU-6050 initialization after wake from sleep
-// Max 500ms timeout ensures we don't wait forever if no USB host present
+// Detect if USB CDC serial is actually available
+// Max 100ms timeout - if Serial doesn't become ready quickly, assume no USB host
 unsigned long serial_start = millis();
-while (!Serial && (millis() - serial_start < 500)) {
+while (!Serial && (millis() - serial_start < 100)) {
   delay(10);
 }
+serialAvailable = (bool)Serial;
 ```
 
+**All Serial calls in critical sections replaced with SAFE_SERIAL_* macros**
+
 This ensures:
-- Serial operations don't block indefinitely
-- MPU initialization timing remains consistent
+- Serial operations NEVER block when no USB host is connected
+- MPU initialization timing is completely unaffected by Serial state
 - Device works reliably with or without serial connection
+- Debugging output still available when serial monitor is connected
 
 ### Fix 2: MPU-6050 Initialization Reordering
 Reordered the initialization sequence to restore normal operation BEFORE calling `mpu.initialize()`:
@@ -82,11 +96,13 @@ mpu.setDHPFMode(MPU6050_DHPF_HOLD)   // Hold mode (no filtering)
 
 ## Key Changes
 
-### 1. Serial Timeout (Lines 732-744)
-Added timeout after `Serial.begin()` to prevent USB CDC blocking:
-- Waits max 500ms for Serial to become ready
-- Prevents indefinite blocking when no USB host connected
-- Ensures consistent timing for subsequent operations
+### 1. Safe Serial System (Lines 23-38, 740-748, throughout)
+Implemented conditional Serial output to prevent USB CDC blocking:
+- Added global `serialAvailable` flag
+- Created SAFE_SERIAL_* macros that check flag before output
+- Detection with 100ms timeout (much shorter than before)
+- All critical Serial calls replaced with safe versions
+- Zero impact on timing when no USB host connected
 
 ### 2. Pre-initialization Wake-up (Lines 779-818)
 Before calling `mpu.initialize()`, if waking from deep sleep:
