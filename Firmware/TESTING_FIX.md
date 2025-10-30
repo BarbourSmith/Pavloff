@@ -15,7 +15,7 @@ Reordered MPU-6050 initialization sequence to restore from sleep mode BEFORE cal
 
 ### Upload Firmware
 ```bash
-cd /home/runner/work/Pavloff/Pavloff/Firmware
+cd Firmware  # Navigate to Firmware directory from repository root
 platformio run -e esp1 -t upload
 ```
 
@@ -168,11 +168,12 @@ If the fix doesn't work, you'll see:
 ## Additional Diagnostics
 
 If problems persist, check:
-1. **MPU-6050 connection**: Verify I2C wiring (GPIO 8=SDA, GPIO 9=SCL)
-2. **Interrupt pin**: Verify GPIO 18 is connected to MPU INT pin
+1. **MPU-6050 connection**: Verify I2C wiring (GPIO 8=SDA, GPIO 9=SCL per platformio.ini build flags)
+2. **Interrupt pin**: Verify GPIO 18 is connected to MPU INT pin (INT_PIN definition in main.cpp)
 3. **Serial output**: Look for any error messages during wake sequence
 4. **BLE**: Verify device advertises after wake ("Pavloff Workout Sensor")
 5. **Calibration**: Ensure gyro offsets are loaded ("Using stored calibration offsets")
+6. **Pin configuration**: Check platformio.ini for SDA_PIN and SCL_PIN definitions if using different hardware
 
 ## Notes
 
