@@ -703,6 +703,33 @@ void enterDeepSleep() {
   Serial.println("=====================================");
   Serial.flush();
   
+  // First, disable cycle mode since it may interfere with interrupt generation
+  Serial.println("Disabling cycle mode for interrupt testing...");
+  mpu.setWakeCycleEnabled(false);
+  mpu.setSleepEnabled(false);
+  delay(50);
+  
+  // Re-configure motion detection interrupt (without cycle mode)
+  Serial.println("Re-configuring motion interrupt for testing...");
+  configureMPUMotionInterrupt();
+  delay(50);
+  
+  // Read back MPU6050 interrupt configuration to verify
+  Serial.println("Reading back MPU6050 configuration:");
+  Serial.print("  INT_ENABLE register: 0x");
+  Serial.println(mpu.getIntEnabled(), HEX);
+  Serial.print("  INT_STATUS register: 0x");
+  Serial.println(mpu.getIntStatus(), HEX);
+  Serial.print("  MOT_THR register: ");
+  Serial.println(mpu.getMotionDetectionThreshold());
+  Serial.print("  MOT_DUR register: ");
+  Serial.println(mpu.getMotionDetectionDuration());
+  Serial.print("  Sleep enabled: ");
+  Serial.println(mpu.getSleepEnabled());
+  Serial.print("  Cycle enabled: ");
+  Serial.println(mpu.getWakeCycleEnabled());
+  Serial.flush();
+  
   // Configure GPIO 18 as input with pull-down
   gpio_config_t io_conf = {};
   io_conf.pin_bit_mask = (1ULL << INT_PIN);
@@ -724,6 +751,7 @@ void enterDeepSleep() {
   // Monitor for interrupts for 60 seconds
   unsigned long startTime = millis();
   unsigned long lastPrint = millis();
+  unsigned long lastStatusCheck = millis();
   while (millis() - startTime < 60000) {
     // Check if interrupt was triggered
     if (interruptTriggered) {
@@ -748,13 +776,37 @@ void enterDeepSleep() {
       Serial.flush();
     }
     
+    // Check MPU6050 interrupt status register every 2 seconds (non-destructive read first)
+    if (millis() - lastStatusCheck >= 2000) {
+      lastStatusCheck = millis();
+      uint8_t intStatus = mpu.getIntStatus();
+      if (intStatus != 0) {
+        Serial.print("MPU6050 INT_STATUS (periodic check): 0x");
+        Serial.print(intStatus, HEX);
+        if (intStatus & 0x40) {
+          Serial.println(" - Motion bit SET (but no GPIO interrupt!)");
+        } else {
+          Serial.println();
+        }
+        Serial.flush();
+      }
+    }
+    
     // Print status every 5 seconds
     if (millis() - lastPrint >= 5000) {
       lastPrint = millis();
       Serial.print("Still monitoring... GPIO 18: ");
       Serial.print(digitalRead(INT_PIN));
       Serial.print(", Total interrupts: ");
-      Serial.println(interruptCount);
+      Serial.print(interruptCount);
+      
+      // Read accelerometer to show motion is being detected
+      int16_t ax, ay, az;
+      mpu.getAcceleration(&ax, &ay, &az);
+      float accelMag = sqrt((ax*ax + ay*ay + az*az) / (16384.0*16384.0));
+      Serial.print(", Accel mag: ");
+      Serial.print(accelMag, 3);
+      Serial.println("g");
       Serial.flush();
     }
     
