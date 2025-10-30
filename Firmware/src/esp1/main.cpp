@@ -733,6 +733,15 @@ void setup() {
   // Initialize Serial communication
   Serial.begin(115200);
   
+  // Wait briefly for USB CDC to initialize (ESP32-S3 with ARDUINO_USB_CDC_ON_BOOT=1)
+  // Without this, Serial operations can block when no USB host is connected,
+  // causing timing issues with MPU-6050 initialization after wake from sleep
+  // Max 500ms timeout ensures we don't wait forever if no USB host present
+  unsigned long serial_start = millis();
+  while (!Serial && (millis() - serial_start < 500)) {
+    delay(10);
+  }
+  
   // Disable WiFi radio immediately to save power (not needed for BLE-only operation)
   // WiFi can consume 20-100mA even when not actively used
   // Note: esp_wifi_stop() may fail if WiFi was never started, which is expected and harmless

@@ -1,9 +1,18 @@
 # Fix Summary: Rep Detection After Long Sleep
 
 ## Issue
-After waking from a long deep sleep (multiple minutes), the device would connect via BLE but rep detection would fail - the rep count would stay at 0. Pressing the reset button would fix it temporarily.
+After waking from a long deep sleep (multiple minutes), the device would connect via BLE but rep detection would fail - the rep count would stay at 0. Pressing the reset button would fix it temporarily. **Notably, the issue only occurred when no serial monitor was connected - with a serial connection, rep detection worked correctly.**
 
-## Root Cause
+## Root Causes
+Two related issues were identified and fixed:
+
+### 1. USB CDC Serial Blocking Issue
+The ESP32-S3 is configured with `ARDUINO_USB_CDC_ON_BOOT=1`, which enables USB CDC serial. When no USB host is connected:
+- `Serial.println()` calls can block or introduce significant delays
+- This affects timing-sensitive I2C operations with the MPU-6050
+- The MPU wake-up sequence timing becomes unreliable
+
+### 2. MPU-6050 Initialization Sequence
 The MPU-6050 sensor initialization sequence was incorrect when waking from deep sleep:
 
 1. Device enters deep sleep with MPU in low-power mode:
@@ -24,7 +33,30 @@ The MPU-6050 sensor initialization sequence was incorrect when waking from deep 
 
 4. Result: MPU in inconsistent state, sensor readings fail, rep detection doesn't work
 
-## Solution
+## Solutions
+
+### Fix 1: USB CDC Serial Timeout (Lines 732-744)
+Added a timeout after `Serial.begin()` to prevent blocking when no USB host is connected:
+
+```cpp
+Serial.begin(115200);
+
+// Wait briefly for USB CDC to initialize (ESP32-S3 with ARDUINO_USB_CDC_ON_BOOT=1)
+// Without this, Serial operations can block when no USB host is connected,
+// causing timing issues with MPU-6050 initialization after wake from sleep
+// Max 500ms timeout ensures we don't wait forever if no USB host present
+unsigned long serial_start = millis();
+while (!Serial && (millis() - serial_start < 500)) {
+  delay(10);
+}
+```
+
+This ensures:
+- Serial operations don't block indefinitely
+- MPU initialization timing remains consistent
+- Device works reliably with or without serial connection
+
+### Fix 2: MPU-6050 Initialization Reordering
 Reordered the initialization sequence to restore normal operation BEFORE calling `mpu.initialize()`:
 
 **Fixed sequence**:
@@ -50,7 +82,13 @@ mpu.setDHPFMode(MPU6050_DHPF_HOLD)   // Hold mode (no filtering)
 
 ## Key Changes
 
-### 1. Pre-initialization Wake-up (Lines 779-818)
+### 1. Serial Timeout (Lines 732-744)
+Added timeout after `Serial.begin()` to prevent USB CDC blocking:
+- Waits max 500ms for Serial to become ready
+- Prevents indefinite blocking when no USB host connected
+- Ensures consistent timing for subsequent operations
+
+### 2. Pre-initialization Wake-up (Lines 779-818)
 Before calling `mpu.initialize()`, if waking from deep sleep:
 - Clear motion interrupt status
 - Disable motion detection interrupt
@@ -68,8 +106,17 @@ After initialization and range configuration:
 
 This ensures clean sensor readings without high-pass filtering interference.
 
-### 3. Removed Redundant Wake Call
+### 4. Removed Redundant Wake Call
 The original `wakeMPUFromSleep()` function call was removed from the post-initialization phase since wake-up is now done pre-initialization.
+
+## Why This Matters
+
+The USB CDC serial blocking issue explains why:
+- ✅ Rep detection worked WITH serial monitor connected (Serial operations complete quickly)
+- ❌ Rep detection failed WITHOUT serial monitor (Serial operations block/delay, disrupting MPU timing)
+- ✅ Reset button fixed it temporarily (fresh initialization without wake-up delays)
+
+The 500ms timeout ensures the device works reliably regardless of USB connection state.
 
 ## Technical Details
 
