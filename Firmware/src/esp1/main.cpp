@@ -106,6 +106,16 @@ unsigned long lastStillTime = 0;     // Track when device became stationary
 bool wasStationary = false;          // Track if device was stationary in previous iteration
 bool calibrationComplete = false;    // Track if calibration has been done
 
+// Interrupt debugging variables
+volatile bool interruptTriggered = false;
+volatile unsigned long interruptCount = 0;
+
+// ISR for MPU6050 interrupt pin (for testing)
+void IRAM_ATTR mpuInterruptISR() {
+  interruptTriggered = true;
+  interruptCount++;
+}
+
 // Timing constants
 #define INTEGRATION_INTERVAL_MS 10  // Calculate position every 10ms for accuracy
 #define REPORT_INTERVAL_MS 500       // Report data every 500ms
@@ -683,6 +693,87 @@ void enterDeepSleep() {
   esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_SLOW_MEM, ESP_PD_OPTION_OFF);
   esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_FAST_MEM, ESP_PD_OPTION_OFF);
   
+  // ============================================================
+  // TESTING MODE: Instead of sleeping, test the interrupt
+  // ============================================================
+  Serial.println("=====================================");
+  Serial.println("INTERRUPT TESTING MODE");
+  Serial.println("NOT entering deep sleep - testing interrupt");
+  Serial.println("Move the device to trigger motion interrupt");
+  Serial.println("=====================================");
+  Serial.flush();
+  
+  // Configure GPIO 18 as input with pull-down
+  gpio_config_t io_conf = {};
+  io_conf.pin_bit_mask = (1ULL << INT_PIN);
+  io_conf.mode = GPIO_MODE_INPUT;
+  io_conf.pull_up_en = GPIO_PULLUP_DISABLE;
+  io_conf.pull_down_en = GPIO_PULLDOWN_ENABLE;
+  io_conf.intr_type = GPIO_INTR_POSEDGE;  // Trigger on rising edge for testing
+  gpio_config(&io_conf);
+  
+  // Attach interrupt handler
+  attachInterrupt(digitalPinToInterrupt(INT_PIN), mpuInterruptISR, RISING);
+  
+  Serial.println("Interrupt handler attached to GPIO 18");
+  Serial.print("Current GPIO 18 level: ");
+  Serial.println(digitalRead(INT_PIN));
+  Serial.println("Waiting for interrupt... (will monitor for 60 seconds)");
+  Serial.flush();
+  
+  // Monitor for interrupts for 60 seconds
+  unsigned long startTime = millis();
+  unsigned long lastPrint = millis();
+  while (millis() - startTime < 60000) {
+    // Check if interrupt was triggered
+    if (interruptTriggered) {
+      Serial.println("*** INTERRUPT TRIGGERED! ***");
+      Serial.print("Interrupt count: ");
+      Serial.println(interruptCount);
+      Serial.print("GPIO 18 level: ");
+      Serial.println(digitalRead(INT_PIN));
+      
+      // Read and print MPU6050 interrupt status
+      uint8_t intStatus = mpu.getIntStatus();
+      Serial.print("MPU6050 interrupt status: 0x");
+      Serial.println(intStatus, HEX);
+      if (intStatus & 0x40) {
+        Serial.println("  - Motion interrupt bit is SET");
+      } else {
+        Serial.println("  - Motion interrupt bit is NOT set");
+      }
+      
+      interruptTriggered = false;  // Reset flag
+      Serial.println("Waiting for next interrupt...");
+      Serial.flush();
+    }
+    
+    // Print status every 5 seconds
+    if (millis() - lastPrint >= 5000) {
+      lastPrint = millis();
+      Serial.print("Still monitoring... GPIO 18: ");
+      Serial.print(digitalRead(INT_PIN));
+      Serial.print(", Total interrupts: ");
+      Serial.println(interruptCount);
+      Serial.flush();
+    }
+    
+    delay(10);
+  }
+  
+  Serial.println("=====================================");
+  Serial.println("Testing complete. Check results above.");
+  Serial.println("System will now loop normally.");
+  Serial.println("=====================================");
+  Serial.flush();
+  
+  // Detach interrupt and restore normal operation
+  detachInterrupt(digitalPinToInterrupt(INT_PIN));
+  
+  // Don't actually enter deep sleep - just return
+  return;
+  
+  /* ORIGINAL DEEP SLEEP CODE - DISABLED FOR TESTING
   // Configure GPIO interrupt wake-up on INT_PIN (GPIO 18) for ESP32-S3
   // Motion interrupt from MPU6050 will wake the ESP32
   // ESP32-S3 uses gpio_wakeup_enable() + esp_sleep_enable_gpio_wakeup()
@@ -711,6 +802,7 @@ void enterDeepSleep() {
   
   // Enter deep sleep
   esp_deep_sleep_start();
+  */
 }
 
 void setup() {
