@@ -6,8 +6,8 @@ After waking from a long deep sleep (multiple minutes), the device would connect
 ## Root Causes
 Two related issues were identified and fixed:
 
-### 1. USB CDC Serial Blocking Issue (RESOLVED by disabling USB CDC)
-The ESP32-S3 was initially configured with `ARDUINO_USB_CDC_ON_BOOT=1`, which enables USB CDC serial. When no USB host is connected:
+### 1. USB CDC Serial Blocking Issue (RESOLVED by removing Serial output)
+The ESP32-S3 is configured with `ARDUINO_USB_CDC_ON_BOOT=1`, which enables USB CDC serial. When no USB host is connected:
 - `Serial.println()` calls block or introduce significant delays
 - This affects timing-sensitive I2C operations with the MPU-6050
 - The MPU wake-up sequence timing becomes unreliable
@@ -36,26 +36,19 @@ The MPU-6050 sensor initialization sequence was incorrect when waking from deep 
 
 ## Solutions
 
-### Fix 1: Disable USB CDC, Use Hardware UART (platformio.ini line 29)
-**DEFINITIVE FIX**: Changed from USB CDC to hardware UART for Serial communication:
+### Fix 1: Remove All Serial Output (main.cpp)
+**DEFINITIVE FIX**: Removed all Serial print statements from the code:
 
-**platformio.ini change**:
-```ini
-# Before (USB CDC - causes blocking):
--D ARDUINO_USB_CDC_ON_BOOT=1
-
-# After (Hardware UART - never blocks):
--D ARDUINO_USB_CDC_ON_BOOT=0
-```
+**Changes**:
+- Removed all `Serial.print()`, `Serial.println()`, and `Serial.begin()` calls
+- Keeps USB CDC enabled (`ARDUINO_USB_CDC_ON_BOOT=1`) for debugging when needed
+- Serial output can be temporarily added for debugging and removed before production
 
 **Impact**:
-- Serial now uses hardware UART (TX/RX pins) instead of USB CDC
-- Hardware UART operations NEVER block, regardless of connection state
+- Zero USB CDC blocking since there are no Serial operations
 - Completely eliminates all USB-related timing issues
 - Zero impact on MPU-6050 initialization timing
-- Debug output works via hardware UART (needs USB-to-UART adapter or onboard bridge)
-
-**Note**: Serial monitor will now connect via hardware UART instead of USB CDC. Most ESP32-S3 devkits have an onboard USB-to-UART bridge for this purpose.
+- USB CDC remains available for adding debug output when needed
 
 ### Fix 2: MPU-6050 Initialization Reordering
 Reordered the initialization sequence to restore normal operation BEFORE calling `mpu.initialize()`:
@@ -83,12 +76,12 @@ mpu.setDHPFMode(MPU6050_DHPF_HOLD)   // Hold mode (no filtering)
 
 ## Key Changes
 
-### 1. Hardware UART Configuration (platformio.ini line 29)
-Changed USB CDC configuration to use hardware UART:
-- `ARDUINO_USB_CDC_ON_BOOT=1` → `ARDUINO_USB_CDC_ON_BOOT=0`
-- Serial now uses dedicated UART hardware
-- No blocking behavior, ever
-- Most reliable solution for timing-critical applications
+### 1. Serial Output Removal (main.cpp)
+Removed all Serial print statements from production code:
+- No `Serial.begin()`, `Serial.print()`, or `Serial.println()` calls
+- USB CDC remains enabled for debugging when needed
+- No blocking behavior since no Serial operations occur
+- Clean production code with debugging available when needed
 
 ### 2. Pre-initialization Wake-up (Lines 779-818)
 Before calling `mpu.initialize()`, if waking from deep sleep:
@@ -157,20 +150,18 @@ See `TESTING_FIX.md` for comprehensive testing procedures covering:
 5. ✅ Proper sensor initialization guaranteed
 
 ## Files Modified
-- `Firmware/platformio.ini` - Changed ARDUINO_USB_CDC_ON_BOOT from 1 to 0
-- `Firmware/src/esp1/main.cpp` - Fixed MPU initialization sequence
+- `Firmware/src/esp1/main.cpp` - Removed all Serial output, fixed MPU initialization sequence
+- `Firmware/platformio.ini` - Kept ARDUINO_USB_CDC_ON_BOOT=1 for debugging capability
 - `Firmware/TESTING_FIX.md` - New comprehensive testing guide (183 lines)
 - `Firmware/FIX_SUMMARY.md` - This summary document
 
-## Hardware Requirements for Serial Monitor
+## Debugging Notes
 
-With `ARDUINO_USB_CDC_ON_BOOT=0`, Serial uses hardware UART:
-- **TX Pin**: GPIO43 (default UART0 TX on ESP32-S3)
-- **RX Pin**: GPIO44 (default UART0 RX on ESP32-S3)
-
-Most ESP32-S3 development boards include an onboard USB-to-UART bridge chip (e.g., CP2102, CH340) that automatically connects these pins to USB. Serial monitor will work normally via the board's USB port.
-
-If your board doesn't have an onboard USB-to-UART bridge, you'll need an external USB-to-UART adapter connected to TX/RX pins.
+USB CDC is still enabled (`ARDUINO_USB_CDC_ON_BOOT=1`) so you can add Serial debugging when needed:
+- Add `Serial.begin(115200);` in `setup()` when debugging is needed
+- Add `Serial.println()` statements where needed
+- Remove all Serial statements before production deployment
+- This approach provides flexibility while ensuring production code has no blocking issues
 
 ## Related Documentation
 - `Firmware/POWER_MANAGEMENT.md` - Deep sleep configuration
