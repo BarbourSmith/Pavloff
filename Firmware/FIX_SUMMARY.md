@@ -6,11 +6,12 @@ After waking from a long deep sleep (multiple minutes), the device would connect
 ## Root Causes
 Two related issues were identified and fixed:
 
-### 1. USB CDC Serial Blocking Issue
-The ESP32-S3 is configured with `ARDUINO_USB_CDC_ON_BOOT=1`, which enables USB CDC serial. When no USB host is connected:
-- `Serial.println()` calls can block or introduce significant delays
+### 1. USB CDC Serial Blocking Issue (RESOLVED by disabling USB CDC)
+The ESP32-S3 was initially configured with `ARDUINO_USB_CDC_ON_BOOT=1`, which enables USB CDC serial. When no USB host is connected:
+- `Serial.println()` calls block or introduce significant delays
 - This affects timing-sensitive I2C operations with the MPU-6050
 - The MPU wake-up sequence timing becomes unreliable
+- Even with conditional Serial output, USB CDC can still cause timing issues
 
 ### 2. MPU-6050 Initialization Sequence
 The MPU-6050 sensor initialization sequence was incorrect when waking from deep sleep:
@@ -35,40 +36,26 @@ The MPU-6050 sensor initialization sequence was incorrect when waking from deep 
 
 ## Solutions
 
-### Fix 1: Safe Serial Output System (Lines 23-38, 740-748)
-Implemented a conditional Serial output system to prevent USB CDC blocking:
+### Fix 1: Disable USB CDC, Use Hardware UART (platformio.ini line 29)
+**DEFINITIVE FIX**: Changed from USB CDC to hardware UART for Serial communication:
 
-**Global flag and macros (lines 23-38)**:
-```cpp
-// Global flag to track if Serial is available and won't block
-bool serialAvailable = false;
+**platformio.ini change**:
+```ini
+# Before (USB CDC - causes blocking):
+-D ARDUINO_USB_CDC_ON_BOOT=1
 
-// Safe Serial macros that only output when Serial is confirmed available
-#define SAFE_SERIAL_PRINT(x) if (serialAvailable) Serial.print(x)
-#define SAFE_SERIAL_PRINTLN(x) if (serialAvailable) Serial.println(x)
-#define SAFE_SERIAL_PRINTF(...) if (serialAvailable) Serial.printf(__VA_ARGS__)
+# After (Hardware UART - never blocks):
+-D ARDUINO_USB_CDC_ON_BOOT=0
 ```
 
-**Detection logic in setup() (lines 740-748)**:
-```cpp
-Serial.begin(115200);
+**Impact**:
+- Serial now uses hardware UART (TX/RX pins) instead of USB CDC
+- Hardware UART operations NEVER block, regardless of connection state
+- Completely eliminates all USB-related timing issues
+- Zero impact on MPU-6050 initialization timing
+- Debug output works via hardware UART (needs USB-to-UART adapter or onboard bridge)
 
-// Detect if USB CDC serial is actually available
-// Max 100ms timeout - if Serial doesn't become ready quickly, assume no USB host
-unsigned long serial_start = millis();
-while (!Serial && (millis() - serial_start < 100)) {
-  delay(10);
-}
-serialAvailable = (bool)Serial;
-```
-
-**All Serial calls in critical sections replaced with SAFE_SERIAL_* macros**
-
-This ensures:
-- Serial operations NEVER block when no USB host is connected
-- MPU initialization timing is completely unaffected by Serial state
-- Device works reliably with or without serial connection
-- Debugging output still available when serial monitor is connected
+**Note**: Serial monitor will now connect via hardware UART instead of USB CDC. Most ESP32-S3 devkits have an onboard USB-to-UART bridge for this purpose.
 
 ### Fix 2: MPU-6050 Initialization Reordering
 Reordered the initialization sequence to restore normal operation BEFORE calling `mpu.initialize()`:
@@ -96,13 +83,12 @@ mpu.setDHPFMode(MPU6050_DHPF_HOLD)   // Hold mode (no filtering)
 
 ## Key Changes
 
-### 1. Safe Serial System (Lines 23-38, 740-748, throughout)
-Implemented conditional Serial output to prevent USB CDC blocking:
-- Added global `serialAvailable` flag
-- Created SAFE_SERIAL_* macros that check flag before output
-- Detection with 100ms timeout (much shorter than before)
-- All critical Serial calls replaced with safe versions
-- Zero impact on timing when no USB host connected
+### 1. Hardware UART Configuration (platformio.ini line 29)
+Changed USB CDC configuration to use hardware UART:
+- `ARDUINO_USB_CDC_ON_BOOT=1` → `ARDUINO_USB_CDC_ON_BOOT=0`
+- Serial now uses dedicated UART hardware
+- No blocking behavior, ever
+- Most reliable solution for timing-critical applications
 
 ### 2. Pre-initialization Wake-up (Lines 779-818)
 Before calling `mpu.initialize()`, if waking from deep sleep:
@@ -171,9 +157,20 @@ See `TESTING_FIX.md` for comprehensive testing procedures covering:
 5. ✅ Proper sensor initialization guaranteed
 
 ## Files Modified
-- `Firmware/src/esp1/main.cpp` - Fixed initialization sequence (59 lines changed)
+- `Firmware/platformio.ini` - Changed ARDUINO_USB_CDC_ON_BOOT from 1 to 0
+- `Firmware/src/esp1/main.cpp` - Fixed MPU initialization sequence
 - `Firmware/TESTING_FIX.md` - New comprehensive testing guide (183 lines)
 - `Firmware/FIX_SUMMARY.md` - This summary document
+
+## Hardware Requirements for Serial Monitor
+
+With `ARDUINO_USB_CDC_ON_BOOT=0`, Serial uses hardware UART:
+- **TX Pin**: GPIO43 (default UART0 TX on ESP32-S3)
+- **RX Pin**: GPIO44 (default UART0 RX on ESP32-S3)
+
+Most ESP32-S3 development boards include an onboard USB-to-UART bridge chip (e.g., CP2102, CH340) that automatically connects these pins to USB. Serial monitor will work normally via the board's USB port.
+
+If your board doesn't have an onboard USB-to-UART bridge, you'll need an external USB-to-UART adapter connected to TX/RX pins.
 
 ## Related Documentation
 - `Firmware/POWER_MANAGEMENT.md` - Deep sleep configuration

@@ -26,23 +26,14 @@
 #define IDLE_TIMEOUT_MS 20000  // 20 seconds in milliseconds (for testing)
 #define CALIBRATION_STILLNESS_MS 240000  // 4 minutes in milliseconds
 
-// Global flag to track if Serial is available and won't block
-// This prevents USB CDC blocking issues when no USB host is connected
-bool serialAvailable = false;
-
-// Safe Serial macros that only output when Serial is confirmed available
-#define SAFE_SERIAL_PRINT(x) if (serialAvailable) Serial.print(x)
-#define SAFE_SERIAL_PRINTLN(x) if (serialAvailable) Serial.println(x)
-#define SAFE_SERIAL_PRINTF(...) if (serialAvailable) Serial.printf(__VA_ARGS__)
-
 // Power optimization settings
 void configurePowerOptimizations() {
   // Reduce CPU frequency to save power (80 MHz is sufficient for this application)
   // ESP32-S3 supports 240MHz, 160MHz, 80MHz, 40MHz, 20MHz, 10MHz
   setCpuFrequencyMhz(80);
-  SAFE_SERIAL_PRINT("CPU frequency set to: ");
-  SAFE_SERIAL_PRINT(getCpuFrequencyMhz());
-  SAFE_SERIAL_PRINTLN(" MHz");
+  Serial.print("CPU frequency set to: ");
+  Serial.print(getCpuFrequencyMhz());
+  Serial.println(" MHz");
   
   // Enable automatic light sleep when idle
   // This allows the CPU to enter light sleep between tasks
@@ -52,7 +43,7 @@ void configurePowerOptimizations() {
   pm_config.light_sleep_enable = true;
   esp_pm_configure(&pm_config);
   
-  SAFE_SERIAL_PRINTLN("Power optimizations configured");
+  Serial.println("Power optimizations configured");
 }
 
 // Create an MPU6050 object
@@ -739,27 +730,19 @@ void enterDeepSleep() {
 }
 
 void setup() {
-  // Initialize Serial communication
+  // Initialize Serial communication (Hardware UART - does not block)
+  // Note: ARDUINO_USB_CDC_ON_BOOT=0 means Serial uses hardware UART instead of USB CDC
+  // This prevents blocking issues when no USB host is connected
   Serial.begin(115200);
-  
-  // Detect if USB CDC serial is actually available (ESP32-S3 with ARDUINO_USB_CDC_ON_BOOT=1)
-  // Without this check, Serial operations can block when no USB host is connected,
-  // causing timing issues with MPU-6050 initialization after wake from sleep
-  // Max 100ms timeout - if Serial doesn't become ready quickly, assume no USB host
-  unsigned long serial_start = millis();
-  while (!Serial && (millis() - serial_start < 100)) {
-    delay(10);
-  }
-  serialAvailable = (bool)Serial;
   
   // Disable WiFi radio immediately to save power (not needed for BLE-only operation)
   // WiFi can consume 20-100mA even when not actively used
   // Note: esp_wifi_stop() may fail if WiFi was never started, which is expected and harmless
   esp_err_t err = esp_wifi_stop();
   if (err == ESP_OK) {
-    SAFE_SERIAL_PRINTLN("WiFi stopped successfully");
+    Serial.println("WiFi stopped successfully");
   } else if (err == ESP_ERR_WIFI_NOT_INIT) {
-    SAFE_SERIAL_PRINTLN("WiFi was not initialized (expected for BLE-only mode)");
+    Serial.println("WiFi was not initialized (expected for BLE-only mode)");
   }
   
   // Configure power optimizations
@@ -768,28 +751,28 @@ void setup() {
   // Check wake-up reason
   esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
   if (wakeup_reason == ESP_SLEEP_WAKEUP_EXT1) {
-    SAFE_SERIAL_PRINTLN("=====================================");
-    SAFE_SERIAL_PRINTLN("WOKE UP FROM DEEP SLEEP");
-    SAFE_SERIAL_PRINTLN("Reason: Motion detected (EXT1 GPIO interrupt)");
-    SAFE_SERIAL_PRINT("Woke from GPIO pin: ");
-    SAFE_SERIAL_PRINTLN(INT_PIN);
-    SAFE_SERIAL_PRINT("EXT1 wakeup status: 0x");
-    if (serialAvailable) Serial.println(esp_sleep_get_ext1_wakeup_status(), HEX);
-    SAFE_SERIAL_PRINTLN("=====================================");
+    Serial.println("=====================================");
+    Serial.println("WOKE UP FROM DEEP SLEEP");
+    Serial.println("Reason: Motion detected (EXT1 GPIO interrupt)");
+    Serial.print("Woke from GPIO pin: ");
+    Serial.println(INT_PIN);
+    Serial.print("EXT1 wakeup status: 0x");
+    Serial.println(esp_sleep_get_ext1_wakeup_status(), HEX);
+    Serial.println("=====================================");
     
     // Motion detected - continue with normal startup
-    SAFE_SERIAL_PRINTLN("Motion detected - resuming normal operation...");
+    Serial.println("Motion detected - resuming normal operation...");
   } else if (wakeup_reason == ESP_SLEEP_WAKEUP_UNDEFINED) {
-    SAFE_SERIAL_PRINTLN("=====================================");
-    SAFE_SERIAL_PRINTLN("DEVICE STARTING");
-    SAFE_SERIAL_PRINTLN("Reason: Power-on or hard reset");
-    SAFE_SERIAL_PRINTLN("=====================================");
+    Serial.println("=====================================");
+    Serial.println("DEVICE STARTING");
+    Serial.println("Reason: Power-on or hard reset");
+    Serial.println("=====================================");
   } else {
-    SAFE_SERIAL_PRINTLN("=====================================");
-    SAFE_SERIAL_PRINTLN("DEVICE STARTING");
-    SAFE_SERIAL_PRINT("Wake-up reason: ");
-    SAFE_SERIAL_PRINTLN(wakeup_reason);
-    SAFE_SERIAL_PRINTLN("=====================================");
+    Serial.println("=====================================");
+    Serial.println("DEVICE STARTING");
+    Serial.print("Wake-up reason: ");
+    Serial.println(wakeup_reason);
+    Serial.println("=====================================");
   }
 
   // --- MPU-6050 Setup ---
@@ -798,24 +781,24 @@ void setup() {
   // If waking from deep sleep, restore MPU from low power mode FIRST
   // This must be done before initialize() to ensure proper state
   if (wakeup_reason == ESP_SLEEP_WAKEUP_EXT1) {
-    SAFE_SERIAL_PRINTLN("Restoring MPU-6050 from sleep mode before initialization...");
+    Serial.println("Restoring MPU-6050 from sleep mode before initialization...");
     
     // Clear any pending motion interrupt
     uint8_t intStatus = mpu.getIntStatus();
-    SAFE_SERIAL_PRINT("  - Interrupt status on wake: 0x");
-    if (serialAvailable) Serial.println(intStatus, HEX);
+    Serial.print("  - Interrupt status on wake: 0x");
+    Serial.println(intStatus, HEX);
     if (intStatus & 0x40) {
-      SAFE_SERIAL_PRINTLN("  - Motion interrupt was triggered");
+      Serial.println("  - Motion interrupt was triggered");
     }
     
     // Disable motion detection interrupt immediately
     mpu.setIntMotionEnabled(false);
-    SAFE_SERIAL_PRINTLN("  - Motion interrupt disabled");
+    Serial.println("  - Motion interrupt disabled");
     
     // Disable cycle mode and ensure device is awake
     mpu.setWakeCycleEnabled(false);
     mpu.setSleepEnabled(false);
-    SAFE_SERIAL_PRINTLN("  - Wake cycle and sleep mode disabled");
+    Serial.println("  - Wake cycle and sleep mode disabled");
     
     // Enable all sensors that may have been disabled for sleep
     mpu.setStandbyXGyroEnabled(false);
@@ -824,16 +807,16 @@ void setup() {
     mpu.setStandbyXAccelEnabled(false);
     mpu.setStandbyYAccelEnabled(false);
     mpu.setStandbyZAccelEnabled(false);
-    SAFE_SERIAL_PRINTLN("  - All sensors enabled");
+    Serial.println("  - All sensors enabled");
     
     // Re-enable temperature sensor
     mpu.setTempSensorEnabled(true);
-    SAFE_SERIAL_PRINTLN("  - Temperature sensor enabled");
+    Serial.println("  - Temperature sensor enabled");
     
     // Wait for sensor to fully stabilize after wake
     delay(200);
     
-    SAFE_SERIAL_PRINTLN("MPU-6050 pre-initialization complete");
+    Serial.println("MPU-6050 pre-initialization complete");
   }
   
   // Initialize MPU-6050 (now that it's in proper state)
@@ -841,9 +824,9 @@ void setup() {
   
   // Test connection
   if (mpu.testConnection()) {
-    SAFE_SERIAL_PRINTLN("MPU-6050 connection successful");
+    Serial.println("MPU-6050 connection successful");
   } else {
-    SAFE_SERIAL_PRINTLN("MPU-6050 connection failed");
+    Serial.println("MPU-6050 connection failed");
   }
   
   // Set ranges: ±2g for accelerometer, ±500°/s for gyroscope (matching tockn library)
@@ -861,28 +844,28 @@ void setup() {
   delay(10);
   mpu.setDHPFMode(MPU6050_DHPF_HOLD);  // Hold mode for normal operation (no high-pass filtering)
   
-  SAFE_SERIAL_PRINTLN("MPU-6050 initialized and configured for normal operation");
+  Serial.println("MPU-6050 initialized and configured for normal operation");
   
   // Try to load stored calibration offsets (software offsets in degrees/s)
   if (loadGyroOffsets(&gyroXoffset, &gyroYoffset, &gyroZoffset)) {
     calibrationComplete = true;
-    SAFE_SERIAL_PRINTLN("Using stored calibration offsets");
-    SAFE_SERIAL_PRINT("X : "); SAFE_SERIAL_PRINTLN(gyroXoffset);
-    SAFE_SERIAL_PRINT("Y : "); SAFE_SERIAL_PRINTLN(gyroYoffset);
-    SAFE_SERIAL_PRINT("Z : "); SAFE_SERIAL_PRINTLN(gyroZoffset);
+    Serial.println("Using stored calibration offsets");
+    Serial.print("X : "); Serial.println(gyroXoffset);
+    Serial.print("Y : "); Serial.println(gyroYoffset);
+    Serial.print("Z : "); Serial.println(gyroZoffset);
   } else {
     // No stored offsets - perform calibration immediately on startup
     calibrationComplete = false;
     gyroXoffset = 0.0f;
     gyroYoffset = 0.0f;
     gyroZoffset = 0.0f;
-    SAFE_SERIAL_PRINTLN("No stored calibration found - performing calibration now");
-    SAFE_SERIAL_PRINTLN("IMPORTANT: Keep device completely still during calibration!");
+    Serial.println("No stored calibration found - performing calibration now");
+    Serial.println("IMPORTANT: Keep device completely still during calibration!");
     delay(2000);  // Give user time to read message and stabilize device
     performCalibration();
   }
   
-  SAFE_SERIAL_PRINTLN("------------------------------------");
+  Serial.println("------------------------------------");
 
   // Reset all state variables (critical after wake from sleep)
   resetStateVariables();
@@ -898,7 +881,7 @@ void setup() {
   // Set BLE power to minimum (can increase if needed for range)
   // ESP_PWR_LVL_N12 to ESP_PWR_LVL_P9 (lower = less power)
   BLEDevice::setPower(ESP_PWR_LVL_N0, ESP_BLE_PWR_TYPE_DEFAULT);
-  SAFE_SERIAL_PRINTLN("BLE power set to minimum for energy efficiency");
+  Serial.println("BLE power set to minimum for energy efficiency");
 
   // Create the BLE Server
   pServer = BLEDevice::createServer();
@@ -945,7 +928,7 @@ void setup() {
   pAdvertising->setMinPreferred(0x06);
   pAdvertising->setMinPreferred(0x12);
   pAdvertising->start();
-  SAFE_SERIAL_PRINTLN("Waiting for a client connection to notify...");
+  Serial.println("Waiting for a client connection to notify...");
 }
 
 void loop() {
