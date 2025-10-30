@@ -279,12 +279,6 @@ struct WorkoutView: View {
             .sheet(isPresented: $showingSetup) {
                 SetupView(workoutSettings: $workoutSettings)
             }
-            .onChange(of: showingSetup) { isPresented in
-                // When setup sheet is dismissed, recheck blocking state
-                if !isPresented {
-                    checkAndEnableScreenTimeBlocking()
-                }
-            }
             .sheet(isPresented: $showingCongratulations) {
                 CongratulationsView(workoutSettings: workoutSettings, onRestart: {
                     restartWorkout()
@@ -389,8 +383,7 @@ struct WorkoutView: View {
             print("[WORKOUT] Workout not completed today, enabling app blocking")
             screenTimeManager.enableAppBlocking()
         } else {
-            print("[WORKOUT] Workout already completed today, disabling app blocking")
-            screenTimeManager.disableAppBlocking()
+            print("[WORKOUT] Workout already completed today, apps remain unblocked")
         }
     }
     
