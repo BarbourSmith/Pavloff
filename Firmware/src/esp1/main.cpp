@@ -776,7 +776,48 @@ void setup() {
   // --- MPU-6050 Setup ---
   Wire.begin(SDA_PIN, SCL_PIN); // SDA, SCL
   
-  // Initialize MPU-6050
+  // If waking from deep sleep, restore MPU from low power mode FIRST
+  // This must be done before initialize() to ensure proper state
+  if (wakeup_reason == ESP_SLEEP_WAKEUP_EXT1) {
+    Serial.println("Restoring MPU-6050 from sleep mode before initialization...");
+    
+    // Clear any pending motion interrupt
+    uint8_t intStatus = mpu.getIntStatus();
+    Serial.print("  - Interrupt status on wake: 0x");
+    Serial.println(intStatus, HEX);
+    if (intStatus & 0x40) {
+      Serial.println("  - Motion interrupt was triggered");
+    }
+    
+    // Disable motion detection interrupt immediately
+    mpu.setIntMotionEnabled(false);
+    Serial.println("  - Motion interrupt disabled");
+    
+    // Disable cycle mode and ensure device is awake
+    mpu.setWakeCycleEnabled(false);
+    mpu.setSleepEnabled(false);
+    Serial.println("  - Wake cycle and sleep mode disabled");
+    
+    // Enable all sensors that may have been disabled for sleep
+    mpu.setStandbyXGyroEnabled(false);
+    mpu.setStandbyYGyroEnabled(false);
+    mpu.setStandbyZGyroEnabled(false);
+    mpu.setStandbyXAccelEnabled(false);
+    mpu.setStandbyYAccelEnabled(false);
+    mpu.setStandbyZAccelEnabled(false);
+    Serial.println("  - All sensors enabled");
+    
+    // Re-enable temperature sensor
+    mpu.setTempSensorEnabled(true);
+    Serial.println("  - Temperature sensor enabled");
+    
+    // Wait for sensor to fully stabilize after wake
+    delay(200);
+    
+    Serial.println("MPU-6050 pre-initialization complete");
+  }
+  
+  // Initialize MPU-6050 (now that it's in proper state)
   mpu.initialize();
   
   // Test connection
@@ -790,12 +831,18 @@ void setup() {
   mpu.setFullScaleAccelRange(MPU6050_ACCEL_FS_2);
   mpu.setFullScaleGyroRange(MPU6050_GYRO_FS_500);
   
-  // If waking from interrupt, clear it and restore normal operation
-  if (wakeup_reason == ESP_SLEEP_WAKEUP_EXT1) {
-    wakeMPUFromSleep();
-  }
+  // Ensure all interrupts are disabled for normal operation
+  mpu.setIntEnabled(0x00);
+  mpu.setIntFreefallEnabled(false);
+  mpu.setIntMotionEnabled(false);
+  mpu.setIntZeroMotionEnabled(false);
   
-  Serial.println("MPU-6050 initialized");
+  // Reset DHPF to ensure clean accelerometer readings
+  mpu.setDHPFMode(MPU6050_DHPF_RESET);
+  delay(10);
+  mpu.setDHPFMode(MPU6050_DHPF_HOLD);  // Hold mode for normal operation (no high-pass filtering)
+  
+  Serial.println("MPU-6050 initialized and configured for normal operation");
   
   // Try to load stored calibration offsets (software offsets in degrees/s)
   if (loadGyroOffsets(&gyroXoffset, &gyroYoffset, &gyroZoffset)) {
