@@ -662,8 +662,18 @@ void enterDeepSleep() {
   // Put MPU-6050 into low power mode with motion interrupt configured
   putMPUToSleep();
   
+  // Clear any pending interrupt status before sleep
+  uint8_t intStatus = mpu.getIntStatus();
+  Serial.print("Cleared interrupt status before sleep: 0x");
+  Serial.println(intStatus, HEX);
+  
   // Wait for MPU-6050 to enter low power mode and interrupt to be ready
   delay(200);
+  
+  // Check GPIO 18 level before sleep
+  Serial.print("GPIO 18 level before sleep: ");
+  Serial.println(digitalRead(INT_PIN));
+  Serial.flush();
   
   // Disable BLE and wait for clean shutdown
   BLEDevice::deinit(true);
@@ -693,28 +703,24 @@ void enterDeepSleep() {
   esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_SLOW_MEM, ESP_PD_OPTION_OFF);
   esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_FAST_MEM, ESP_PD_OPTION_OFF);
   
-  // Configure GPIO interrupt wake-up on INT_PIN (GPIO 18) for ESP32-S3
+  // Configure GPIO interrupt wake-up on INT_PIN (GPIO 18) for ESP32-S3 deep sleep
   // Motion interrupt from MPU6050 will wake the ESP32
-  // ESP32-S3 uses gpio_wakeup_enable() + esp_sleep_enable_gpio_wakeup()
+  // For deep sleep, ESP32-S3 uses ext1 wakeup for RTC GPIOs
   
-  // Configure GPIO 18 as input with pull-down (so HIGH level triggers wake)
-  gpio_config_t io_conf = {};
-  io_conf.pin_bit_mask = (1ULL << INT_PIN);
-  io_conf.mode = GPIO_MODE_INPUT;
-  io_conf.pull_up_en = GPIO_PULLUP_DISABLE;
-  io_conf.pull_down_en = GPIO_PULLDOWN_ENABLE;
-  io_conf.intr_type = GPIO_INTR_DISABLE;
-  gpio_config(&io_conf);
+  // GPIO 18 is RTC_GPIO 18 on ESP32-S3
+  // Use ext1 wakeup with single GPIO and HIGH level trigger
+  uint64_t gpio_mask = (1ULL << INT_PIN);
   
-  // Enable GPIO wakeup on HIGH level
-  // Since we have pull-down enabled, the pin is normally LOW
-  // When MPU6050 triggers interrupt, it goes HIGH and wakes ESP32
-  gpio_wakeup_enable((gpio_num_t)INT_PIN, GPIO_INTR_HIGH_LEVEL);
-  esp_sleep_enable_gpio_wakeup();
+  // Enable ext1 wakeup on GPIO 18 with ANY_HIGH mode (wakes when any selected GPIO is HIGH)
+  esp_sleep_enable_ext1_wakeup(gpio_mask, ESP_EXT1_WAKEUP_ANY_HIGH);
   
-  Serial.print("GPIO wake configured on pin ");
+  // Configure internal pull-down on the GPIO
+  gpio_pulldown_en((gpio_num_t)INT_PIN);
+  gpio_pullup_dis((gpio_num_t)INT_PIN);
+  
+  Serial.print("Deep sleep EXT1 wake configured on GPIO ");
   Serial.print(INT_PIN);
-  Serial.println(" (MPU6050 INT pin, HIGH level trigger)");
+  Serial.println(" (HIGH level trigger with pull-down)");
   Serial.println("Entering deep sleep NOW...");
   Serial.flush();
   delay(100);  // Ensure serial output completes
@@ -742,12 +748,14 @@ void setup() {
   
   // Check wake-up reason
   esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
-  if (wakeup_reason == ESP_SLEEP_WAKEUP_GPIO) {
+  if (wakeup_reason == ESP_SLEEP_WAKEUP_EXT1) {
     Serial.println("=====================================");
     Serial.println("WOKE UP FROM DEEP SLEEP");
-    Serial.println("Reason: Motion detected (GPIO interrupt)");
+    Serial.println("Reason: Motion detected (EXT1 GPIO interrupt)");
     Serial.print("Woke from GPIO pin: ");
     Serial.println(INT_PIN);
+    Serial.print("EXT1 wakeup status: 0x");
+    Serial.println(esp_sleep_get_ext1_wakeup_status(), HEX);
     Serial.println("=====================================");
     
     // Motion detected - continue with normal startup
@@ -783,7 +791,7 @@ void setup() {
   mpu.setFullScaleGyroRange(MPU6050_GYRO_FS_500);
   
   // If waking from interrupt, clear it and restore normal operation
-  if (wakeup_reason == ESP_SLEEP_WAKEUP_GPIO) {
+  if (wakeup_reason == ESP_SLEEP_WAKEUP_EXT1) {
     wakeMPUFromSleep();
   }
   
