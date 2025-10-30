@@ -21,6 +21,9 @@ class ScreenTimeManager: ObservableObject {
             // Save the fact that we have a selection
             let hasSelection = !selectedApps.applicationTokens.isEmpty || !selectedApps.categoryTokens.isEmpty
             UserDefaults.standard.set(hasSelection, forKey: "hasAppSelection")
+            
+            // Persist the selection for app restarts
+            saveSelection()
         }
     }
     
@@ -34,6 +37,37 @@ class ScreenTimeManager: ObservableObject {
         // Check initial authorization status
         Task {
             await checkAuthorizationStatus()
+        }
+        
+        // Load persisted selection
+        loadSelection()
+    }
+    
+    // Save the selection to UserDefaults
+    private func saveSelection() {
+        do {
+            let encoder = JSONEncoder()
+            let data = try encoder.encode(selectedApps)
+            UserDefaults.standard.set(data, forKey: "savedAppSelection")
+            print("[ScreenTime] Selection saved successfully")
+        } catch {
+            print("[ScreenTime] Failed to save selection: \(error)")
+        }
+    }
+    
+    // Load the selection from UserDefaults
+    private func loadSelection() {
+        guard let data = UserDefaults.standard.data(forKey: "savedAppSelection") else {
+            print("[ScreenTime] No saved selection found")
+            return
+        }
+        
+        do {
+            let decoder = JSONDecoder()
+            selectedApps = try decoder.decode(FamilyActivitySelection.self, from: data)
+            print("[ScreenTime] Selection loaded successfully with \(selectedApps.applicationTokens.count) apps")
+        } catch {
+            print("[ScreenTime] Failed to load selection: \(error)")
         }
     }
     
@@ -62,18 +96,21 @@ class ScreenTimeManager: ObservableObject {
             return
         }
         
-        guard !selectedApps.applicationTokens.isEmpty || !selectedApps.categoryTokens.isEmpty else {
-            print("[ScreenTime] No apps selected for blocking")
-            return
+        // Only set shields if we have selection tokens in memory
+        // After app restart, tokens are lost but shields persist in ManagedSettingsStore
+        if !selectedApps.applicationTokens.isEmpty || !selectedApps.categoryTokens.isEmpty {
+            // Set shields for selected apps
+            store.shield.applications = selectedApps.applicationTokens
+            if !selectedApps.categoryTokens.isEmpty {
+                store.shield.applicationCategories = .specific(selectedApps.categoryTokens)
+            }
+            
+            print("[ScreenTime] App blocking enabled with \(selectedApps.applicationTokens.count) apps and \(selectedApps.categoryTokens.count) categories")
+        } else {
+            // After app restart, we don't have tokens but shields persist automatically in ManagedSettingsStore
+            // We can't reapply shields without tokens, but existing shields should still be active
+            print("[ScreenTime] No tokens available to set shields (shields should persist from previous session)")
         }
-        
-        // Shield the selected apps
-        store.shield.applications = selectedApps.applicationTokens
-        if !selectedApps.categoryTokens.isEmpty {
-            store.shield.applicationCategories = .specific(selectedApps.categoryTokens)
-        }
-        
-        print("[ScreenTime] App blocking enabled with \(selectedApps.applicationTokens.count) apps and \(selectedApps.categoryTokens.count) categories")
     }
     
     // Disable app blocking when workout is completed
@@ -105,6 +142,8 @@ class ScreenTimeManager: ObservableObject {
         selectedApps = FamilyActivitySelection()
         disableAppBlocking()
         UserDefaults.standard.set(false, forKey: "hasAppSelection")
+        UserDefaults.standard.removeObject(forKey: "savedAppSelection")
+        print("[ScreenTime] Selection cleared")
     }
 }
 
