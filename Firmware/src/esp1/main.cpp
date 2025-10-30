@@ -683,14 +683,28 @@ void enterDeepSleep() {
   esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_SLOW_MEM, ESP_PD_OPTION_OFF);
   esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_FAST_MEM, ESP_PD_OPTION_OFF);
   
-  // Configure GPIO interrupt wake-up on INT_PIN (GPIO 18)
+  // Configure GPIO interrupt wake-up on INT_PIN (GPIO 18) for ESP32-S3
   // Motion interrupt from MPU6050 will wake the ESP32
-  // Using HIGH level trigger since MPU6050 interrupt is active HIGH and latched
-  esp_sleep_enable_ext0_wakeup((gpio_num_t)INT_PIN, 1);  // 1 = HIGH level
+  // ESP32-S3 uses gpio_wakeup_enable() + esp_sleep_enable_gpio_wakeup()
+  
+  // Configure GPIO 18 as input with pull-down (so HIGH level triggers wake)
+  gpio_config_t io_conf = {};
+  io_conf.pin_bit_mask = (1ULL << INT_PIN);
+  io_conf.mode = GPIO_MODE_INPUT;
+  io_conf.pull_up_en = GPIO_PULLUP_DISABLE;
+  io_conf.pull_down_en = GPIO_PULLDOWN_ENABLE;
+  io_conf.intr_type = GPIO_INTR_DISABLE;
+  gpio_config(&io_conf);
+  
+  // Enable GPIO wakeup on rising edge (LOW to HIGH transition)
+  // Since we have pull-down enabled, the pin is normally LOW
+  // When MPU6050 triggers interrupt, it goes HIGH and wakes ESP32
+  gpio_wakeup_enable((gpio_num_t)INT_PIN, GPIO_INTR_HIGH_LEVEL);
+  esp_sleep_enable_gpio_wakeup();
   
   Serial.print("GPIO wake configured on pin ");
   Serial.print(INT_PIN);
-  Serial.println(" (MPU6050 INT pin)");
+  Serial.println(" (MPU6050 INT pin, HIGH level trigger)");
   Serial.println("Entering deep sleep NOW...");
   Serial.flush();
   delay(100);  // Ensure serial output completes
@@ -718,7 +732,7 @@ void setup() {
   
   // Check wake-up reason
   esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
-  if (wakeup_reason == ESP_SLEEP_WAKEUP_EXT0) {
+  if (wakeup_reason == ESP_SLEEP_WAKEUP_GPIO) {
     Serial.println("=====================================");
     Serial.println("WOKE UP FROM DEEP SLEEP");
     Serial.println("Reason: Motion detected (GPIO interrupt)");
@@ -759,7 +773,7 @@ void setup() {
   mpu.setFullScaleGyroRange(MPU6050_GYRO_FS_500);
   
   // If waking from interrupt, clear it and restore normal operation
-  if (wakeup_reason == ESP_SLEEP_WAKEUP_EXT0) {
+  if (wakeup_reason == ESP_SLEEP_WAKEUP_GPIO) {
     wakeMPUFromSleep();
   }
   
