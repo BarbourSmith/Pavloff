@@ -31,9 +31,6 @@ void configurePowerOptimizations() {
   // Reduce CPU frequency to save power (80 MHz is sufficient for this application)
   // ESP32-S3 supports 240MHz, 160MHz, 80MHz, 40MHz, 20MHz, 10MHz
   setCpuFrequencyMhz(80);
-  Serial.print("CPU frequency set to: ");
-  Serial.print(getCpuFrequencyMhz());
-  Serial.println(" MHz");
   
   // Enable automatic light sleep when idle
   // This allows the CPU to enter light sleep between tasks
@@ -43,7 +40,6 @@ void configurePowerOptimizations() {
   pm_config.light_sleep_enable = true;
   esp_pm_configure(&pm_config);
   
-  Serial.println("Power optimizations configured");
 }
 
 // Create an MPU6050 object
@@ -155,13 +151,11 @@ class MyServerCallbacks: public BLEServerCallbacks {
     void onConnect(BLEServer* pServer) {
       deviceConnected = true;
       lastActivityTime = millis();  // Reset activity timer on connection
-      Serial.println("Device connected");
     }
 
     void onDisconnect(BLEServer* pServer) {
       deviceConnected = false;
       lastActivityTime = millis();  // Reset activity timer on disconnection
-      Serial.println("Device disconnected");
       // Restart advertising so a new client can connect
       pServer->getAdvertising()->start();
     }
@@ -173,8 +167,6 @@ class RepCharacteristicCallbacks: public BLECharacteristicCallbacks {
       std::string value = pCharacteristic->getValue();
       
       if (value.length() > 0) {
-        Serial.print("Received command: ");
-        Serial.println(value.c_str());
         
         // Reset activity timer on any BLE interaction
         lastActivityTime = millis();
@@ -184,7 +176,6 @@ class RepCharacteristicCallbacks: public BLECharacteristicCallbacks {
           repCount = 0;
           repState = REP_IDLE;
           phaseStartTime = millis();
-          Serial.println("Rep count reset to 0");
           
           // Send immediate update with new count
           char repData[30];
@@ -216,13 +207,6 @@ void saveGyroOffsets(float offsetX, float offsetY, float offsetZ) {
   preferences.putBool("hasOffsets", true);
   preferences.putInt("calVersion", 2);  // Version 2 = ElectronicCats library with software offsets
   preferences.end();
-  Serial.println("Gyro offsets saved to persistent storage");
-  Serial.print("Offsets: X=");
-  Serial.print(offsetX, 4);
-  Serial.print(", Y=");
-  Serial.print(offsetY, 4);
-  Serial.print(", Z=");
-  Serial.println(offsetZ, 4);
 }
 
 // Load gyro calibration offsets from persistent storage
@@ -239,31 +223,18 @@ bool loadGyroOffsets(float* offsetX, float* offsetY, float* offsetZ) {
     *offsetY = preferences.getFloat("gyroOffsetY", 0.0f);
     *offsetZ = preferences.getFloat("gyroOffsetZ", 0.0f);
     preferences.end();
-    Serial.println("Loaded gyro offsets from persistent storage");
-    Serial.print("Offsets: X=");
-    Serial.print(*offsetX, 4);
-    Serial.print(", Y=");
-    Serial.print(*offsetY, 4);
-    Serial.print(", Z=");
-    Serial.println(*offsetZ, 4);
     return true;
   }
   
   preferences.end();
   if (hasOffsets && calVersion != 2) {
-    Serial.println("Old calibration format detected - will recalibrate");
   } else {
-    Serial.println("No stored gyro offsets found");
   }
   return false;
 }
 
 // Perform gyro calibration and save results (matches tockn library behavior)
 void performCalibration() {
-  Serial.println();
-  Serial.println("========================================");
-  Serial.println("Starting gyroscope calibration...");
-  Serial.println("DO NOT MOVE MPU6050");
   
   // Calculate gyro offsets by averaging readings (same as tockn library: 3000 samples)
   float x = 0.0f, y = 0.0f, z = 0.0f;
@@ -273,7 +244,6 @@ void performCalibration() {
   
   for (int i = 0; i < 3000; i++) {
     if (i % 1000 == 0) {
-      Serial.print(".");
     }
     mpu.getRotation(&rx, &ry, &rz);
     
@@ -288,17 +258,10 @@ void performCalibration() {
   gyroYoffset = y / 3000.0f;
   gyroZoffset = z / 3000.0f;
   
-  Serial.println();
-  Serial.println("Done!");
-  Serial.print("X : "); Serial.println(gyroXoffset);
-  Serial.print("Y : "); Serial.println(gyroYoffset);
-  Serial.print("Z : "); Serial.println(gyroZoffset);
   
   saveGyroOffsets(gyroXoffset, gyroYoffset, gyroZoffset);
   calibrationComplete = true;
   
-  Serial.println("Program will start after 3 seconds");
-  Serial.println("========================================");
   delay(3000);
 }
 
@@ -405,14 +368,12 @@ void filterAndClampAccel(float rawX, float rawY, float rawZ, float* outX, float*
 
 // Configure MPU6050 motion detection interrupt for wake-up
 void configureMPUMotionInterrupt() {
-  Serial.println("Configuring MPU6050 motion detection interrupt...");
   
   // Reset all interrupt registers to known state
   mpu.setIntEnabled(0x00);  // Disable all interrupts
   mpu.setIntFreefallEnabled(false);
   mpu.setIntMotionEnabled(false);
   mpu.setIntZeroMotionEnabled(false);
-  Serial.println("  - Cleared all interrupts");
   
   // Configure interrupt pin behavior
   // Active HIGH, push-pull, held until interrupt is cleared, cleared on any read
@@ -420,7 +381,6 @@ void configureMPUMotionInterrupt() {
   mpu.setInterruptDrive(false);     // false = push-pull
   mpu.setInterruptLatch(true);      // true = held until cleared
   mpu.setInterruptLatchClear(true); // true = cleared on any read
-  Serial.println("  - Configured INT pin: active HIGH, push-pull, latched");
   
   // Configure motion detection
   // Motion threshold: 1-255 (1 LSB = 2mg @ 2g range, so value of 32 = 64mg = 0.064g)
@@ -428,30 +388,23 @@ void configureMPUMotionInterrupt() {
   // For normal wake: 32 = 64mg = 0.064g  
   // For less sensitive: 64 = 128mg = 0.128g
   mpu.setMotionDetectionThreshold(32);  // 64mg threshold
-  Serial.println("  - Motion threshold: 64mg (0.064g)");
   
   // Motion duration: 0-255 (1 LSB = 1ms @ 1kHz ODR)
   // Setting to 5ms to avoid false triggers from vibration
   mpu.setMotionDetectionDuration(5);  // 5ms duration
-  Serial.println("  - Motion duration: 5ms");
   
   // Configure Digital High Pass Filter (DHPF) for motion detection
   // DHPF reset to remove DC bias from accelerometer
   mpu.setDHPFMode(MPU6050_DHPF_RESET);
   delay(10);  // Allow DHPF to reset
   mpu.setDHPFMode(MPU6050_DHPF_5);  // Use 5Hz high-pass filter
-  Serial.println("  - DHPF: 5Hz high-pass filter");
   
   // Enable motion detection interrupt
   mpu.setIntMotionEnabled(true);
-  Serial.println("  - Motion interrupt enabled");
   
   // Verify interrupt is configured
   uint8_t intStatus = mpu.getIntStatus();
-  Serial.print("  - Initial interrupt status: 0x");
-  Serial.println(intStatus, HEX);
   
-  Serial.println("MPU6050 motion interrupt configured successfully");
 }
 
 // Rep detection using velocity magnitude and direction changes
@@ -478,7 +431,6 @@ void detectRep(float velX, float velY, float velZ, float linearAccelMag, unsigne
   // Reset if no motion detected for too long
   if (!isMoving && (currentTime - lastMotionTime > REP_REST_TIMEOUT_MS)) {
     if (repState != REP_IDLE) {
-      Serial.println("REP: Reset - No motion timeout");
       repState = REP_IDLE;
       phaseStartTime = currentTime;
     }
@@ -500,10 +452,8 @@ void detectRep(float velX, float velY, float velZ, float linearAccelMag, unsigne
         // Determine initial direction based on dominant axis
         if (dominantAxisVelocity > 0) {
           repState = REP_MOVING_UP;
-          Serial.println("REP: Started - Moving UP");
         } else {
           repState = REP_MOVING_DOWN;
-          Serial.println("REP: Started - Moving DOWN");
         }
         phaseStartTime = currentTime;
       }
@@ -515,8 +465,6 @@ void detectRep(float velX, float velY, float velZ, float linearAccelMag, unsigne
         repState = REP_MOVING_DOWN;
         repCount++;
         phaseStartTime = currentTime;
-        Serial.print("REP: Direction change UP->DOWN | Total Reps: ");
-        Serial.println(repCount);
       }
       break;
       
@@ -525,8 +473,6 @@ void detectRep(float velX, float velY, float velZ, float linearAccelMag, unsigne
       if (isMoving && dominantAxisVelocity > REP_VELOCITY_THRESHOLD * 1.2f && phaseDuration > REP_MIN_DURATION_MS) {
         repState = REP_MOVING_UP;
         phaseStartTime = currentTime;
-        Serial.print("REP: Direction change DOWN->UP | Total Reps: ");
-        Serial.println(repCount);
       }
       break;
       
@@ -538,14 +484,12 @@ void detectRep(float velX, float velY, float velZ, float linearAccelMag, unsigne
 
 // Put MPU-6050 into low power mode for sleep
 void putMPUToSleep() {
-  Serial.println("Preparing MPU-6050 for sleep mode...");
   
   // Configure motion detection interrupt for wake-up
   configureMPUMotionInterrupt();
   
   // Disable temperature sensor to save power
   mpu.setTempSensorEnabled(false);
-  Serial.println("  - Temperature sensor disabled");
   
   // Disable gyroscope to save power, keep accelerometer enabled for motion detection
   mpu.setStandbyXGyroEnabled(true);
@@ -554,19 +498,16 @@ void putMPUToSleep() {
   mpu.setStandbyXAccelEnabled(false);
   mpu.setStandbyYAccelEnabled(false);
   mpu.setStandbyZAccelEnabled(false);
-  Serial.println("  - Gyroscope disabled, accelerometer enabled for motion detection");
   
   // NOTE: Cycle mode disabled - testing showed it interferes with interrupt generation
   // Keep MPU6050 in normal mode with motion detection interrupt enabled
   // This uses more power (~3.6mA vs ~500μA in cycle mode) but interrupts work reliably
   mpu.setWakeCycleEnabled(false);
   mpu.setSleepEnabled(false);
-  Serial.println("  - Normal mode (cycle mode disabled for interrupt compatibility)");
   
   // Wait for power mode changes to settle
   delay(100);
   
-  Serial.println("MPU-6050 ready for low power operation with motion interrupt");
 }
 
 // Reset all state variables to prepare for motion tracking
@@ -610,25 +551,19 @@ void resetStateVariables() {
   wasStationary = false;
   lastStillTime = millis();
   
-  Serial.println("State variables reset");
 }
 
 // Wake up MPU-6050 from low power mode
 void wakeMPUFromSleep() {
-  Serial.println("Waking MPU-6050 from low power mode...");
   
   // Clear any pending motion interrupt
   uint8_t intStatus = mpu.getIntStatus();
-  Serial.print("  - Interrupt status on wake: 0x");
-  Serial.println(intStatus, HEX);
   if (intStatus & 0x40) {
-    Serial.println("  - Motion interrupt was triggered");
   }
   
   // Disable cycle mode and wake up MPU-6050
   mpu.setWakeCycleEnabled(false);
   mpu.setSleepEnabled(false);
-  Serial.println("  - Set to normal mode");
   
   // Enable all sensors (gyroscope and accelerometer)
   mpu.setStandbyXGyroEnabled(false);
@@ -637,43 +572,27 @@ void wakeMPUFromSleep() {
   mpu.setStandbyXAccelEnabled(false);
   mpu.setStandbyYAccelEnabled(false);
   mpu.setStandbyZAccelEnabled(false);
-  Serial.println("  - Enabled all sensors");
   
   // Disable motion detection interrupt during normal operation
   mpu.setIntMotionEnabled(false);
-  Serial.println("  - Motion interrupt disabled for normal operation");
   
   delay(100);  // Wait for sensor to stabilize
   
-  Serial.println("MPU-6050 woken up and ready for normal operation");
 }
 
 // Enter deep sleep mode with interrupt wake
 void enterDeepSleep() {
-  Serial.println("=====================================");
-  Serial.println("ENTERING DEEP SLEEP MODE");
-  Serial.println("Device will wake on motion detection");
-  Serial.print("Current uptime: ");
-  Serial.print(millis() / 1000);
-  Serial.println(" seconds");
-  Serial.println("=====================================");
-  Serial.flush();  // Ensure all serial data is sent
   
   // Put MPU-6050 into low power mode with motion interrupt configured
   putMPUToSleep();
   
   // Clear any pending interrupt status before sleep
   uint8_t intStatus = mpu.getIntStatus();
-  Serial.print("Cleared interrupt status before sleep: 0x");
-  Serial.println(intStatus, HEX);
   
   // Wait for MPU-6050 to enter low power mode and interrupt to be ready
   delay(200);
   
   // Check GPIO 18 level before sleep
-  Serial.print("GPIO 18 level before sleep: ");
-  Serial.println(digitalRead(INT_PIN));
-  Serial.flush();
   
   // Disable BLE and wait for clean shutdown
   BLEDevice::deinit(true);
@@ -683,20 +602,14 @@ void enterDeepSleep() {
   // Note: These may fail if WiFi was never started, which is expected and harmless
   esp_err_t wifi_err = esp_wifi_stop();
   if (wifi_err != ESP_OK && wifi_err != ESP_ERR_WIFI_NOT_INIT) {
-    Serial.print("WiFi stop warning: ");
-    Serial.println(wifi_err);
   }
   
   wifi_err = esp_wifi_deinit();
   if (wifi_err != ESP_OK && wifi_err != ESP_ERR_WIFI_NOT_INIT) {
-    Serial.print("WiFi deinit warning: ");
-    Serial.println(wifi_err);
   }
   
   // Wait for all radio shutdowns to complete
   delay(200);
-  Serial.println("BLE and WiFi shut down");
-  Serial.flush();
   
   // Disable unused peripherals to minimize power consumption
   esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_OFF);
@@ -718,11 +631,6 @@ void enterDeepSleep() {
   gpio_pulldown_en((gpio_num_t)INT_PIN);
   gpio_pullup_dis((gpio_num_t)INT_PIN);
   
-  Serial.print("Deep sleep EXT1 wake configured on GPIO ");
-  Serial.print(INT_PIN);
-  Serial.println(" (HIGH level trigger with pull-down)");
-  Serial.println("Entering deep sleep NOW...");
-  Serial.flush();
   delay(100);  // Ensure serial output completes
   
   // Enter deep sleep
@@ -730,17 +638,12 @@ void enterDeepSleep() {
 }
 
 void setup() {
-  // Initialize Serial communication
-  Serial.begin(115200);
-  
   // Disable WiFi radio immediately to save power (not needed for BLE-only operation)
   // WiFi can consume 20-100mA even when not actively used
   // Note: esp_wifi_stop() may fail if WiFi was never started, which is expected and harmless
   esp_err_t err = esp_wifi_stop();
   if (err == ESP_OK) {
-    Serial.println("WiFi stopped successfully");
   } else if (err == ESP_ERR_WIFI_NOT_INIT) {
-    Serial.println("WiFi was not initialized (expected for BLE-only mode)");
   }
   
   // Configure power optimizations
@@ -749,74 +652,84 @@ void setup() {
   // Check wake-up reason
   esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
   if (wakeup_reason == ESP_SLEEP_WAKEUP_EXT1) {
-    Serial.println("=====================================");
-    Serial.println("WOKE UP FROM DEEP SLEEP");
-    Serial.println("Reason: Motion detected (EXT1 GPIO interrupt)");
-    Serial.print("Woke from GPIO pin: ");
-    Serial.println(INT_PIN);
-    Serial.print("EXT1 wakeup status: 0x");
-    Serial.println(esp_sleep_get_ext1_wakeup_status(), HEX);
-    Serial.println("=====================================");
     
     // Motion detected - continue with normal startup
-    Serial.println("Motion detected - resuming normal operation...");
   } else if (wakeup_reason == ESP_SLEEP_WAKEUP_UNDEFINED) {
-    Serial.println("=====================================");
-    Serial.println("DEVICE STARTING");
-    Serial.println("Reason: Power-on or hard reset");
-    Serial.println("=====================================");
   } else {
-    Serial.println("=====================================");
-    Serial.println("DEVICE STARTING");
-    Serial.print("Wake-up reason: ");
-    Serial.println(wakeup_reason);
-    Serial.println("=====================================");
   }
 
   // --- MPU-6050 Setup ---
   Wire.begin(SDA_PIN, SCL_PIN); // SDA, SCL
   
-  // Initialize MPU-6050
+  // If waking from deep sleep, restore MPU from low power mode FIRST
+  // This must be done before initialize() to ensure proper state
+  if (wakeup_reason == ESP_SLEEP_WAKEUP_EXT1) {
+    
+    // Clear any pending motion interrupt
+    uint8_t intStatus = mpu.getIntStatus();
+    if (intStatus & 0x40) {
+    }
+    
+    // Disable motion detection interrupt immediately
+    mpu.setIntMotionEnabled(false);
+    
+    // Disable cycle mode and ensure device is awake
+    mpu.setWakeCycleEnabled(false);
+    mpu.setSleepEnabled(false);
+    
+    // Enable all sensors that may have been disabled for sleep
+    mpu.setStandbyXGyroEnabled(false);
+    mpu.setStandbyYGyroEnabled(false);
+    mpu.setStandbyZGyroEnabled(false);
+    mpu.setStandbyXAccelEnabled(false);
+    mpu.setStandbyYAccelEnabled(false);
+    mpu.setStandbyZAccelEnabled(false);
+    
+    // Re-enable temperature sensor
+    mpu.setTempSensorEnabled(true);
+    
+    // Wait for sensor to fully stabilize after wake
+    delay(200);
+    
+  }
+  
+  // Initialize MPU-6050 (now that it's in proper state)
   mpu.initialize();
   
   // Test connection
   if (mpu.testConnection()) {
-    Serial.println("MPU-6050 connection successful");
   } else {
-    Serial.println("MPU-6050 connection failed");
   }
   
   // Set ranges: ±2g for accelerometer, ±500°/s for gyroscope (matching tockn library)
   mpu.setFullScaleAccelRange(MPU6050_ACCEL_FS_2);
   mpu.setFullScaleGyroRange(MPU6050_GYRO_FS_500);
   
-  // If waking from interrupt, clear it and restore normal operation
-  if (wakeup_reason == ESP_SLEEP_WAKEUP_EXT1) {
-    wakeMPUFromSleep();
-  }
+  // Ensure all interrupts are disabled for normal operation
+  mpu.setIntEnabled(0x00);
+  mpu.setIntFreefallEnabled(false);
+  mpu.setIntMotionEnabled(false);
+  mpu.setIntZeroMotionEnabled(false);
   
-  Serial.println("MPU-6050 initialized");
+  // Reset DHPF to ensure clean accelerometer readings
+  mpu.setDHPFMode(MPU6050_DHPF_RESET);
+  delay(10);
+  mpu.setDHPFMode(MPU6050_DHPF_HOLD);  // Hold mode for normal operation (no high-pass filtering)
+  
   
   // Try to load stored calibration offsets (software offsets in degrees/s)
   if (loadGyroOffsets(&gyroXoffset, &gyroYoffset, &gyroZoffset)) {
     calibrationComplete = true;
-    Serial.println("Using stored calibration offsets");
-    Serial.print("X : "); Serial.println(gyroXoffset);
-    Serial.print("Y : "); Serial.println(gyroYoffset);
-    Serial.print("Z : "); Serial.println(gyroZoffset);
   } else {
     // No stored offsets - perform calibration immediately on startup
     calibrationComplete = false;
     gyroXoffset = 0.0f;
     gyroYoffset = 0.0f;
     gyroZoffset = 0.0f;
-    Serial.println("No stored calibration found - performing calibration now");
-    Serial.println("IMPORTANT: Keep device completely still during calibration!");
     delay(2000);  // Give user time to read message and stabilize device
     performCalibration();
   }
   
-  Serial.println("------------------------------------");
 
   // Reset all state variables (critical after wake from sleep)
   resetStateVariables();
@@ -832,7 +745,6 @@ void setup() {
   // Set BLE power to minimum (can increase if needed for range)
   // ESP_PWR_LVL_N12 to ESP_PWR_LVL_P9 (lower = less power)
   BLEDevice::setPower(ESP_PWR_LVL_N0, ESP_BLE_PWR_TYPE_DEFAULT);
-  Serial.println("BLE power set to minimum for energy efficiency");
 
   // Create the BLE Server
   pServer = BLEDevice::createServer();
@@ -879,7 +791,6 @@ void setup() {
   pAdvertising->setMinPreferred(0x06);
   pAdvertising->setMinPreferred(0x12);
   pAdvertising->start();
-  Serial.println("Waiting for a client connection to notify...");
 }
 
 void loop() {
@@ -889,32 +800,12 @@ void loop() {
   static unsigned long lastDiagnosticTime = 0;
   if (currentTime - lastDiagnosticTime >= 2000) {
     lastDiagnosticTime = currentTime;
-    Serial.println("======== STATE DIAGNOSTIC ========");
-    Serial.print("Uptime: "); Serial.print(currentTime / 1000); Serial.println(" seconds");
-    Serial.print("BLE Connected: "); Serial.println(deviceConnected ? "YES" : "NO");
-    Serial.print("Rep Count: "); Serial.print(repCount);
-    Serial.print(" | State: ");
     switch(repState) {
-      case REP_IDLE: Serial.println("IDLE"); break;
-      case REP_MOVING_UP: Serial.println("MOVING_UP"); break;
-      case REP_MOVING_DOWN: Serial.println("MOVING_DOWN"); break;
-      case REP_TRANSITION: Serial.println("TRANSITION"); break;
-      default: Serial.println("UNKNOWN"); break;
     }
-    Serial.print("Position (m): X="); Serial.print(positionX, 3);
-    Serial.print(", Y="); Serial.print(positionY, 3);
-    Serial.print(", Z="); Serial.print(positionZ, 3); Serial.println();
-    Serial.print("Velocity (m/s): X="); Serial.print(velocityX, 3);
-    Serial.print(", Y="); Serial.print(velocityY, 3);
-    Serial.print(", Z="); Serial.print(velocityZ, 3); Serial.println();
-    Serial.print("Idle timer: "); Serial.print((currentTime - lastActivityTime) / 1000); 
-    Serial.print(" / "); Serial.print(IDLE_TIMEOUT_MS / 1000); Serial.println(" seconds");
-    Serial.println("==================================");
   }
   
   // Check for idle timeout and enter deep sleep
   if (currentTime - lastActivityTime > IDLE_TIMEOUT_MS) {
-    Serial.println("Idle timeout reached - entering deep sleep");
     enterDeepSleep();
     // This line will never be reached as deep sleep resets the device
   }
@@ -922,7 +813,6 @@ void loop() {
   // Warn when approaching sleep (5 seconds before)
   static bool warningPrinted = false;
   if (currentTime - lastActivityTime > (IDLE_TIMEOUT_MS - 5000) && !warningPrinted) {
-    Serial.println("WARNING: Device will enter sleep in 5 seconds if no activity detected");
     warningPrinted = true;
   }
   
@@ -971,14 +861,6 @@ void loop() {
   static unsigned long lastDebugTime = 0;
   // if (currentTime - lastDebugTime >= 100) {
   //   lastDebugTime = currentTime;
-  //   Serial.print("RAW: Accel(g): ");
-  //   Serial.print(rawAccelX, 3); Serial.print(", ");
-  //   Serial.print(rawAccelY, 3); Serial.print(", ");
-  //   Serial.print(rawAccelZ, 3);
-  //   Serial.print(" | Gyro(rad/s): ");
-  //   Serial.print(rawGyroX, 3); Serial.print(", ");
-  //   Serial.print(rawGyroY, 3); Serial.print(", ");
-  //   Serial.println(rawGyroZ, 3);
   // }
 
   // Skip integration on first iteration to avoid large dt error
@@ -990,11 +872,6 @@ void loop() {
 
     // Debug: Print quaternion orientation
     // if (currentTime - lastDebugTime < 10) {
-    //   Serial.print("QUAT: q0=");
-    //   Serial.print(q0, 4); Serial.print(", q1=");
-    //   Serial.print(q1, 4); Serial.print(", q2=");
-    //   Serial.print(q2, 4); Serial.print(", q3=");
-    //   Serial.println(q3, 4);
     // }
 
     // Rotate acceleration to Earth frame (tilt-compensated)
@@ -1008,16 +885,6 @@ void loop() {
 
     // Debug: Print Earth-frame acceleration
     // if (currentTime - lastDebugTime < 10) {
-    //   Serial.print("EARTH: Accel(g): ");
-    //   Serial.print(earthAccelX, 3); Serial.print(", ");
-    //   Serial.print(earthAccelY, 3); Serial.print(", ");
-    //   Serial.print(earthAccelZ, 3);
-    //   Serial.print(" | Mag: ");
-    //   Serial.print(accelMag, 3);
-    //   Serial.print(" | GyroMag: ");
-    //   Serial.print(gyroMag, 3);
-    //   if (isStationary) Serial.print(" [STATIONARY]");
-    //   Serial.println();
     // }
 
     // Remove gravity (0, 0, 1g) to get linear acceleration in Earth frame
@@ -1056,12 +923,6 @@ void loop() {
 
     // Debug: Print linear acceleration
     // if (currentTime - lastDebugTime < 10) {
-    //   Serial.print("LINEAR: Accel(m/s²): ");
-    //   Serial.print(linearAccelX, 3); Serial.print(", ");
-    //   Serial.print(linearAccelY, 3); Serial.print(", ");
-    //   Serial.print(linearAccelZ, 3);
-    //   if (isStationary) Serial.print(" [STATIONARY]");
-    //   Serial.println();
     // }
 
     // Integrate acceleration to get velocity (v = v0 + a*dt)
@@ -1081,12 +942,6 @@ void loop() {
 
     // Debug: Print velocity
     // if (currentTime - lastDebugTime < 10) {
-    //   Serial.print("VEL: (m/s): ");
-    //   Serial.print(velocityX, 4); Serial.print(", ");
-    //   Serial.print(velocityY, 4); Serial.print(", ");
-    //   Serial.print(velocityZ, 4);
-    //   Serial.print(" | dt: ");
-    //   Serial.println(dt, 4);
     // }
 
     // Integrate velocity to get position (p = p0 + v*dt)
@@ -1101,18 +956,9 @@ void loop() {
 
     // Debug: Print position
     // if (currentTime - lastDebugTime < 10) {
-    //   Serial.print("POS: (m): ");
-    //   Serial.print(positionX, 4); Serial.print(", ");
-    //   Serial.print(positionY, 4); Serial.print(", ");
-    //   Serial.println(positionZ, 4);
     //   
     //   // Calculate and print total distance from starting point
     //   float totalDistance = sqrt(positionX*positionX + positionY*positionY + positionZ*positionZ);
-    //   Serial.print("DIST: (m): ");
-    //   Serial.print(totalDistance, 4);
-    //   Serial.print(" | (mm): ");
-    //   Serial.println(totalDistance * 1000.0, 2);
-    //   Serial.println("---");
     // }
 
     // Detect workout reps based on velocity and acceleration patterns
@@ -1151,11 +997,6 @@ void loop() {
     // Set the characteristic value and notify the client
     pRepCharacteristic->setValue(repData);
     pRepCharacteristic->notify();
-    Serial.print("Sent Reps:  ");
-    Serial.print(repData);
-    Serial.print(" (repCount=");
-    Serial.print(repCount);
-    Serial.println(")");
   }
 
   // Short delay for high-frequency position calculation
