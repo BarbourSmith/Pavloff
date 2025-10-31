@@ -1,5 +1,7 @@
 # Midnight Re-Lock Solution Summary
 
+> **Note**: References to `SharedConstants.swift` in this document are outdated. The implementation uses hardcoded string constants directly in the code instead of a separate SharedConstants file, as that file was not properly added to the Xcode project.
+
 ## Problem Statement
 
 Apps were not re-locking at midnight after being unlocked following a workout completion. Once unlocked, apps would stay unlocked indefinitely instead of re-locking the next day.

@@ -20,7 +20,7 @@ class ScreenTimeManager: ObservableObject {
         didSet {
             // Save the fact that we have a selection
             let hasSelection = !selectedApps.applicationTokens.isEmpty || !selectedApps.categoryTokens.isEmpty
-            userDefaults.set(hasSelection, forKey: SharedConstants.UserDefaultsKeys.hasAppSelection)
+            userDefaults.set(hasSelection, forKey: "hasAppSelection")
             
             // Persist the selection for app restarts
             saveSelection()
@@ -35,7 +35,7 @@ class ScreenTimeManager: ObservableObject {
     
     // Use App Group UserDefaults for sharing data with extension
     private let userDefaults: UserDefaults = {
-        guard let defaults = UserDefaults(suiteName: SharedConstants.appGroupIdentifier) else {
+        guard let defaults = UserDefaults(suiteName: "group.com.barboursmith.pavloff") else {
             print("[ScreenTime] Warning: Failed to create App Group UserDefaults, falling back to standard")
             return UserDefaults.standard
         }
@@ -69,19 +69,19 @@ class ScreenTimeManager: ObservableObject {
     
     // Save the selection to UserDefaults
     private func saveSelection() {
-        do {
-            let encoder = JSONEncoder()
-            let data = try encoder.encode(selectedApps)
-            userDefaults.set(data, forKey: SharedConstants.UserDefaultsKeys.savedAppSelection)
+        let encoder = JSONEncoder()
+        let data = try? encoder.encode(selectedApps)
+        if let data = data {
+            userDefaults.set(data, forKey: "savedAppSelection")
             print("[ScreenTime] Selection saved successfully to App Group")
-        } catch {
-            print("[ScreenTime] Failed to save selection: \(error)")
+        } else {
+            print("[ScreenTime] Failed to encode selection")
         }
     }
     
     // Load the selection from UserDefaults
     private func loadSelection() {
-        guard let data = userDefaults.data(forKey: SharedConstants.UserDefaultsKeys.savedAppSelection) else {
+        guard let data = userDefaults.data(forKey: "savedAppSelection") else {
             print("[ScreenTime] No saved selection found in UserDefaults")
             return
         }
@@ -216,7 +216,7 @@ class ScreenTimeManager: ObservableObject {
     
     // Check if we have apps selected
     var hasAppsSelected: Bool {
-        return userDefaults.bool(forKey: SharedConstants.UserDefaultsKeys.hasAppSelection)
+        return userDefaults.bool(forKey: "hasAppSelection")
     }
     
     // Clear all selected apps
@@ -224,8 +224,8 @@ class ScreenTimeManager: ObservableObject {
         selectedApps = FamilyActivitySelection()
         disableAppBlocking()
         stopDailyMonitoring()
-        userDefaults.set(false, forKey: SharedConstants.UserDefaultsKeys.hasAppSelection)
-        userDefaults.removeObject(forKey: SharedConstants.UserDefaultsKeys.savedAppSelection)
+        userDefaults.set(false, forKey: "hasAppSelection")
+        userDefaults.removeObject(forKey: "savedAppSelection")
         print("[ScreenTime] Selection cleared")
     }
 }

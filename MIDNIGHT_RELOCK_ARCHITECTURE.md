@@ -1,5 +1,7 @@
 # Midnight Re-Lock Architecture
 
+> **Note**: References to `SharedConstants.swift` in this document are outdated. The implementation uses hardcoded string constants directly in the code instead of a separate SharedConstants file, as that file was not properly added to the Xcode project.
+
 ## System Architecture Diagram
 
 ```

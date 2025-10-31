@@ -37,7 +37,7 @@ class DeviceActivityMonitorExtension: DeviceActivityMonitor {
         print("[DeviceActivityMonitor] Midnight reset triggered - checking if shields should be reapplied")
         
         // Use App Group UserDefaults
-        guard let userDefaults = UserDefaults(suiteName: SharedConstants.appGroupIdentifier) else {
+        guard let userDefaults = UserDefaults(suiteName: "group.com.barboursmith.pavloff") else {
             print("[DeviceActivityMonitor] Error: Failed to access App Group UserDefaults")
             return
         }
@@ -46,7 +46,7 @@ class DeviceActivityMonitorExtension: DeviceActivityMonitor {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
         
-        if let lastCompletionDate = userDefaults.object(forKey: SharedConstants.UserDefaultsKeys.lastWorkoutCompletion) as? Date {
+        if let lastCompletionDate = userDefaults.object(forKey: "lastWorkoutCompletion") as? Date {
             let lastCompletionDay = calendar.startOfDay(for: lastCompletionDate)
             
             // If workout was completed yesterday, it's now a new day and shields should be reapplied
@@ -66,13 +66,13 @@ class DeviceActivityMonitorExtension: DeviceActivityMonitor {
     // Reapply shields from the shared app group storage
     private func reapplyShields(userDefaults: UserDefaults) {
         // Check if we have apps selected
-        guard userDefaults.bool(forKey: SharedConstants.UserDefaultsKeys.hasAppSelection) else {
+        guard userDefaults.bool(forKey: "hasAppSelection") else {
             print("[DeviceActivityMonitor] No apps selected, skipping shield application")
             return
         }
         
         // Try to load the saved selection
-        guard let data = userDefaults.data(forKey: SharedConstants.UserDefaultsKeys.savedAppSelection) else {
+        guard let data = userDefaults.data(forKey: "savedAppSelection") else {
             print("[DeviceActivityMonitor] No saved selection data found")
             return
         }
