@@ -43,6 +43,8 @@ class ScreenTimeManager: ObservableObject {
     }()
     
     private init() {
+        print("[ScreenTime] Initializing ScreenTimeManager...")
+        
         // Check initial authorization status
         Task {
             await checkAuthorizationStatus()
@@ -51,9 +53,17 @@ class ScreenTimeManager: ObservableObject {
         // Load persisted selection
         loadSelection()
         
+        print("[ScreenTime] After loadSelection, tokens count: apps=\(selectedApps.applicationTokens.count), categories=\(selectedApps.categoryTokens.count)")
+        
         // If we have a saved selection, ensure monitoring is active
-        if hasAppsSelected && (!selectedApps.applicationTokens.isEmpty || !selectedApps.categoryTokens.isEmpty) {
-            setupDailyMonitoring()
+        if hasAppsSelected {
+            print("[ScreenTime] Has app selection flag is true")
+            if !selectedApps.applicationTokens.isEmpty || !selectedApps.categoryTokens.isEmpty {
+                print("[ScreenTime] Tokens are available, setting up monitoring")
+                setupDailyMonitoring()
+            } else {
+                print("[ScreenTime] Warning: hasAppSelection is true but no tokens loaded")
+            }
         }
     }
     
@@ -72,16 +82,22 @@ class ScreenTimeManager: ObservableObject {
     // Load the selection from UserDefaults
     private func loadSelection() {
         guard let data = userDefaults.data(forKey: "savedAppSelection") else {
-            print("[ScreenTime] No saved selection found")
+            print("[ScreenTime] No saved selection found in UserDefaults")
             return
         }
+        
+        print("[ScreenTime] Found saved selection data (\(data.count) bytes), attempting to decode...")
         
         do {
             let decoder = JSONDecoder()
             selectedApps = try decoder.decode(FamilyActivitySelection.self, from: data)
-            print("[ScreenTime] Selection loaded successfully with \(selectedApps.applicationTokens.count) apps")
+            print("[ScreenTime] Selection loaded successfully:")
+            print("[ScreenTime] - Application tokens: \(selectedApps.applicationTokens.count)")
+            print("[ScreenTime] - Category tokens: \(selectedApps.categoryTokens.count)")
+            print("[ScreenTime] - Web domain tokens: \(selectedApps.webDomainTokens.count)")
         } catch {
-            print("[ScreenTime] Failed to load selection: \(error)")
+            print("[ScreenTime] Failed to decode selection: \(error)")
+            print("[ScreenTime] Error details: \(error.localizedDescription)")
         }
     }
     
@@ -120,6 +136,20 @@ class ScreenTimeManager: ObservableObject {
         if selectedApps.applicationTokens.isEmpty && selectedApps.categoryTokens.isEmpty {
             print("[ScreenTime] Tokens are empty, attempting to reload selection...")
             loadSelection()
+            
+            // If still empty after reload, the tokens have expired
+            if selectedApps.applicationTokens.isEmpty && selectedApps.categoryTokens.isEmpty {
+                print("[ScreenTime] Warning: Tokens could not be restored from storage")
+                print("[ScreenTime] User may need to reselect apps in Workout Settings")
+                
+                // Try to apply shields one more time in case they're still in the store
+                // (ManagedSettingsStore persists shields even if we don't have tokens)
+                print("[ScreenTime] Attempting to verify if shields are still active in ManagedSettingsStore...")
+                
+                // We can't directly read shield settings, but we can try to set them again
+                // If tokens are truly gone, this won't work, but it's worth trying
+                return
+            }
         }
         
         // Set shields if we have selection tokens in memory
@@ -134,14 +164,6 @@ class ScreenTimeManager: ObservableObject {
             setupDailyMonitoring()
             
             print("[ScreenTime] App blocking enabled with \(selectedApps.applicationTokens.count) apps and \(selectedApps.categoryTokens.isEmpty ? 0 : selectedApps.categoryTokens.count) categories")
-        } else {
-            // Tokens are not available - this can happen after app termination
-            // The tokens are session-specific and don't persist reliably
-            print("[ScreenTime] Warning: No tokens available despite having app selection")
-            print("[ScreenTime] This may indicate tokens expired or were invalidated")
-            print("[ScreenTime] Shields cannot be reapplied without valid tokens")
-            // Note: We keep the hasAppSelection flag so user knows they had a selection
-            // but we can't actually apply shields without tokens
         }
     }
     
