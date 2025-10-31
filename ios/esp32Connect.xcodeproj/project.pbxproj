@@ -16,7 +16,6 @@
 		443106508C3E4493B30DC867 /* BLEManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F0018F7811041CEBE34E61D /* BLEManager.swift */; };
 		5FC18872C91D4936AAF94B4C /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE50CB5574214F99A14202C6 /* Models.swift */; };
 		60D7C94F2EB536510076DBF0 /* DeviceActivity.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 60D7C94E2EB536510076DBF0 /* DeviceActivity.framework */; };
-		60D7C9572EB536510076DBF0 /* DeviceActivityMonitorExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 60D7C94D2EB536510076DBF0 /* DeviceActivityMonitorExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		60D7C9602EB5382B0076DBF0 /* FamilyControls.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 60D7C95F2EB5382B0076DBF0 /* FamilyControls.framework */; };
 		60D7C9622EB5383B0076DBF0 /* ManagedSettings.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 60D7C9612EB5383B0076DBF0 /* ManagedSettings.framework */; };
 		6C583A8B36864E37BF51FCB3 /* AppConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100ACD91ACB46818A92AA8D /* AppConfig.swift */; };
@@ -32,7 +31,14 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
-		60D7C9552EB536510076DBF0 /* PBXContainerItemProxy */ = {
+		60D7C9642EB570B10076DBF0 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 83CBB9F71A601CBA00E9B192 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 60D7C94C2EB536510076DBF0;
+			remoteInfo = DeviceActivityMonitorExtension;
+		};
+		60D7C9672EB570B90076DBF0 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 83CBB9F71A601CBA00E9B192 /* Project object */;
 			proxyType = 1;
@@ -42,15 +48,24 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
-		60D7C9582EB536510076DBF0 /* Embed Foundation Extensions */ = {
+		60D7C9662EB570B10076DBF0 /* Embed Foundation Extensions */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
 			dstPath = "";
 			dstSubfolderSpec = 13;
 			files = (
-				60D7C9572EB536510076DBF0 /* DeviceActivityMonitorExtension.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		60D7C9692EB572920076DBF0 /* Copy Files */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+			);
+			name = "Copy Files";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXCopyFilesBuildPhase section */
@@ -208,12 +223,14 @@
 				13B07F871A680F5B00A75B9A /* Sources */,
 				13B07F8C1A680F5B00A75B9A /* Frameworks */,
 				13B07F8E1A680F5B00A75B9A /* Resources */,
-				60D7C9582EB536510076DBF0 /* Embed Foundation Extensions */,
+				60D7C9662EB570B10076DBF0 /* Embed Foundation Extensions */,
+				60D7C9692EB572920076DBF0 /* Copy Files */,
 			);
 			buildRules = (
 			);
 			dependencies = (
-				60D7C9562EB536510076DBF0 /* PBXTargetDependency */,
+				60D7C9652EB570B10076DBF0 /* PBXTargetDependency */,
+				60D7C9682EB570B90076DBF0 /* PBXTargetDependency */,
 			);
 			name = esp32Connect;
 			productName = esp32Connect;
@@ -331,10 +348,15 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
-		60D7C9562EB536510076DBF0 /* PBXTargetDependency */ = {
+		60D7C9652EB570B10076DBF0 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 60D7C94C2EB536510076DBF0 /* DeviceActivityMonitorExtension */;
-			targetProxy = 60D7C9552EB536510076DBF0 /* PBXContainerItemProxy */;
+			targetProxy = 60D7C9642EB570B10076DBF0 /* PBXContainerItemProxy */;
+		};
+		60D7C9682EB570B90076DBF0 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 60D7C94C2EB536510076DBF0 /* DeviceActivityMonitorExtension */;
+			targetProxy = 60D7C9672EB570B90076DBF0 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -345,10 +367,10 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = esp32Connect/esp32Connect.entitlements;
-				CODE_SIGN_STYLE = Manual;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
-				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = Y29YA968X5;
+				DEVELOPMENT_TEAM = Y29YA968X5;
 				ENABLE_BITCODE = NO;
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"$(inherited)",
@@ -369,7 +391,6 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.maslowcnc.Tides;
 				PRODUCT_NAME = esp32Connect;
 				PROVISIONING_PROFILE_SPECIFIER = "";
-				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = App;
 				SWIFT_OBJC_BRIDGING_HEADER = "esp32Connect/esp32Connect-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
@@ -383,10 +404,10 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = esp32Connect/esp32Connect.entitlements;
-				CODE_SIGN_STYLE = Manual;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
-				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = Y29YA968X5;
+				DEVELOPMENT_TEAM = Y29YA968X5;
 				INFOPLIST_FILE = esp32Connect/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -402,7 +423,6 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.maslowcnc.Tides;
 				PRODUCT_NAME = esp32Connect;
 				PROVISIONING_PROFILE_SPECIFIER = "";
-				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = App;
 				SWIFT_OBJC_BRIDGING_HEADER = "esp32Connect/esp32Connect-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				VERSIONING_SYSTEM = "apple-generic";
@@ -421,11 +441,11 @@
 				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
 				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
 				CODE_SIGN_ENTITLEMENTS = DeviceActivityMonitorExtension/DeviceActivityMonitorExtension.entitlements;
-				CODE_SIGN_STYLE = Manual;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEBUG_INFORMATION_FORMAT = dwarf;
-				DEVELOPMENT_TEAM = "";
-				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = Y29YA968X5;
+				DEVELOPMENT_TEAM = Y29YA968X5;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -445,7 +465,6 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.maslowcnc.Tides.DeviceActivityMonitorExtension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
-				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = "Activity Monitor";
 				SKIP_INSTALL = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
@@ -470,12 +489,12 @@
 				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
 				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
 				CODE_SIGN_ENTITLEMENTS = DeviceActivityMonitorExtension/DeviceActivityMonitorExtension.entitlements;
-				CODE_SIGN_STYLE = Manual;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
 				CURRENT_PROJECT_VERSION = 1;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				DEVELOPMENT_TEAM = "";
-				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = Y29YA968X5;
+				DEVELOPMENT_TEAM = Y29YA968X5;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -494,7 +513,6 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.maslowcnc.Tides.DeviceActivityMonitorExtension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
-				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = "Activity Monitor";
 				SKIP_INSTALL = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
