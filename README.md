@@ -21,9 +21,12 @@ This is a complete native Swift rewrite of the original React Native application
 - **⚙️ Mid-Workout Adjustments**: Change targets without losing progress
 - **🔄 Quick Reset**: Restart current exercise with one tap
 - **🔥 Streak Tracking**: Duolingo-style streak feature tracks consecutive workout days with milestone celebrations
+- **🔒 App Blocking**: Block distracting apps until you complete your daily workout (requires iOS 16.0+)
 
 See [WORKOUT_FEATURE.md](WORKOUT_FEATURE.md) for complete feature guide.
 See [STREAK_FEATURE.md](STREAK_FEATURE.md) for streak tracking details.
+See [SCREEN_TIME_FEATURE.md](SCREEN_TIME_FEATURE.md) for app blocking details.
+See [MIDNIGHT_RELOCK_SETUP.md](MIDNIGHT_RELOCK_SETUP.md) for setting up automatic midnight re-locking.
 
 ## Core Features
 
@@ -292,6 +295,14 @@ This app replaces the previous React Native implementation with a native Swift a
 - **[WORKOUT_SCREENS.md](WORKOUT_SCREENS.md)**: Visual mockups and screen flow diagrams
 - **[IMPLEMENTATION_SUMMARY.md](IMPLEMENTATION_SUMMARY.md)**: Technical architecture and implementation details
 - **[FEATURE_SUMMARY.md](FEATURE_SUMMARY.md)**: Executive summary and requirements fulfillment
+
+### Screen Time & App Blocking
+- **[SCREEN_TIME_FEATURE.md](SCREEN_TIME_FEATURE.md)**: App blocking feature overview
+- **[SCREEN_TIME_DEV_GUIDE.md](SCREEN_TIME_DEV_GUIDE.md)**: Developer guide for Screen Time API
+- **[SCREEN_TIME_UI.md](SCREEN_TIME_UI.md)**: UI design and implementation details
+- **[MIDNIGHT_RELOCK_SETUP.md](MIDNIGHT_RELOCK_SETUP.md)**: 🆕 Setup guide for automatic midnight re-locking
+- **[MIDNIGHT_RELOCK_SOLUTION_SUMMARY.md](MIDNIGHT_RELOCK_SOLUTION_SUMMARY.md)**: 🆕 Technical solution summary
+- **[MIDNIGHT_RELOCK_ARCHITECTURE.md](MIDNIGHT_RELOCK_ARCHITECTURE.md)**: 🆕 Architecture diagrams and data flows
 
 ### Original Documentation
 - **[SCREEN_LAYOUTS.md](SCREEN_LAYOUTS.md)**: Legacy screen designs for device management mode

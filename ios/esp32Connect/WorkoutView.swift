@@ -29,6 +29,15 @@ struct WorkoutView: View {
     private let targetDeviceNames = ["Pavloff Workout Sensor", "ESP32_IMU_Stream"]
     private let scanInterval: TimeInterval = 5.0
     
+    // Use App Group UserDefaults for sharing data with extension
+    private let userDefaults: UserDefaults = {
+        guard let defaults = UserDefaults(suiteName: "group.com.barboursmith.pavloff") else {
+            print("[WORKOUT] Warning: Failed to create App Group UserDefaults, falling back to standard")
+            return UserDefaults.standard
+        }
+        return defaults
+    }()
+    
     private var currentExercise: Exercise {
         workoutSettings.exercises[currentExerciseIndex]
     }
@@ -367,7 +376,7 @@ struct WorkoutView: View {
     
     private func checkAndEnableScreenTimeBlocking() {
         // Check if workout was completed today
-        let lastCompletionDate = UserDefaults.standard.object(forKey: "lastWorkoutCompletion") as? Date
+        let lastCompletionDate = userDefaults.object(forKey: "lastWorkoutCompletion") as? Date
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
         
@@ -388,8 +397,8 @@ struct WorkoutView: View {
     }
     
     private func workoutCompletedToday() {
-        // Save completion time
-        UserDefaults.standard.set(Date(), forKey: "lastWorkoutCompletion")
+        // Save completion time to App Group UserDefaults
+        userDefaults.set(Date(), forKey: "lastWorkoutCompletion")
         workoutStartedToday = true
         
         // Update streak
