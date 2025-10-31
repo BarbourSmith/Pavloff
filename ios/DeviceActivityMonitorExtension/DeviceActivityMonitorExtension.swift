@@ -5,6 +5,7 @@
 //  Monitor for device activity events to handle automatic app blocking at midnight
 //
 
+import Foundation
 import DeviceActivity
 import FamilyControls
 import ManagedSettings
