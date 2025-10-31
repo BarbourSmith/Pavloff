@@ -31,7 +31,7 @@ struct WorkoutView: View {
     
     // Use App Group UserDefaults for sharing data with extension
     private let userDefaults: UserDefaults = {
-        guard let defaults = UserDefaults(suiteName: "group.com.barboursmith.pavloff") else {
+        guard let defaults = UserDefaults(suiteName: SharedConstants.appGroupIdentifier) else {
             print("[WORKOUT] Warning: Failed to create App Group UserDefaults, falling back to standard")
             return UserDefaults.standard
         }
@@ -376,7 +376,7 @@ struct WorkoutView: View {
     
     private func checkAndEnableScreenTimeBlocking() {
         // Check if workout was completed today
-        let lastCompletionDate = userDefaults.object(forKey: "lastWorkoutCompletion") as? Date
+        let lastCompletionDate = userDefaults.object(forKey: SharedConstants.UserDefaultsKeys.lastWorkoutCompletion) as? Date
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
         
@@ -398,7 +398,7 @@ struct WorkoutView: View {
     
     private func workoutCompletedToday() {
         // Save completion time to App Group UserDefaults
-        userDefaults.set(Date(), forKey: "lastWorkoutCompletion")
+        userDefaults.set(Date(), forKey: SharedConstants.UserDefaultsKeys.lastWorkoutCompletion)
         workoutStartedToday = true
         
         // Update streak

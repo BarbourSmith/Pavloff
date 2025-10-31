@@ -20,7 +20,7 @@ class ScreenTimeManager: ObservableObject {
         didSet {
             // Save the fact that we have a selection
             let hasSelection = !selectedApps.applicationTokens.isEmpty || !selectedApps.categoryTokens.isEmpty
-            userDefaults.set(hasSelection, forKey: "hasAppSelection")
+            userDefaults.set(hasSelection, forKey: SharedConstants.UserDefaultsKeys.hasAppSelection)
             
             // Persist the selection for app restarts
             saveSelection()
@@ -35,7 +35,7 @@ class ScreenTimeManager: ObservableObject {
     
     // Use App Group UserDefaults for sharing data with extension
     private let userDefaults: UserDefaults = {
-        guard let defaults = UserDefaults(suiteName: "group.com.barboursmith.pavloff") else {
+        guard let defaults = UserDefaults(suiteName: SharedConstants.appGroupIdentifier) else {
             print("[ScreenTime] Warning: Failed to create App Group UserDefaults, falling back to standard")
             return UserDefaults.standard
         }
@@ -72,7 +72,7 @@ class ScreenTimeManager: ObservableObject {
         do {
             let encoder = JSONEncoder()
             let data = try encoder.encode(selectedApps)
-            userDefaults.set(data, forKey: "savedAppSelection")
+            userDefaults.set(data, forKey: SharedConstants.UserDefaultsKeys.savedAppSelection)
             print("[ScreenTime] Selection saved successfully to App Group")
         } catch {
             print("[ScreenTime] Failed to save selection: \(error)")
@@ -81,7 +81,7 @@ class ScreenTimeManager: ObservableObject {
     
     // Load the selection from UserDefaults
     private func loadSelection() {
-        guard let data = userDefaults.data(forKey: "savedAppSelection") else {
+        guard let data = userDefaults.data(forKey: SharedConstants.UserDefaultsKeys.savedAppSelection) else {
             print("[ScreenTime] No saved selection found in UserDefaults")
             return
         }
@@ -163,7 +163,7 @@ class ScreenTimeManager: ObservableObject {
             // Set up daily monitoring schedule to re-enable blocking at midnight
             setupDailyMonitoring()
             
-            print("[ScreenTime] App blocking enabled with \(selectedApps.applicationTokens.count) apps and \(selectedApps.categoryTokens.isEmpty ? 0 : selectedApps.categoryTokens.count) categories")
+            print("[ScreenTime] App blocking enabled with \(selectedApps.applicationTokens.count) apps and \(selectedApps.categoryTokens.count) categories")
         }
     }
     
@@ -199,13 +199,10 @@ class ScreenTimeManager: ObservableObject {
             return
         }
         
-        // IMPORTANT: We do NOT remove shields here!
-        // Instead, we rely on the workoutCompleted flag in WorkoutView
-        // Shields remain in ManagedSettingsStore and persist across app launches
-        // This ensures that at midnight, shields are still in effect without needing tokens
-        
-        // However, for user experience, we do need to remove shields
-        // The trade-off is that we'll need user to reselect apps if tokens don't persist
+        // Remove shields to unlock apps for the user after workout completion
+        // Note: This means shields must be reapplied at midnight for the next day
+        // With the DeviceActivityMonitor extension, this happens automatically
+        // Without the extension, shields are reapplied when user opens the app
         store.shield.applications = nil
         store.shield.applicationCategories = nil
         
@@ -219,7 +216,7 @@ class ScreenTimeManager: ObservableObject {
     
     // Check if we have apps selected
     var hasAppsSelected: Bool {
-        return userDefaults.bool(forKey: "hasAppSelection")
+        return userDefaults.bool(forKey: SharedConstants.UserDefaultsKeys.hasAppSelection)
     }
     
     // Clear all selected apps
@@ -227,8 +224,8 @@ class ScreenTimeManager: ObservableObject {
         selectedApps = FamilyActivitySelection()
         disableAppBlocking()
         stopDailyMonitoring()
-        userDefaults.set(false, forKey: "hasAppSelection")
-        userDefaults.removeObject(forKey: "savedAppSelection")
+        userDefaults.set(false, forKey: SharedConstants.UserDefaultsKeys.hasAppSelection)
+        userDefaults.removeObject(forKey: SharedConstants.UserDefaultsKeys.savedAppSelection)
         print("[ScreenTime] Selection cleared")
     }
 }

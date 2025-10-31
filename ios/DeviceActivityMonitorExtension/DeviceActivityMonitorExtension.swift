@@ -36,8 +36,10 @@ class DeviceActivityMonitorExtension: DeviceActivityMonitor {
     private func handleMidnightReset() {
         print("[DeviceActivityMonitor] Midnight reset triggered - checking if shields should be reapplied")
         
-        // Use App Group UserDefaults
-        guard let userDefaults = UserDefaults(suiteName: "group.com.barboursmith.pavloff") else {
+        // Use App Group UserDefaults (NOTE: This constant should be imported from SharedConstants)
+        // For the extension, we hardcode it here as extensions may not easily share Swift files
+        let appGroupIdentifier = "group.com.barboursmith.pavloff"
+        guard let userDefaults = UserDefaults(suiteName: appGroupIdentifier) else {
             print("[DeviceActivityMonitor] Error: Failed to access App Group UserDefaults")
             return
         }
