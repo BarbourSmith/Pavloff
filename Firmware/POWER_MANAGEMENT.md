@@ -39,7 +39,7 @@ Activity is detected from:
 **Interrupt System**:
 - ESP32 wakes from deep sleep via hardware interrupt from MPU-6050 INT pin (GPIO 18)
 - MPU-6050 continuously monitors for motion using hardware motion detection
-- Motion threshold: 64mg (0.064g) with 5ms duration to avoid false triggers
+- Motion threshold: 32mg (0.032g) with 5ms duration for sensitive wake-up
 - When motion is detected, MPU-6050 triggers interrupt to wake ESP32
 - Device stays awake and continues normal operation
 
@@ -63,7 +63,7 @@ Activity is detected from:
 ### MPU-6050 Configuration
 
 **Motion Detection (Hardware Interrupt)**:
-- Threshold: 64mg (0.064g) acceleration at ±2g range (32 LSB, where 1 LSB = 2mg)
+- Threshold: 32mg (0.032g) acceleration at ±2g range (16 LSB, where 1 LSB = 2mg)
 - Duration: 5ms minimum to avoid false triggers from vibration
 - Digital High-Pass Filter: 5Hz to remove DC bias
 - Interrupt output: Active HIGH, push-pull, latched until cleared
@@ -110,17 +110,18 @@ Adjust motion detection threshold in `configureMPUMotionInterrupt()`:
 
 ```cpp
 // Motion threshold: 1-255 LSB (1 LSB = 2mg at ±2g accelerometer range)
-// Current setting: 32 LSB = 64mg = 0.064g
-mpu.setMotionDetectionThreshold(32);  // 64mg threshold
+// Current setting: 16 LSB = 32mg = 0.032g (sensitive for easy wake-up)
+mpu.setMotionDetectionThreshold(16);  // 32mg threshold - more sensitive for easier wake-up
 ```
 
 **Note**: The threshold calculation depends on the accelerometer range setting (±2g, ±4g, ±8g, ±16g). Current firmware uses ±2g range where 1 LSB = 2mg.
 
-Lower threshold = more sensitive (may wake on small movements):
-- 16 LSB = 32mg (very sensitive)
+Current setting is 16 LSB = 32mg (sensitive for easy wake-up).
 
-Higher threshold = less sensitive (requires more motion to wake):
-- 64 LSB = 128mg (less sensitive)
+To adjust sensitivity:
+- Lower threshold (e.g., 8 LSB = 16mg): Even more sensitive (may wake on very small movements)
+- Higher threshold (e.g., 32 LSB = 64mg): Less sensitive (requires more motion to wake)
+- Much higher (e.g., 64 LSB = 128mg): Much less sensitive
 
 ### Motion Detection Duration
 

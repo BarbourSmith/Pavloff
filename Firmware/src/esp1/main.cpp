@@ -387,7 +387,7 @@ void configureMPUMotionInterrupt() {
   // For sensitive wake: 16 = 32mg = 0.032g
   // For normal wake: 32 = 64mg = 0.064g  
   // For less sensitive: 64 = 128mg = 0.128g
-  mpu.setMotionDetectionThreshold(32);  // 64mg threshold
+  mpu.setMotionDetectionThreshold(16);  // 32mg threshold - more sensitive for easier wake-up
   
   // Motion duration: 0-255 (1 LSB = 1ms @ 1kHz ODR)
   // Setting to 5ms to avoid false triggers from vibration

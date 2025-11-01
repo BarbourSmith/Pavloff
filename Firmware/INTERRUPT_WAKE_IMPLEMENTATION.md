@@ -39,8 +39,8 @@ The MPU6050 INT pin is configured as:
 The motion detection is configured in `configureMPUMotionInterrupt()`:
 
 ```cpp
-// Motion threshold: 32 LSB = 64mg at ±2g range
-mpu.setMotionDetectionThreshold(32);
+// Motion threshold: 16 LSB = 32mg at ±2g range (sensitive for easy wake-up)
+mpu.setMotionDetectionThreshold(16);
 
 // Motion duration: 5ms minimum
 mpu.setMotionDetectionDuration(5);
@@ -55,7 +55,7 @@ mpu.setIntMotionEnabled(true);
 **Motion Detection Algorithm:**
 1. MPU6050 continuously samples accelerometer at 1.25 Hz in cycle mode
 2. Each sample is high-pass filtered (5Hz cutoff) to remove DC bias
-3. If motion exceeds 64mg threshold for 5ms duration, interrupt triggers
+3. If motion exceeds 32mg threshold for 5ms duration, interrupt triggers
 4. INT pin goes HIGH and remains HIGH until status is read
 5. ESP32 wakes from deep sleep via GPIO interrupt
 
