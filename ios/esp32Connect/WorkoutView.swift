@@ -373,10 +373,11 @@ struct WorkoutView: View {
     }
     
     private func resetCurrentExercise() {
+        lastRepCount = 0
+        updateLastActivityTimestamp()
+        
         if let device = connectedDevice {
             bleManager.resetRepCount(for: device.id)
-            lastRepCount = 0
-            updateLastActivityTimestamp()
         }
     }
     
