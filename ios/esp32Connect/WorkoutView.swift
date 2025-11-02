@@ -373,9 +373,11 @@ struct WorkoutView: View {
     }
     
     private func resetCurrentExercise() {
+        // Always reset local state regardless of connection status
         lastRepCount = 0
         updateLastActivityTimestamp()
         
+        // Reset device counter if connected
         if let device = connectedDevice {
             bleManager.resetRepCount(for: device.id)
         }
