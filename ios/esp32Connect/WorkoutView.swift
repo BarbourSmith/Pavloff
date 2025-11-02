@@ -550,8 +550,14 @@ struct WorkoutView: View {
                 print("[WORKOUT] Inactivity timeout (\(Int(elapsedTime/60)) minutes). Resetting workout to beginning.")
                 // Reset workout state
                 currentExerciseIndex = 0
+                lastRepCount = 0
                 userDefaults.removeObject(forKey: "lastWorkoutActivity")
                 userDefaults.removeObject(forKey: "currentExerciseIndex")
+                
+                // Reset BLE rep counter if device is connected
+                if let device = connectedDevice {
+                    bleManager.resetRepCount(for: device.id)
+                }
             } else {
                 print("[WORKOUT] Resuming workout from exercise \(currentExercise) (last activity \(Int(elapsedTime/60)) minutes ago)")
                 // Restore saved exercise index
