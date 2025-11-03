@@ -29,6 +29,9 @@ struct WorkoutView: View {
     private let targetDeviceNames = ["Pavloff Workout Sensor", "ESP32_IMU_Stream"]
     private let scanInterval: TimeInterval = 5.0
     
+    // Workout inactivity timeout (30 minutes in seconds)
+    private let inactivityTimeout: TimeInterval = 30 * 60
+    
     // Use App Group UserDefaults for sharing data with extension
     private let userDefaults: UserDefaults = {
         guard let defaults = UserDefaults(suiteName: "group.com.barboursmith.pavloff") else {
@@ -294,6 +297,7 @@ struct WorkoutView: View {
                 })
             }
             .onAppear {
+                checkForInactivityAndReset()
                 startAutoConnect()
                 checkAndEnableScreenTimeBlocking()
             }
@@ -327,6 +331,11 @@ struct WorkoutView: View {
                 if newReps >= currentExercise.targetReps && newReps > lastRepCount {
                     exerciseCompleted()
                 }
+                
+                // Update last activity timestamp if reps increased
+                if newReps > lastRepCount {
+                    updateLastActivityTimestamp()
+                }
                 lastRepCount = newReps
             }
         }
@@ -348,6 +357,9 @@ struct WorkoutView: View {
     private func exerciseCompleted() {
         print("[WORKOUT] Exercise completed: \(currentExercise.name)")
         
+        // Update last activity timestamp
+        updateLastActivityTimestamp()
+        
         // Move to next exercise
         if currentExerciseIndex < workoutSettings.exercises.count - 1 {
             currentExerciseIndex += 1
@@ -361,9 +373,13 @@ struct WorkoutView: View {
     }
     
     private func resetCurrentExercise() {
+        // Reset rep count for current exercise (stays on same exercise)
+        lastRepCount = 0
+        updateLastActivityTimestamp()
+        
+        // Reset device rep counter if connected
         if let device = connectedDevice {
             bleManager.resetRepCount(for: device.id)
-            lastRepCount = 0
         }
     }
     
@@ -372,6 +388,7 @@ struct WorkoutView: View {
         resetCurrentExercise()
         showingCongratulations = false
         checkAndEnableScreenTimeBlocking()
+        updateLastActivityTimestamp()
     }
     
     private func checkAndEnableScreenTimeBlocking() {
@@ -400,6 +417,11 @@ struct WorkoutView: View {
         // Save completion time to App Group UserDefaults
         userDefaults.set(Date(), forKey: "lastWorkoutCompletion")
         workoutStartedToday = true
+        
+        // Clear workout state as workout is complete
+        userDefaults.removeObject(forKey: "lastWorkoutActivity")
+        userDefaults.removeObject(forKey: "currentExerciseIndex")
+        print("[WORKOUT] Cleared workout state after completion")
         
         // Update streak
         streakManager.checkAndUpdateStreak()
@@ -517,6 +539,43 @@ struct WorkoutView: View {
                 checkConnectionStatus(device)
             }
         }
+    }
+    
+    private func checkForInactivityAndReset() {
+        let lastActivityDate = userDefaults.object(forKey: "lastWorkoutActivity") as? Date
+        let currentExercise = userDefaults.integer(forKey: "currentExerciseIndex")
+        
+        // If we have saved state, check if timeout has elapsed
+        if let lastActivity = lastActivityDate {
+            let elapsedTime = Date().timeIntervalSince(lastActivity)
+            
+            if elapsedTime > inactivityTimeout {
+                print("[WORKOUT] Inactivity timeout (\(Int(elapsedTime/60)) minutes). Resetting workout to beginning.")
+                // Reset workout state
+                currentExerciseIndex = 0
+                lastRepCount = 0
+                userDefaults.removeObject(forKey: "lastWorkoutActivity")
+                userDefaults.removeObject(forKey: "currentExerciseIndex")
+                
+                // Reset BLE rep counter if device is connected
+                if let device = connectedDevice {
+                    bleManager.resetRepCount(for: device.id)
+                }
+            } else {
+                print("[WORKOUT] Resuming workout from exercise \(currentExercise) (last activity \(Int(elapsedTime/60)) minutes ago)")
+                // Restore saved exercise index
+                currentExerciseIndex = currentExercise
+            }
+        } else {
+            print("[WORKOUT] No previous workout state found, starting fresh")
+            currentExerciseIndex = 0
+        }
+    }
+    
+    private func updateLastActivityTimestamp() {
+        userDefaults.set(Date(), forKey: "lastWorkoutActivity")
+        userDefaults.set(currentExerciseIndex, forKey: "currentExerciseIndex")
+        print("[WORKOUT] Updated last activity timestamp")
     }
     
     private func cleanup() {
