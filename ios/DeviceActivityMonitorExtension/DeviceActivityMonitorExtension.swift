@@ -38,7 +38,7 @@ class DeviceActivityMonitorExtension: DeviceActivityMonitor {
         print("[DeviceActivityMonitor] Midnight reset triggered - checking if shields should be reapplied")
         
         // Use App Group UserDefaults
-        guard let userDefaults = UserDefaults(suiteName: "group.com.barboursmith.pavloff") else {
+        guard let userDefaults = UserDefaults(suiteName: "group.com.maslowcnc.Tides") else {
             print("[DeviceActivityMonitor] Error: Failed to access App Group UserDefaults")
             return
         }

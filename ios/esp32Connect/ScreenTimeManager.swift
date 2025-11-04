@@ -35,7 +35,7 @@ class ScreenTimeManager: ObservableObject {
     
     // Use App Group UserDefaults for sharing data with extension
     private let userDefaults: UserDefaults = {
-        guard let defaults = UserDefaults(suiteName: "group.com.barboursmith.pavloff") else {
+        guard let defaults = UserDefaults(suiteName: "group.com.maslowcnc.Tides") else {
             print("[ScreenTime] Warning: Failed to create App Group UserDefaults, falling back to standard")
             return UserDefaults.standard
         }
