@@ -233,6 +233,22 @@ struct WorkoutView: View {
                                     .foregroundColor(.white)
                                     .cornerRadius(8)
                                 }
+                                
+                                // Restart Workout button
+                                Button(action: {
+                                    restartWorkout()
+                                }) {
+                                    HStack {
+                                        Image(systemName: "arrow.counterclockwise.circle.fill")
+                                        Text("Restart Workout")
+                                    }
+                                    .fontWeight(.semibold)
+                                    .frame(maxWidth: .infinity)
+                                    .padding()
+                                    .background(Color.red)
+                                    .foregroundColor(.white)
+                                    .cornerRadius(8)
+                                }
                             }
                             .padding(.horizontal)
                         }
@@ -305,7 +321,8 @@ struct WorkoutView: View {
                 cleanup()
             }
             .onReceive(NotificationCenter.default.publisher(for: UIScene.willEnterForegroundNotification)) { _ in
-                print("[WORKOUT] App entering foreground, rechecking app blocking status")
+                print("[WORKOUT] App entering foreground, checking for inactivity and app blocking status")
+                checkForInactivityAndReset()
                 checkAndEnableScreenTimeBlocking()
             }
             .onReceive(NotificationCenter.default.publisher(for: UIApplication.significantTimeChangeNotification)) { _ in
