@@ -233,6 +233,22 @@ struct WorkoutView: View {
                                     .foregroundColor(.white)
                                     .cornerRadius(8)
                                 }
+                                
+                                // Restart Workout button
+                                Button(action: {
+                                    restartWorkout()
+                                }) {
+                                    HStack {
+                                        Image(systemName: "arrow.counterclockwise.circle.fill")
+                                        Text("Restart Workout")
+                                    }
+                                    .fontWeight(.semibold)
+                                    .frame(maxWidth: .infinity)
+                                    .padding()
+                                    .background(Color.red)
+                                    .foregroundColor(.white)
+                                    .cornerRadius(8)
+                                }
                             }
                             .padding(.horizontal)
                         }
