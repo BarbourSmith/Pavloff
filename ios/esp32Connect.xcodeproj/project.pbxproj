@@ -28,6 +28,7 @@
 		AC01234567890ABCDEF12345 /* AutoConnectDataDisplayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC01234567890ABCDEF12345 /* AutoConnectDataDisplayView.swift */; };
 		E20F79DAFA5042F18286D991 /* ConnectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B700AC7A3B1F495C80E42D88 /* ConnectionView.swift */; };
 		F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11748412D0307B40044C1D9 /* AppDelegate.swift */; };
+		5C01E7A71031422F8A87EF88 /* DeviceActivityMonitorExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 60D7C94D2EB536510076DBF0 /* DeviceActivityMonitorExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -54,6 +55,7 @@
 			dstPath = "";
 			dstSubfolderSpec = 13;
 			files = (
+				5C01E7A71031422F8A87EF88 /* DeviceActivityMonitorExtension.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
