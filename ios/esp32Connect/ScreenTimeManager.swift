@@ -209,6 +209,44 @@ class ScreenTimeManager: ObservableObject {
         print("[ScreenTime] App blocking disabled - workout completed!")
     }
     
+    // Force enable blocking using stored shields (doesn't require tokens)
+    // This is a fallback method when tokens have expired but we still want to reapply shields
+    func forceEnableBlockingFromStore() {
+        guard isAuthorized else {
+            print("[ScreenTime] Not authorized to enable app blocking")
+            return
+        }
+        
+        guard hasAppsSelected else {
+            print("[ScreenTime] No apps have been selected for blocking")
+            return
+        }
+        
+        print("[ScreenTime] Force enabling blocking - attempting to reapply shields")
+        
+        // Try to reload tokens from storage
+        if selectedApps.applicationTokens.isEmpty && selectedApps.categoryTokens.isEmpty {
+            loadSelection()
+        }
+        
+        // If we successfully loaded tokens, apply them
+        if !selectedApps.applicationTokens.isEmpty || !selectedApps.categoryTokens.isEmpty {
+            store.shield.applications = selectedApps.applicationTokens
+            if !selectedApps.categoryTokens.isEmpty {
+                store.shield.applicationCategories = .specific(selectedApps.categoryTokens)
+            }
+            print("[ScreenTime] Successfully reapplied shields from stored tokens")
+        } else {
+            // If tokens are unavailable, log a clear message for the user
+            print("[ScreenTime] ⚠️ WARNING: Cannot reapply shields - tokens have expired")
+            print("[ScreenTime] ⚠️ User needs to reselect apps in Workout Settings")
+            print("[ScreenTime] ⚠️ This is a known iOS limitation with FamilyActivitySelection tokens")
+        }
+        
+        // Ensure monitoring schedule is active
+        setupDailyMonitoring()
+    }
+    
     // Check if blocking is currently active
     var isBlockingEnabled: Bool {
         return store.shield.applications != nil || store.shield.applicationCategories != nil

@@ -424,7 +424,15 @@ struct WorkoutView: View {
         // Enable blocking if workout not completed today
         if !workoutStartedToday {
             print("[WORKOUT] Workout not completed today, enabling app blocking")
+            // Try normal enable first
             screenTimeManager.enableAppBlocking()
+            
+            // If normal enable failed due to token issues, try force enable
+            // This provides better resilience when tokens have expired
+            if !screenTimeManager.isBlockingEnabled && screenTimeManager.hasAppsSelected {
+                print("[WORKOUT] Normal enable failed, attempting force enable from store")
+                screenTimeManager.forceEnableBlockingFromStore()
+            }
         } else {
             print("[WORKOUT] Workout already completed today, apps remain unblocked")
         }
