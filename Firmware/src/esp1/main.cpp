@@ -692,7 +692,18 @@ void enterDeepSleep() {
 void setup() {
   // Initialize Serial communication for debugging
   Serial.begin(115200);
-  delay(1000);  // Wait for serial port to initialize
+  
+  // For ESP32-S3 with USB CDC, we need to wait for USB connection
+  // This ensures serial output is actually sent and visible
+  // Wait up to 3 seconds for USB CDC connection
+  #if ARDUINO_USB_CDC_ON_BOOT
+  for(int i = 0; i < 30 && !Serial; i++) {
+    delay(100);  // Wait for USB CDC connection
+  }
+  #else
+  delay(1000);  // Wait for hardware UART to initialize
+  #endif
+  
   Serial.println("\n\n=== Pavloff Workout Sensor Starting ===");
   Serial.println("Firmware: ESP32-S3 Motion Tracking");
   Serial.print("CPU Frequency: ");

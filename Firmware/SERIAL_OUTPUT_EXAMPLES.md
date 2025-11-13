@@ -4,6 +4,20 @@ This document shows what the serial output will look like with the new diagnosti
 
 **Serial Configuration**: 115200 baud, 8N1
 
+## Important Note About USB CDC Serial
+
+The ESP32-S3 uses USB CDC (Communication Device Class) for serial output. This means:
+
+1. **You must open the serial monitor BEFORE programming the board** or press the RESET button after opening the serial monitor
+2. The firmware waits up to 3 seconds for a USB connection before continuing
+3. If no serial monitor is connected, the device will still boot and operate normally after the 3-second timeout
+4. Serial output will only be visible if the serial monitor is connected during boot
+
+**Recommended workflow:**
+1. Open serial monitor at 115200 baud
+2. Press RESET button on the ESP32-S3
+3. Watch for the startup sequence
+
 ## Boot Sequence
 
 ### Normal Boot (Power-on)
