@@ -13,7 +13,7 @@
 
 // Debug configuration
 // Set to 1 to enable serial debug output, 0 to disable
-#define ENABLE_SERIAL_DEBUG 1
+#define ENABLE_SERIAL_DEBUG 0
 
 // Serial debug macros - all serial output can be disabled by setting ENABLE_SERIAL_DEBUG to 0
 #if ENABLE_SERIAL_DEBUG
