@@ -677,6 +677,9 @@ void enterDeepSleep() {
   // Turn off blue LED before sleep
   ledcWrite(LED_PWM_CHANNEL, 0);
   
+  // Turn off blue LED before sleep
+  ledcWrite(LED_PWM_CHANNEL, 0);
+  
   // Put MPU-6050 into low power mode with motion interrupt configured
   DEBUG_PRINTLN("Configuring MPU for motion wake-up");
   putMPUToSleep();
