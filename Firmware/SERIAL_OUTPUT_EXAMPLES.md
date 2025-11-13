@@ -4,6 +4,22 @@ This document shows what the serial output will look like with the new diagnosti
 
 **Serial Configuration**: 115200 baud, 8N1
 
+## Enabling/Disabling Serial Debug Output
+
+All serial debug output can be controlled with a single `#define` at the top of `main.cpp`:
+
+```cpp
+// Set to 1 to enable serial debug output, 0 to disable
+#define ENABLE_SERIAL_DEBUG 1
+```
+
+**To disable all debug output:**
+- Change `#define ENABLE_SERIAL_DEBUG 1` to `#define ENABLE_SERIAL_DEBUG 0`
+- Recompile and upload the firmware
+- This saves approximately 7.5KB of flash memory and eliminates all serial overhead
+
+**Default setting:** Debug output is **enabled** (set to 1) to help with board bring-up and troubleshooting.
+
 ## Important Note About USB CDC Serial
 
 The ESP32-S3 uses USB CDC (Communication Device Class) for serial output. This means:
