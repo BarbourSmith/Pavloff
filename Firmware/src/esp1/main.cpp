@@ -31,6 +31,12 @@
 #define SCL_PIN 9   // I2C SCL pin
 #define INT_PIN 18  // MPU6050 INT pin connected to ESP32 GPIO 18
 
+// Status LED pin configuration
+#define BLUE_LED_PIN 47  // Blue status LED
+#define LED_PWM_CHANNEL 0  // LEDC channel for LED PWM
+#define LED_PWM_FREQ 5000  // 5 KHz PWM frequency
+#define LED_PWM_RESOLUTION 8  // 8-bit resolution (0-255)
+
 // Power management constants
 #define IDLE_TIMEOUT_MS 20000  // 20 seconds in milliseconds (for testing)
 #define CALIBRATION_STILLNESS_MS 240000  // 4 minutes in milliseconds
@@ -110,6 +116,11 @@ unsigned long lastActivityTime = 0;  // Track last time there was activity
 unsigned long lastStillTime = 0;     // Track when device became stationary
 bool wasStationary = false;          // Track if device was stationary in previous iteration
 bool calibrationComplete = false;    // Track if calibration has been done
+
+// Blue LED heartbeat variables
+unsigned long lastLedUpdate = 0;     // Track last LED update time
+uint8_t ledBrightness = 0;           // Current LED brightness (0-255)
+bool ledIncreasing = true;           // LED brightness direction
 
 // Interrupt debugging variables
 volatile bool interruptTriggered = false;
@@ -630,9 +641,41 @@ void wakeMPUFromSleep() {
   
 }
 
+// Update blue LED with heartbeat pattern
+void updateLedHeartbeat() {
+  unsigned long currentTime = millis();
+  
+  // Update LED every 20ms for smooth fading
+  if (currentTime - lastLedUpdate >= 20) {
+    lastLedUpdate = currentTime;
+    
+    // Heartbeat pattern: slow fade in/out
+    if (ledIncreasing) {
+      ledBrightness += 2;
+      if (ledBrightness >= 254) {
+        ledBrightness = 255;
+        ledIncreasing = false;
+      }
+    } else {
+      if (ledBrightness >= 2) {
+        ledBrightness -= 2;
+      } else {
+        ledBrightness = 0;
+        ledIncreasing = true;
+      }
+    }
+    
+    // Use LEDC to set LED brightness
+    ledcWrite(LED_PWM_CHANNEL, ledBrightness);
+  }
+}
+
 // Enter deep sleep mode with interrupt wake
 void enterDeepSleep() {
   DEBUG_PRINTLN("\n=== Entering Deep Sleep ===");
+  
+  // Turn off blue LED before sleep
+  ledcWrite(LED_PWM_CHANNEL, 0);
   
   // Put MPU-6050 into low power mode with motion interrupt configured
   DEBUG_PRINTLN("Configuring MPU for motion wake-up");
@@ -707,6 +750,11 @@ void enterDeepSleep() {
 }
 
 void setup() {
+  // Initialize blue LED with LEDC PWM
+  ledcSetup(LED_PWM_CHANNEL, LED_PWM_FREQ, LED_PWM_RESOLUTION);
+  ledcAttachPin(BLUE_LED_PIN, LED_PWM_CHANNEL);
+  ledcWrite(LED_PWM_CHANNEL, 0);  // Start with LED off
+  
   #if ENABLE_SERIAL_DEBUG
   // Initialize Serial communication for debugging
   Serial.begin(115200);
@@ -961,6 +1009,9 @@ void setup() {
 
 void loop() {
   unsigned long currentTime = millis();
+  
+  // Update blue LED heartbeat pattern
+  updateLedHeartbeat();
   
   // Periodic diagnostic output every 2 seconds
   static unsigned long lastDiagnosticTime = 0;
