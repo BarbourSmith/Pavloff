@@ -595,20 +595,21 @@ void wakeMPUFromSleep() {
 void updateLedHeartbeat() {
   unsigned long currentTime = millis();
   
-  // Update LED every 10ms for smooth fading
-  if (currentTime - lastLedUpdate >= 10) {
+  // Update LED every 20ms for smooth fading
+  if (currentTime - lastLedUpdate >= 20) {
     lastLedUpdate = currentTime;
     
     // Heartbeat pattern: slow fade in/out
     if (ledIncreasing) {
-      ledBrightness += 3;
-      if (ledBrightness >= 255) {
+      ledBrightness += 2;
+      if (ledBrightness >= 254) {
         ledBrightness = 255;
         ledIncreasing = false;
       }
     } else {
-      ledBrightness -= 3;
-      if (ledBrightness <= 0) {
+      if (ledBrightness >= 2) {
+        ledBrightness -= 2;
+      } else {
         ledBrightness = 0;
         ledIncreasing = true;
       }
