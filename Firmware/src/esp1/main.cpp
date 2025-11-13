@@ -1111,6 +1111,11 @@ void setup() {
   
   DEBUG_PRINTLN("\n=== Setup Complete ===");
   DEBUG_PRINTLN("Device is ready and advertising");
+  DEBUG_PRINT("Initial Battery Voltage: ");
+  DEBUG_PRINT(getBatteryVoltage());
+  DEBUG_PRINT("V (");
+  DEBUG_PRINT(getBatteryPercentage());
+  DEBUG_PRINTLN("%)");
   DEBUG_PRINTLN("Entering main loop...\n");
 }
 
@@ -1140,6 +1145,11 @@ void loop() {
       case REP_TRANSITION: DEBUG_PRINTLN("TRANSITION"); break;
       default: DEBUG_PRINTLN("UNKNOWN"); break;
     }
+    DEBUG_PRINT("Battery Voltage: ");
+    DEBUG_PRINT(getBatteryVoltage());
+    DEBUG_PRINT("V (");
+    DEBUG_PRINT(getBatteryPercentage());
+    DEBUG_PRINTLN("%)");
     DEBUG_PRINT("Time until sleep: ");
     DEBUG_PRINT((IDLE_TIMEOUT_MS - (currentTime - lastActivityTime)) / 1000);
     DEBUG_PRINTLN(" seconds");
