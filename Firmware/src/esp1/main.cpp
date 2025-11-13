@@ -22,6 +22,9 @@
 // IMU interrupt pin configuration
 #define INT_PIN 18  // MPU6050 INT pin connected to ESP32 GPIO 18
 
+// Status LED pin configuration
+#define BLUE_LED_PIN 47  // Blue status LED
+
 // Power management constants
 #define IDLE_TIMEOUT_MS 20000  // 20 seconds in milliseconds (for testing)
 #define CALIBRATION_STILLNESS_MS 240000  // 4 minutes in milliseconds
@@ -101,6 +104,11 @@ unsigned long lastActivityTime = 0;  // Track last time there was activity
 unsigned long lastStillTime = 0;     // Track when device became stationary
 bool wasStationary = false;          // Track if device was stationary in previous iteration
 bool calibrationComplete = false;    // Track if calibration has been done
+
+// Blue LED heartbeat variables
+unsigned long lastLedUpdate = 0;     // Track last LED update time
+uint8_t ledBrightness = 0;           // Current LED brightness (0-255)
+bool ledIncreasing = true;           // LED brightness direction
 
 // Interrupt debugging variables
 volatile bool interruptTriggered = false;
@@ -580,8 +588,39 @@ void wakeMPUFromSleep() {
   
 }
 
+// Update blue LED with heartbeat pattern
+void updateLedHeartbeat() {
+  unsigned long currentTime = millis();
+  
+  // Update LED every 10ms for smooth fading
+  if (currentTime - lastLedUpdate >= 10) {
+    lastLedUpdate = currentTime;
+    
+    // Heartbeat pattern: slow fade in/out
+    if (ledIncreasing) {
+      ledBrightness += 3;
+      if (ledBrightness >= 255) {
+        ledBrightness = 255;
+        ledIncreasing = false;
+      }
+    } else {
+      ledBrightness -= 3;
+      if (ledBrightness <= 0) {
+        ledBrightness = 0;
+        ledIncreasing = true;
+      }
+    }
+    
+    // Use PWM to set LED brightness
+    analogWrite(BLUE_LED_PIN, ledBrightness);
+  }
+}
+
 // Enter deep sleep mode with interrupt wake
 void enterDeepSleep() {
+  
+  // Turn off blue LED before sleep
+  analogWrite(BLUE_LED_PIN, 0);
   
   // Put MPU-6050 into low power mode with motion interrupt configured
   putMPUToSleep();
@@ -638,6 +677,10 @@ void enterDeepSleep() {
 }
 
 void setup() {
+  // Initialize blue LED pin
+  pinMode(BLUE_LED_PIN, OUTPUT);
+  analogWrite(BLUE_LED_PIN, 0);  // Start with LED off
+  
   // Disable WiFi radio immediately to save power (not needed for BLE-only operation)
   // WiFi can consume 20-100mA even when not actively used
   // Note: esp_wifi_stop() may fail if WiFi was never started, which is expected and harmless
@@ -795,6 +838,9 @@ void setup() {
 
 void loop() {
   unsigned long currentTime = millis();
+  
+  // Update blue LED heartbeat pattern
+  updateLedHeartbeat();
   
   // Periodic diagnostic output every 2 seconds
   static unsigned long lastDiagnosticTime = 0;
