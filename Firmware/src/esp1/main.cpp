@@ -24,6 +24,9 @@
 
 // Status LED pin configuration
 #define BLUE_LED_PIN 47  // Blue status LED
+#define LED_PWM_CHANNEL 0  // LEDC channel for LED PWM
+#define LED_PWM_FREQ 5000  // 5 KHz PWM frequency
+#define LED_PWM_RESOLUTION 8  // 8-bit resolution (0-255)
 
 // Power management constants
 #define IDLE_TIMEOUT_MS 20000  // 20 seconds in milliseconds (for testing)
@@ -611,8 +614,8 @@ void updateLedHeartbeat() {
       }
     }
     
-    // Use PWM to set LED brightness
-    analogWrite(BLUE_LED_PIN, ledBrightness);
+    // Use LEDC to set LED brightness
+    ledcWrite(LED_PWM_CHANNEL, ledBrightness);
   }
 }
 
@@ -620,7 +623,7 @@ void updateLedHeartbeat() {
 void enterDeepSleep() {
   
   // Turn off blue LED before sleep
-  analogWrite(BLUE_LED_PIN, 0);
+  ledcWrite(LED_PWM_CHANNEL, 0);
   
   // Put MPU-6050 into low power mode with motion interrupt configured
   putMPUToSleep();
@@ -677,9 +680,10 @@ void enterDeepSleep() {
 }
 
 void setup() {
-  // Initialize blue LED pin
-  pinMode(BLUE_LED_PIN, OUTPUT);
-  analogWrite(BLUE_LED_PIN, 0);  // Start with LED off
+  // Initialize blue LED with LEDC PWM
+  ledcSetup(LED_PWM_CHANNEL, LED_PWM_FREQ, LED_PWM_RESOLUTION);
+  ledcAttachPin(BLUE_LED_PIN, LED_PWM_CHANNEL);
+  ledcWrite(LED_PWM_CHANNEL, 0);  // Start with LED off
   
   // Disable WiFi radio immediately to save power (not needed for BLE-only operation)
   // WiFi can consume 20-100mA even when not actively used
