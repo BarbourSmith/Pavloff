@@ -2,188 +2,291 @@
 
 This document shows what the serial output will look like with the new diagnostic features.
 
+**Serial Configuration**: 115200 baud, 8N1
+
 ## Boot Sequence
 
 ### Normal Boot (Power-on)
 ```
-=====================================
-DEVICE STARTING
-Power-on or reset detected
-=====================================
-CPU frequency set to: 80 MHz
-Power optimizations configured
-MPU-6050 initialized
-Using stored calibration offsets
-Offsets: X=0.1234, Y=-0.0987, Z=0.0543
-------------------------------------
+
+=== Pavloff Workout Sensor Starting ===
+Firmware: ESP32-S3 Motion Tracking
+CPU Frequency: 240 MHz
+
+--- Disabling WiFi ---
+WiFi was not initialized (expected)
+
+--- Configuring Power Optimizations ---
+CPU Frequency after optimization: 80 MHz
+
+--- Checking Wake-Up Reason ---
+Wake-up source: POWER ON or RESET
+
+--- Initializing MPU-6050 ---
+I2C SDA Pin: 8
+I2C SCL Pin: 9
+INT Pin: 18
+I2C bus initialized
+Calling mpu.initialize()...
+MPU-6050 initialization complete
+Testing MPU-6050 connection... SUCCESS! MPU-6050 connection verified
+Configuring MPU-6050 ranges...
+  Accelerometer: ±2g
+  Gyroscope: ±500°/s
+Disabling interrupts for normal operation
+DHPF configured to HOLD mode
+
+--- Loading Gyro Calibration ---
+Loaded stored calibration offsets:
+  X offset: 0.1234 °/s
+  Y offset: -0.0987 °/s
+  Z offset: 0.0543 °/s
+
+--- Resetting State Variables ---
 State variables reset
-BLE power set to minimum for energy efficiency
-Waiting for a client connection to notify...
+Activity timer initialized: 1234 ms
+
+--- Initializing BLE ---
+Creating BLE device: 'Pavloff Workout Sensor'
+Setting BLE power level to 0 dBm
+Creating BLE server
+BLE server callbacks configured
+Creating BLE service with UUID: 4fafc201-1fb5-459e-8fcc-c5c9c331914b
+Creating Accelerometer characteristic
+  Accelerometer characteristic configured
+Creating Gyroscope characteristic
+  Gyroscope characteristic configured
+Creating Rep Counter characteristic
+  Rep Counter characteristic configured
+Starting BLE service
+Starting BLE advertising
+BLE advertising started
+
+=== Setup Complete ===
+Device is ready and advertising
+Entering main loop...
 ```
 
 ### Wake from Sleep
 ```
-=====================================
-WOKE UP FROM DEEP SLEEP
-Reason: Motion detection triggered
-Resuming normal operation...
-=====================================
-CPU frequency set to: 80 MHz
-Power optimizations configured
-Waking MPU-6050 from low power mode...
-  - Cleared motion interrupt status
-  - Set to normal mode (PWR_MGMT_1 = 0x00)
-  - Enabled all sensors (PWR_MGMT_2 = 0x00)
-  - Disabled motion interrupt (INT_ENABLE = 0x00)
-MPU-6050 woken up and ready for normal operation
-MPU-6050 initialized
-Using stored calibration offsets
-------------------------------------
+
+=== Pavloff Workout Sensor Starting ===
+Firmware: ESP32-S3 Motion Tracking
+CPU Frequency: 240 MHz
+
+--- Disabling WiFi ---
+WiFi was not initialized (expected)
+
+--- Configuring Power Optimizations ---
+CPU Frequency after optimization: 80 MHz
+
+--- Checking Wake-Up Reason ---
+Wake-up source: MOTION INTERRUPT (GPIO 18)
+
+--- Initializing MPU-6050 ---
+I2C SDA Pin: 8
+I2C SCL Pin: 9
+INT Pin: 18
+I2C bus initialized
+Restoring MPU from low power mode...
+Motion interrupt was pending
+Calling mpu.initialize()...
+MPU-6050 initialization complete
+Testing MPU-6050 connection... SUCCESS! MPU-6050 connection verified
+Configuring MPU-6050 ranges...
+  Accelerometer: ±2g
+  Gyroscope: ±500°/s
+Disabling interrupts for normal operation
+DHPF configured to HOLD mode
+
+--- Loading Gyro Calibration ---
+Loaded stored calibration offsets:
+  X offset: 0.1234 °/s
+  Y offset: -0.0987 °/s
+  Z offset: 0.0543 °/s
+
+--- Resetting State Variables ---
 State variables reset
-BLE power set to minimum for energy efficiency
-Waiting for a client connection to notify...
+Activity timer initialized: 5678 ms
+
+--- Initializing BLE ---
+Creating BLE device: 'Pavloff Workout Sensor'
+Setting BLE power level to 0 dBm
+Creating BLE server
+BLE server callbacks configured
+Creating BLE service with UUID: 4fafc201-1fb5-459e-8fcc-c5c9c331914b
+Creating Accelerometer characteristic
+  Accelerometer characteristic configured
+Creating Gyroscope characteristic
+  Gyroscope characteristic configured
+Creating Rep Counter characteristic
+  Rep Counter characteristic configured
+Starting BLE service
+Starting BLE advertising
+BLE advertising started
+
+=== Setup Complete ===
+Device is ready and advertising
+Entering main loop...
 ```
 
 ## Normal Operation Diagnostics
 
-### Idle State
+### Idle State (every 2 seconds)
 ```
-======== STATE DIAGNOSTIC ========
+--- Status Update ---
 Uptime: 5 seconds
-BLE Connected: YES
-Rep Count: 0 | State: IDLE
-Position (m): X=0.000, Y=0.000, Z=0.000
-Velocity (m/s): X=0.000, Y=0.000, Z=0.000
-Idle timer: 5 / 20 seconds
-==================================
+BLE Connected: NO
+Rep Count: 0
+Rep State: IDLE
+Time until sleep: 15 seconds
 ```
 
-### During Rep (Moving Up)
+### After BLE Connection
 ```
-REP: Started - Moving UP
-======== STATE DIAGNOSTIC ========
+*** BLE CLIENT CONNECTED ***
+
+--- Status Update ---
 Uptime: 8 seconds
 BLE Connected: YES
-Rep Count: 0 | State: MOVING_UP
-Position (m): X=0.012, Y=-0.003, Z=0.145
-Velocity (m/s): X=0.023, Y=-0.005, Z=0.312
-Idle timer: 0 / 20 seconds
-==================================
-Sent Reps:  Count:0,State:UP (repCount=0)
+Rep Count: 0
+Rep State: IDLE
+Time until sleep: 20 seconds
 ```
 
-### After Completing Rep
+### During Rep Detection
 ```
-REP: Direction change UP->DOWN | Total Reps: 1
-======== STATE DIAGNOSTIC ========
-Uptime: 10 seconds
+--- Status Update ---
+Uptime: 12 seconds
 BLE Connected: YES
-Rep Count: 1 | State: MOVING_DOWN
-Position (m): X=0.008, Y=-0.001, Z=0.087
-Velocity (m/s): X=-0.015, Y=0.002, Z=-0.245
-Idle timer: 0 / 20 seconds
-==================================
-Sent Reps:  Count:1,State:DOWN (repCount=1)
-```
+Rep Count: 2
+Rep State: MOVING_UP
+Time until sleep: 20 seconds
 
-### Multiple Reps
-```
-REP: Direction change DOWN->UP | Total Reps: 1
-REP: Direction change UP->DOWN | Total Reps: 2
-REP: Direction change DOWN->UP | Total Reps: 2
-REP: Direction change UP->DOWN | Total Reps: 3
-======== STATE DIAGNOSTIC ========
-Uptime: 25 seconds
+--- Status Update ---
+Uptime: 14 seconds
 BLE Connected: YES
-Rep Count: 3 | State: MOVING_DOWN
-Position (m): X=-0.005, Y=0.002, Z=0.023
-Velocity (m/s): X=-0.018, Y=0.003, Z=-0.198
-Idle timer: 0 / 20 seconds
-==================================
-Sent Reps:  Count:3,State:DOWN (repCount=3)
+Rep Count: 3
+Rep State: MOVING_DOWN
+Time until sleep: 20 seconds
+
+--- Status Update ---
+Uptime: 16 seconds
+BLE Connected: YES
+Rep Count: 3
+Rep State: MOVING_UP
+Time until sleep: 20 seconds
 ```
 
 ## Sleep Sequence
 
 ### Warning Before Sleep
 ```
-======== STATE DIAGNOSTIC ========
+--- Status Update ---
 Uptime: 15 seconds
 BLE Connected: NO
-Rep Count: 3 | State: IDLE
-Position (m): X=0.000, Y=0.000, Z=0.000
-Velocity (m/s): X=0.000, Y=0.000, Z=0.000
-Idle timer: 15 / 20 seconds
-==================================
-WARNING: Device will enter sleep in 5 seconds if no activity detected
+Rep Count: 3
+Rep State: IDLE
+Time until sleep: 5 seconds
+
+*** WARNING: Deep sleep in 5 seconds ***
 ```
 
 ### Entering Sleep
 ```
-======== STATE DIAGNOSTIC ========
+--- Status Update ---
 Uptime: 20 seconds
 BLE Connected: NO
-Rep Count: 3 | State: IDLE
-Position (m): X=0.000, Y=0.000, Z=0.000
-Velocity (m/s): X=0.000, Y=0.000, Z=0.000
-Idle timer: 20 / 20 seconds
-==================================
-Idle timeout reached - entering deep sleep
-=====================================
-ENTERING DEEP SLEEP MODE
+Rep Count: 3
+Rep State: IDLE
+Time until sleep: 0 seconds
+
+*** IDLE TIMEOUT - ENTERING DEEP SLEEP ***
+
+=== Entering Deep Sleep ===
+Configuring MPU for motion wake-up
+Putting MPU into low power mode
+  Configuring motion detection interrupt
+  Motion detection interrupt enabled
+  Interrupt status: 0x00
+  Disabling temperature sensor
+  Disabling gyroscope, keeping accelerometer active
+  Keeping MPU in normal mode (cycle mode disabled)
+MPU low power mode configured
+MPU interrupt status before sleep: 0x00
+GPIO 18 level before sleep: 0
+Shutting down BLE
+Shutting down WiFi (if active)
+Disabling unused peripherals
+Configuring wake on GPIO 18 (motion interrupt)
+*** ENTERING DEEP SLEEP NOW ***
 Device will wake on motion detection
-Current uptime: 20 seconds
-=====================================
-Preparing MPU-6050 for sleep mode...
-MPU-6050 motion interrupt configured
-  - Set to normal mode with temp disabled
-  - Disabled gyroscope, kept accelerometer enabled
-  - Motion interrupt enabled
-MPU-6050 in low-power mode with motion detection enabled
-(Gyroscope disabled, temperature sensor disabled for power savings)
 ```
 
 ## BLE Interaction
 
 ### Connection Event
 ```
-Device connected
-======== STATE DIAGNOSTIC ========
+*** BLE CLIENT CONNECTED ***
+
+--- Status Update ---
 Uptime: 12 seconds
 BLE Connected: YES
-Rep Count: 2 | State: IDLE
-Position (m): X=0.000, Y=0.000, Z=0.000
-Velocity (m/s): X=0.000, Y=0.000, Z=0.000
-Idle timer: 0 / 20 seconds
-==================================
+Rep Count: 2
+Rep State: IDLE
+Time until sleep: 20 seconds
 ```
 
 ### Reset Command Received
 ```
-Received command: RESET
-Rep count reset to 0
-Sent Reps:  Count:0,State:IDLE (repCount=0)
-======== STATE DIAGNOSTIC ========
+BLE Write received: RESET
+Rep counter reset command received
+Rep counter reset to 0
+
+--- Status Update ---
 Uptime: 35 seconds
 BLE Connected: YES
-Rep Count: 0 | State: IDLE
-Position (m): X=0.000, Y=0.000, Z=0.000
-Velocity (m/s): X=0.000, Y=0.000, Z=0.000
-Idle timer: 0 / 20 seconds
-==================================
+Rep Count: 0
+Rep State: IDLE
+Time until sleep: 20 seconds
 ```
 
 ### Disconnection Event
 ```
-Device disconnected
-======== STATE DIAGNOSTIC ========
+*** BLE CLIENT DISCONNECTED ***
+Restarting BLE advertising
+
+--- Status Update ---
 Uptime: 45 seconds
 BLE Connected: NO
-Rep Count: 5 | State: IDLE
-Position (m): X=0.000, Y=0.000, Z=0.000
-Velocity (m/s): X=0.000, Y=0.000, Z=0.000
-Idle timer: 0 / 20 seconds
-==================================
+Rep Count: 5
+Rep State: IDLE
+Time until sleep: 15 seconds
+```
+
+## First Boot (No Calibration)
+
+When the device is programmed for the first time with no stored calibration:
+
+```
+--- Loading Gyro Calibration ---
+No stored calibration found
+Starting calibration in 2 seconds...
+*** KEEP DEVICE STATIONARY ***
+
+=== Starting Gyro Calibration ===
+Collecting 3000 samples...
+  Sample 0...
+  Sample 1000...
+  Sample 2000...
+
+Calibration complete!
+Gyro offsets calculated:
+  X: 0.1234 °/s
+  Y: -0.0987 °/s
+  Z: 0.0543 °/s
+Offsets saved to persistent storage
+Resuming normal operation in 3 seconds...
 ```
 
 ## Diagnostic Information Guide
@@ -193,48 +296,55 @@ Idle timer: 0 / 20 seconds
 **Uptime**: Time since boot or wake from sleep (in seconds)
 
 **BLE Connected**: 
-- YES = Client connected and subscribed
-- NO = No active connection
+- YES = Client connected and receiving data
+- NO = No active BLE connection
 
-**Rep Count**: Total reps counted since last reset or wake
+**Rep Count**: Total reps counted since last reset or wake from sleep
 
-**State**: Current rep detection state
-- IDLE = No motion detected
-- MOVING_UP = Upward motion phase
-- MOVING_DOWN = Downward motion phase
+**Rep State**: Current rep detection state
+- IDLE = No motion detected or insufficient motion for rep
+- MOVING_UP = Upward motion phase detected
+- MOVING_DOWN = Downward motion phase detected
 
-**Position**: 3D position estimate in meters (X, Y, Z)
-- Values near 0.000 indicate stable/stationary
-- Larger values indicate movement has occurred
+**Time until sleep**: Seconds remaining before device enters deep sleep
+- Resets to 20 seconds when motion is detected
+- BLE connection does NOT prevent sleep
+- Only motion activity extends the awake time
 
-**Velocity**: 3D velocity in meters per second (X, Y, Z)
-- Values near 0.000 indicate no motion
-- Positive/negative indicates direction
-- Magnitude > 0.20 typically indicates active rep
+### Troubleshooting with Serial Output
 
-**Idle Timer**: 
-- First number: seconds since last activity
-- Second number: timeout threshold (20 for testing, 300 for production)
-- When first >= second, device enters sleep
+**Problem**: No serial output at all
+- Check baud rate is set to 115200
+- Verify USB cable supports data (not just power)
+- Ensure correct COM port is selected
+- Check that ARDUINO_USB_CDC_ON_BOOT=1 in platformio.ini
 
-### Troubleshooting with Diagnostics
+**Problem**: MPU-6050 connection fails
+- Look for "FAILED! MPU-6050 not responding"
+- Check I2C wiring (SDA=GPIO8, SCL=GPIO9)
+- Verify MPU-6050 has power (3.3V)
+- Check for I2C pull-up resistors (typically on MPU board)
+
+**Problem**: Device keeps resetting
+- Look for multiple "Pavloff Workout Sensor Starting" messages
+- Check wake-up reason for clues
+- Verify power supply is stable (500mA minimum)
+- Check for short circuits on GPIO pins
 
 **Problem**: Rep count not incrementing
-- Check State changes from IDLE to MOVING_UP/DOWN
-- Verify Velocity magnitude exceeds 0.20 m/s
-- Ensure motion is sustained for at least 500ms
+- Monitor "Rep State" in status updates
+- State should change from IDLE to MOVING_UP/DOWN during exercise
+- If state stays IDLE, motion may be too slow or too small
+- Minimum velocity threshold is 0.20 m/s
 
-**Problem**: Device sleeping too quickly
-- Monitor Idle timer
-- Verify activity resets timer to 0
-- Check BLE connection extends timeout
+**Problem**: Device enters sleep unexpectedly
+- Watch "Time until sleep" counter
+- Should reset to 20 seconds when motion detected
+- If timer keeps counting down, device isn't detecting motion
+- Check MPU-6050 is responding and providing data
 
-**Problem**: Reps not transmitted via BLE
-- Verify "BLE Connected: YES"
-- Check "Sent Reps:" messages appear
-- Confirm client is subscribed to notifications
-
-**Problem**: Position drifting over time
-- Small drift is normal due to integration
-- Gets reset when device becomes stationary
-- Large continuous drift may indicate calibration issue
+**Problem**: BLE connection not working
+- Verify "BLE advertising started" appears
+- Look for "*** BLE CLIENT CONNECTED ***" when device connects
+- Check that iOS app is scanning for "Pavloff Workout Sensor"
+- Service UUID should be: 4fafc201-1fb5-459e-8fcc-c5c9c331914b
