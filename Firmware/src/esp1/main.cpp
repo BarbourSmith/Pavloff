@@ -22,9 +22,24 @@
 // IMU interrupt pin configuration
 #define INT_PIN 18  // MPU6050 INT pin connected to ESP32 GPIO 18
 
+// Battery voltage detection pin configuration
+// Note: GPIO36 doesn't exist on ESP32-S3. Using GPIO4 which supports ADC1_CH3
+// Adjust this pin based on actual hardware schematic
+#define BATTERY_PIN 4  // Battery voltage divider connected to ADC pin
+
 // Power management constants
 #define IDLE_TIMEOUT_MS 20000  // 20 seconds in milliseconds (for testing)
 #define CALIBRATION_STILLNESS_MS 240000  // 4 minutes in milliseconds
+
+// Battery voltage detection constants
+// Voltage divider: 27k (top) + 68k (bottom) = 95k total
+// Voltage at ADC = Battery_Voltage × (68k / 95k) ≈ Battery_Voltage × 0.7158
+// Battery_Voltage = ADC_Voltage / 0.7158 ≈ ADC_Voltage × 1.3971
+#define BATTERY_R1 27000.0f  // Top resistor (ohms)
+#define BATTERY_R2 68000.0f  // Bottom resistor (ohms)
+#define BATTERY_VOLTAGE_DIVIDER ((BATTERY_R1 + BATTERY_R2) / BATTERY_R2)  // ≈ 1.3971
+#define BATTERY_ADC_SAMPLES 10  // Number of ADC samples to average for stability
+#define BATTERY_READ_INTERVAL_MS 5000  // Read battery voltage every 5 seconds
 
 // Power optimization settings
 void configurePowerOptimizations() {
@@ -64,6 +79,7 @@ BLEServer* pServer = NULL;
 BLECharacteristic* pAccelCharacteristic = NULL;
 BLECharacteristic* pGyroCharacteristic = NULL;
 BLECharacteristic* pRepCharacteristic = NULL;
+BLECharacteristic* pBatteryCharacteristic = NULL;
 bool deviceConnected = false;
 
 // Position and velocity tracking variables
@@ -101,6 +117,10 @@ unsigned long lastActivityTime = 0;  // Track last time there was activity
 unsigned long lastStillTime = 0;     // Track when device became stationary
 bool wasStationary = false;          // Track if device was stationary in previous iteration
 bool calibrationComplete = false;    // Track if calibration has been done
+
+// Battery voltage tracking variables
+float lastBatteryVoltage = 0.0f;     // Last measured battery voltage
+unsigned long lastBatteryReadTime = 0;  // Track when battery was last read
 
 // Interrupt debugging variables
 volatile bool interruptTriggered = false;
@@ -145,6 +165,7 @@ void IRAM_ATTR mpuInterruptISR() {
 #define ACCEL_CHARACTERISTIC_UUID "beb5483e-36e1-4688-b7f5-ea07361b26a8"
 #define GYRO_CHARACTERISTIC_UUID  "1c95d5e2-0a25-4233-8d6c-613d161c210a"
 #define REP_CHARACTERISTIC_UUID   "8d3f7a9e-4b2c-11ef-9f27-0242ac120002"
+#define BATTERY_CHARACTERISTIC_UUID "7c8a8e7a-4c5d-11ef-9f27-0242ac120002"
 
 // Handles BLE connection and disconnection events
 class MyServerCallbacks: public BLEServerCallbacks {
@@ -186,6 +207,69 @@ class RepCharacteristicCallbacks: public BLECharacteristicCallbacks {
       }
     }
 };
+
+// Read battery voltage from ADC with voltage divider compensation
+// Returns battery voltage in volts
+float readBatteryVoltage() {
+  // Take multiple samples and average for stability
+  uint32_t adcSum = 0;
+  for (int i = 0; i < BATTERY_ADC_SAMPLES; i++) {
+    adcSum += analogRead(BATTERY_PIN);
+    delay(1);  // Small delay between samples
+  }
+  
+  // Calculate average ADC reading (12-bit: 0-4095)
+  float adcAverage = (float)adcSum / (float)BATTERY_ADC_SAMPLES;
+  
+  // Convert ADC reading to voltage
+  // ESP32-S3 ADC reference is typically 3.3V for 12-bit resolution
+  // However, ADC attenuation affects this - using default 11dB attenuation
+  // With 11dB attenuation, the measurable range is approximately 0-3.3V
+  float adcVoltage = (adcAverage / 4095.0f) * 3.3f;
+  
+  // Compensate for voltage divider to get actual battery voltage
+  float batteryVoltage = adcVoltage * BATTERY_VOLTAGE_DIVIDER;
+  
+  return batteryVoltage;
+}
+
+// Get battery voltage with caching
+// Returns cached value if read recently, otherwise reads fresh value
+float getBatteryVoltage() {
+  unsigned long currentTime = millis();
+  
+  // Return cached value if read recently
+  if (lastBatteryVoltage > 0.0f && 
+      (currentTime - lastBatteryReadTime) < BATTERY_READ_INTERVAL_MS) {
+    return lastBatteryVoltage;
+  }
+  
+  // Read fresh battery voltage
+  lastBatteryVoltage = readBatteryVoltage();
+  lastBatteryReadTime = currentTime;
+  
+  return lastBatteryVoltage;
+}
+
+// Get battery percentage estimate
+// Returns estimated battery percentage (0-100%)
+// Assumes Li-ion battery: 4.2V (full) to 3.0V (empty)
+int getBatteryPercentage() {
+  float voltage = getBatteryVoltage();
+  
+  // Li-ion battery voltage range
+  const float maxVoltage = 4.2f;  // Fully charged
+  const float minVoltage = 3.0f;  // Depleted (safe cutoff)
+  
+  // Calculate percentage
+  float percentage = ((voltage - minVoltage) / (maxVoltage - minVoltage)) * 100.0f;
+  
+  // Clamp to 0-100 range
+  if (percentage < 0.0f) percentage = 0.0f;
+  if (percentage > 100.0f) percentage = 100.0f;
+  
+  return (int)percentage;
+}
 
 // Fast inverse square root for quaternion normalization
 float invSqrt(float x) {
@@ -737,6 +821,16 @@ void setup() {
   // Initialize activity timer
   lastActivityTime = millis();
 
+  // --- Battery Voltage ADC Setup ---
+  // Configure ADC for battery voltage reading
+  // Set ADC attenuation to 11dB for 0-3.3V range (default)
+  analogSetAttenuation(ADC_11db);  // Global attenuation setting
+  // Note: Individual pin attenuation can be set with analogSetPinAttenuation(BATTERY_PIN, ADC_11db);
+  
+  // Read initial battery voltage
+  lastBatteryVoltage = readBatteryVoltage();
+  lastBatteryReadTime = millis();
+
 
   // --- BLE Setup ---
   // Create the BLE Device
@@ -780,6 +874,16 @@ void setup() {
   pRepCharacteristic->setCallbacks(new RepCharacteristicCallbacks());
   // Set initial value before starting service
   pRepCharacteristic->setValue("Count:0,State:IDLE");
+
+  // Create a BLE Characteristic for Battery Voltage
+  pBatteryCharacteristic = pService->createCharacteristic(
+                      BATTERY_CHARACTERISTIC_UUID,
+                      BLECharacteristic::PROPERTY_READ |
+                      BLECharacteristic::PROPERTY_NOTIFY
+                    );
+  pBatteryCharacteristic->addDescriptor(new BLE2902());
+  // Set initial value before starting service
+  pBatteryCharacteristic->setValue("0.00V,0%");
 
   // Start the service
   pService->start();
@@ -997,6 +1101,16 @@ void loop() {
     // Set the characteristic value and notify the client
     pRepCharacteristic->setValue(repData);
     pRepCharacteristic->notify();
+
+    // --- Prepare and Send Battery Voltage Data ---
+    float batteryVoltage = getBatteryVoltage();
+    int batteryPercent = getBatteryPercentage();
+    char batteryData[30];
+    snprintf(batteryData, sizeof(batteryData), "%.2fV,%d%%", batteryVoltage, batteryPercent);
+
+    // Set the characteristic value and notify the client
+    pBatteryCharacteristic->setValue(batteryData);
+    pBatteryCharacteristic->notify();
   }
 
   // Short delay for high-frequency position calculation
