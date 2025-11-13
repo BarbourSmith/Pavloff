@@ -11,15 +11,9 @@
 #include <esp_wifi.h>
 #include <Preferences.h>
 
-// Pin configuration - defined via PlatformIO build flags
-#ifndef SDA_PIN
-#error "SDA_PIN must be defined in platformio.ini build_flags"
-#endif
-#ifndef SCL_PIN
-#error "SCL_PIN must be defined in platformio.ini build_flags"
-#endif
-
-// IMU interrupt pin configuration
+// Pin configuration
+#define SDA_PIN 8   // I2C SDA pin
+#define SCL_PIN 9   // I2C SCL pin
 #define INT_PIN 18  // MPU6050 INT pin connected to ESP32 GPIO 18
 
 // Power management constants
