@@ -24,6 +24,7 @@ This project implements real-time motion tracking on ESP32 microcontrollers usin
 - SDA: GPIO 8
 - SCL: GPIO 9
 - MPU-6050 INT: GPIO 18 (motion detection interrupt for wake-up)
+- Battery Voltage: GPIO 4 (ADC1_CH3) - configurable, verify with schematic
 
 ## Features
 
@@ -57,10 +58,21 @@ Based on the algorithm from [xioTechnologies/Oscillatory-Motion-Tracking-With-x-
 6. **Drift-Free Velocity**: Integration with high-pass filtering prevents velocity drift
 7. **Drift-Free Position**: Integration with high-pass filtering prevents position drift
 
+### Battery Voltage Detection
+Real-time battery monitoring through voltage divider circuit:
+- **Voltage Divider**: 27kΩ / 68kΩ resistor network
+- **Update Interval**: Every 5 seconds
+- **Battery Percentage**: Automatic calculation for Li-ion batteries (4.2V-3.0V)
+- **BLE Characteristic**: Voltage and percentage transmitted via BLE
+- **Sample Averaging**: 10 ADC samples averaged for stability
+
+See [BATTERY_VOLTAGE.md](BATTERY_VOLTAGE.md) for detailed information.
+
 ### BLE Streaming
 - Position data transmitted every 500ms
 - Gyroscope data for rotation tracking
 - Rep count and state information
+- Battery voltage and percentage
 - Wireless connectivity for real-time monitoring
 
 ## Algorithm Details
@@ -123,6 +135,7 @@ On startup, the device calibrates the gyroscope. **Keep the sensor stationary** 
 - Position data: `X:value,Y:value,Z:value` (in millimeters)
 - Gyroscope data: `X:value,Y:value,Z:value` (in degrees/second)
 - Rep count data: `Count:value,State:state` (count is integer, state is IDLE/UP/DOWN)
+- Battery voltage: `<voltage>V,<percentage>%` (e.g., "3.85V,68%")
 
 ## Applications
 
