@@ -150,6 +150,10 @@ struct SetupView: View {
                     }
                 }
             }
+            .onChange(of: workoutSettings.exercises) { _ in
+                // Save settings whenever exercises change
+                workoutSettings.save()
+            }
             .onAppear {
                 // Request authorization on appear if not already authorized
                 if !screenTimeManager.isAuthorized {
