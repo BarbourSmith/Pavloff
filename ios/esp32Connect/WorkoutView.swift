@@ -13,7 +13,7 @@ struct WorkoutView: View {
     @StateObject private var bleManager = BLEManager()
     @StateObject private var screenTimeManager = ScreenTimeManager.shared
     @StateObject private var streakManager = StreakManager.shared
-    @State private var workoutSettings = WorkoutSettings()
+    @State private var workoutSettings = WorkoutSettings.load()
     @State private var currentExerciseIndex = 0
     @State private var connectionStatus: String = "Scanning for device..."
     @State private var isConnected: Bool = false

@@ -124,7 +124,7 @@ struct DiscoveredCharacteristics {
 }
 
 // MARK: - Workout Models
-struct Exercise: Identifiable, Equatable {
+struct Exercise: Identifiable, Equatable, Codable {
     let id: UUID
     let name: String
     var targetReps: Int
@@ -136,8 +136,10 @@ struct Exercise: Identifiable, Equatable {
     }
 }
 
-struct WorkoutSettings {
+struct WorkoutSettings: Codable {
     var exercises: [Exercise]
+    
+    private static let userDefaultsKey = "workoutSettings"
     
     static let defaultExercises = [
         Exercise(name: "Bicep Curls", targetReps: 10),
@@ -147,6 +149,52 @@ struct WorkoutSettings {
     
     init(exercises: [Exercise] = defaultExercises) {
         self.exercises = exercises
+    }
+    
+    // Load saved settings from UserDefaults, or return default if none saved
+    static func load() -> WorkoutSettings {
+        // Use App Group UserDefaults for consistency with other workout data
+        let userDefaults: UserDefaults = {
+            guard let defaults = UserDefaults(suiteName: "group.com.maslowcnc.Tides") else {
+                print("[WORKOUT_SETTINGS] Warning: Failed to create App Group UserDefaults, falling back to standard")
+                return UserDefaults.standard
+            }
+            return defaults
+        }()
+        
+        guard let data = userDefaults.data(forKey: userDefaultsKey) else {
+            print("[WORKOUT_SETTINGS] No saved settings found, using defaults")
+            return WorkoutSettings()
+        }
+        
+        do {
+            let settings = try JSONDecoder().decode(WorkoutSettings.self, from: data)
+            print("[WORKOUT_SETTINGS] Successfully loaded saved settings with \(settings.exercises.count) exercises")
+            return settings
+        } catch {
+            print("[WORKOUT_SETTINGS] Failed to decode saved settings: \(error). Using defaults.")
+            return WorkoutSettings()
+        }
+    }
+    
+    // Save current settings to UserDefaults
+    func save() {
+        // Use App Group UserDefaults for consistency with other workout data
+        let userDefaults: UserDefaults = {
+            guard let defaults = UserDefaults(suiteName: "group.com.maslowcnc.Tides") else {
+                print("[WORKOUT_SETTINGS] Warning: Failed to create App Group UserDefaults, falling back to standard")
+                return UserDefaults.standard
+            }
+            return defaults
+        }()
+        
+        do {
+            let data = try JSONEncoder().encode(self)
+            userDefaults.set(data, forKey: WorkoutSettings.userDefaultsKey)
+            print("[WORKOUT_SETTINGS] Successfully saved settings")
+        } catch {
+            print("[WORKOUT_SETTINGS] Failed to encode settings: \(error)")
+        }
     }
 }
 
