@@ -13,6 +13,9 @@ struct SetupView: View {
     @Environment(\.dismiss) var dismiss
     @StateObject private var screenTimeManager = ScreenTimeManager.shared
     @State private var showingAppPicker = false
+    @State private var showingAddExercise = false
+    @State private var newExerciseName = ""
+    @State private var newExerciseReps = 10
     
     var body: some View {
         NavigationView {
@@ -34,8 +37,26 @@ struct SetupView: View {
                 // Exercise list
                 ScrollView {
                     VStack(spacing: 15) {
+                        // Add Exercise Button
+                        Button(action: {
+                            showingAddExercise = true
+                        }) {
+                            HStack {
+                                Image(systemName: "plus.circle.fill")
+                                Text("Add New Exercise")
+                            }
+                            .fontWeight(.semibold)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.green.opacity(0.15))
+                            .foregroundColor(.green)
+                            .cornerRadius(8)
+                        }
+                        
                         ForEach($workoutSettings.exercises) { $exercise in
-                            ExerciseConfigRow(exercise: $exercise)
+                            ExerciseConfigRow(exercise: $exercise, onDelete: {
+                                deleteExercise(exercise)
+                            })
                         }
                         
                         // Screen Time Controls Section
@@ -142,6 +163,20 @@ struct SetupView: View {
             }
             .navigationBarTitleDisplayMode(.inline)
             .familyActivityPicker(isPresented: $showingAppPicker, selection: $screenTimeManager.selectedApps)
+            .sheet(isPresented: $showingAddExercise) {
+                AddExerciseSheet(
+                    exerciseName: $newExerciseName,
+                    exerciseReps: $newExerciseReps,
+                    onAdd: {
+                        addExercise()
+                    },
+                    onCancel: {
+                        showingAddExercise = false
+                        newExerciseName = ""
+                        newExerciseReps = 10
+                    }
+                )
+            }
             .onChange(of: showingAppPicker) { isPresented in
                 // When app picker is dismissed and apps are selected, apply shields immediately
                 if !isPresented && screenTimeManager.isAuthorized {
@@ -164,16 +199,53 @@ struct SetupView: View {
             }
         }
     }
+    
+    private func addExercise() {
+        guard !newExerciseName.trimmingCharacters(in: .whitespaces).isEmpty else {
+            showingAddExercise = false
+            newExerciseName = ""
+            newExerciseReps = 10
+            return
+        }
+        
+        let exercise = Exercise(name: newExerciseName.trimmingCharacters(in: .whitespaces), targetReps: newExerciseReps)
+        workoutSettings.exercises.append(exercise)
+        workoutSettings.save()
+        
+        showingAddExercise = false
+        newExerciseName = ""
+        newExerciseReps = 10
+    }
+    
+    private func deleteExercise(_ exercise: Exercise) {
+        // Prevent deleting if it's the last exercise
+        guard workoutSettings.exercises.count > 1 else {
+            return
+        }
+        
+        workoutSettings.exercises.removeAll { $0.id == exercise.id }
+        workoutSettings.save()
+    }
 }
 
 struct ExerciseConfigRow: View {
     @Binding var exercise: Exercise
+    var onDelete: () -> Void
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(exercise.name)
-                .font(.headline)
-                .fontWeight(.bold)
+            HStack {
+                Text(exercise.name)
+                    .font(.headline)
+                    .fontWeight(.bold)
+                
+                Spacer()
+                
+                Button(action: onDelete) {
+                    Image(systemName: "trash.fill")
+                        .foregroundColor(.red)
+                }
+            }
             
             HStack(spacing: 15) {
                 Text("Target Reps:")
@@ -218,6 +290,85 @@ struct ExerciseConfigRow: View {
         .background(Color.white)
         .cornerRadius(12)
         .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
+    }
+}
+
+struct AddExerciseSheet: View {
+    @Binding var exerciseName: String
+    @Binding var exerciseReps: Int
+    var onAdd: () -> Void
+    var onCancel: () -> Void
+    
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 20) {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Exercise Name")
+                        .font(.headline)
+                        .foregroundColor(.gray)
+                    
+                    TextField("e.g., Squats, Push-ups", text: $exerciseName)
+                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                        .padding(.horizontal)
+                }
+                .padding(.top, 20)
+                
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Target Reps")
+                        .font(.headline)
+                        .foregroundColor(.gray)
+                    
+                    HStack {
+                        Button(action: {
+                            if exerciseReps > 1 {
+                                exerciseReps -= 1
+                            }
+                        }) {
+                            Image(systemName: "minus.circle.fill")
+                                .font(.title2)
+                                .foregroundColor(exerciseReps > 1 ? .blue : .gray)
+                        }
+                        .disabled(exerciseReps <= 1)
+                        
+                        Text("\(exerciseReps)")
+                            .font(.title2)
+                            .fontWeight(.bold)
+                            .foregroundColor(.blue)
+                            .frame(minWidth: 50)
+                        
+                        Button(action: {
+                            if exerciseReps < 50 {
+                                exerciseReps += 1
+                            }
+                        }) {
+                            Image(systemName: "plus.circle.fill")
+                                .font(.title2)
+                                .foregroundColor(exerciseReps < 50 ? .blue : .gray)
+                        }
+                        .disabled(exerciseReps >= 50)
+                    }
+                    .padding(.horizontal)
+                }
+                
+                Spacer()
+            }
+            .navigationTitle("Add Exercise")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
+                        onCancel()
+                    }
+                }
+                
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Add") {
+                        onAdd()
+                    }
+                    .disabled(exerciseName.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+            }
+        }
     }
 }
 
