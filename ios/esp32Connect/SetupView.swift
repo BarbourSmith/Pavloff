@@ -17,6 +17,11 @@ struct SetupView: View {
     @State private var newExerciseName = ""
     @State private var newExerciseReps = 10
     
+    // Exercise rep limits
+    private let minExerciseReps = 1
+    private let maxExerciseReps = 50
+    private let defaultExerciseReps = 10
+    
     var body: some View {
         NavigationView {
             VStack(spacing: 0) {
@@ -171,9 +176,7 @@ struct SetupView: View {
                         addExercise()
                     },
                     onCancel: {
-                        showingAddExercise = false
-                        newExerciseName = ""
-                        newExerciseReps = 10
+                        resetExerciseForm()
                     }
                 )
             }
@@ -202,9 +205,7 @@ struct SetupView: View {
     
     private func addExercise() {
         guard !newExerciseName.trimmingCharacters(in: .whitespaces).isEmpty else {
-            showingAddExercise = false
-            newExerciseName = ""
-            newExerciseReps = 10
+            resetExerciseForm()
             return
         }
         
@@ -212,9 +213,13 @@ struct SetupView: View {
         workoutSettings.exercises.append(exercise)
         workoutSettings.save()
         
+        resetExerciseForm()
+    }
+    
+    private func resetExerciseForm() {
         showingAddExercise = false
         newExerciseName = ""
-        newExerciseReps = 10
+        newExerciseReps = defaultExerciseReps
     }
     
     private func deleteExercise(_ exercise: Exercise) {
@@ -231,6 +236,10 @@ struct SetupView: View {
 struct ExerciseConfigRow: View {
     @Binding var exercise: Exercise
     var onDelete: () -> Void
+    
+    // Exercise rep limits (matching SetupView constants)
+    private let minExerciseReps = 1
+    private let maxExerciseReps = 50
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -256,15 +265,15 @@ struct ExerciseConfigRow: View {
                 
                 // Decrease button
                 Button(action: {
-                    if exercise.targetReps > 1 {
+                    if exercise.targetReps > minExerciseReps {
                         exercise.targetReps -= 1
                     }
                 }) {
                     Image(systemName: "minus.circle.fill")
                         .font(.title2)
-                        .foregroundColor(exercise.targetReps > 1 ? .blue : .gray)
+                        .foregroundColor(exercise.targetReps > minExerciseReps ? .blue : .gray)
                 }
-                .disabled(exercise.targetReps <= 1)
+                .disabled(exercise.targetReps <= minExerciseReps)
                 
                 // Rep count display
                 Text("\(exercise.targetReps)")
@@ -275,15 +284,15 @@ struct ExerciseConfigRow: View {
                 
                 // Increase button
                 Button(action: {
-                    if exercise.targetReps < 50 {
+                    if exercise.targetReps < maxExerciseReps {
                         exercise.targetReps += 1
                     }
                 }) {
                     Image(systemName: "plus.circle.fill")
                         .font(.title2)
-                        .foregroundColor(exercise.targetReps < 50 ? .blue : .gray)
+                        .foregroundColor(exercise.targetReps < maxExerciseReps ? .blue : .gray)
                 }
-                .disabled(exercise.targetReps >= 50)
+                .disabled(exercise.targetReps >= maxExerciseReps)
             }
         }
         .padding()
@@ -298,6 +307,10 @@ struct AddExerciseSheet: View {
     @Binding var exerciseReps: Int
     var onAdd: () -> Void
     var onCancel: () -> Void
+    
+    // Exercise rep limits (matching SetupView constants)
+    private let minExerciseReps = 1
+    private let maxExerciseReps = 50
     
     var body: some View {
         NavigationView {
@@ -320,15 +333,15 @@ struct AddExerciseSheet: View {
                     
                     HStack {
                         Button(action: {
-                            if exerciseReps > 1 {
+                            if exerciseReps > minExerciseReps {
                                 exerciseReps -= 1
                             }
                         }) {
                             Image(systemName: "minus.circle.fill")
                                 .font(.title2)
-                                .foregroundColor(exerciseReps > 1 ? .blue : .gray)
+                                .foregroundColor(exerciseReps > minExerciseReps ? .blue : .gray)
                         }
-                        .disabled(exerciseReps <= 1)
+                        .disabled(exerciseReps <= minExerciseReps)
                         
                         Text("\(exerciseReps)")
                             .font(.title2)
@@ -337,15 +350,15 @@ struct AddExerciseSheet: View {
                             .frame(minWidth: 50)
                         
                         Button(action: {
-                            if exerciseReps < 50 {
+                            if exerciseReps < maxExerciseReps {
                                 exerciseReps += 1
                             }
                         }) {
                             Image(systemName: "plus.circle.fill")
                                 .font(.title2)
-                                .foregroundColor(exerciseReps < 50 ? .blue : .gray)
+                                .foregroundColor(exerciseReps < maxExerciseReps ? .blue : .gray)
                         }
-                        .disabled(exerciseReps >= 50)
+                        .disabled(exerciseReps >= maxExerciseReps)
                     }
                     .padding(.horizontal)
                 }
