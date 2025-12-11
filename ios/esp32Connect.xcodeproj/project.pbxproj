@@ -81,6 +81,7 @@
 		2B3C4D5E6F708192A3B4C5D6 /* HoldToConfirmButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = HoldToConfirmButton.swift; path = esp32Connect/HoldToConfirmButton.swift; sourceTree = "<group>"; };
 		3A2B1C4D5E6F708192A3B4C5 /* esp32Connect.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; name = esp32Connect.entitlements; path = esp32Connect/esp32Connect.entitlements; sourceTree = "<group>"; };
 		412FB27218B7A33677308B8E /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xml; name = PrivacyInfo.xcprivacy; path = esp32Connect/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		604DC5FF2EEB3B6E001938F7 /* esp32ConnectRelease.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; name = esp32ConnectRelease.entitlements; path = esp32Connect/esp32ConnectRelease.entitlements; sourceTree = "<group>"; };
 		60D7C94D2EB536510076DBF0 /* DeviceActivityMonitorExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = DeviceActivityMonitorExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		60D7C94E2EB536510076DBF0 /* DeviceActivity.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = DeviceActivity.framework; path = System/Library/Frameworks/DeviceActivity.framework; sourceTree = SDKROOT; };
 		60D7C95F2EB5382B0076DBF0 /* FamilyControls.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = FamilyControls.framework; path = System/Library/Frameworks/FamilyControls.framework; sourceTree = SDKROOT; };
@@ -138,6 +139,7 @@
 		13B07FAE1A68108700A75B9A /* esp32Connect */ = {
 			isa = PBXGroup;
 			children = (
+				604DC5FF2EEB3B6E001938F7 /* esp32ConnectRelease.entitlements */,
 				646F652F4DF0411F86A03430 /* SetupView.swift */,
 				8B8414B5B1FB40519788E100 /* WorkoutView.swift */,
 				0479AA6271854BEEBE11C7E4 /* CongratulationsView.swift */,
@@ -403,7 +405,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
-				CODE_SIGN_ENTITLEMENTS = esp32Connect/esp32Connect.entitlements;
+				CODE_SIGN_ENTITLEMENTS = esp32Connect/esp32ConnectRelease.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
