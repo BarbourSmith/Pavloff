@@ -179,7 +179,7 @@ float vibrationAccelThreshold = 0.15f;    // Minimum acceleration magnitude (g's
 #define REP_ACCEL_MAX 0.5f                // Least sensitive rep accel threshold
 #define REP_VELOCITY_MIN 0.10f            // Most sensitive rep velocity threshold
 #define REP_VELOCITY_MAX 0.35f            // Least sensitive rep velocity threshold
-#define VIBRATION_ACCEL_MIN 0.03f         // Most sensitive vibration threshold (even more sensitive)
+#define VIBRATION_ACCEL_MIN 0.02f         // Most sensitive vibration threshold (ultra sensitive)
 #define VIBRATION_ACCEL_MAX 0.25f         // Least sensitive vibration threshold
 
 // See the following for generating new UUIDs:
