@@ -104,7 +104,7 @@ repAccelThreshold = 0.5 - (sensitivity × 0.35)    // Range: 0.15g to 0.5g
 repVelocityThreshold = 0.35 - (sensitivity × 0.25) // Range: 0.10m/s to 0.35m/s
 
 // Vibration detection threshold
-vibrationAccelThreshold = 0.25 - (sensitivity × 0.17) // Range: 0.08g to 0.25g
+vibrationAccelThreshold = 0.25 - (sensitivity × 0.20) // Range: 0.05g to 0.25g
 ```
 
 **Real-time Updates:**
