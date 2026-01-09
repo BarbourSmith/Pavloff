@@ -103,19 +103,6 @@ struct DeviceDataCard: View {
 struct RepCountView: View {
     let data: SensorData
     
-    private var stateColor: Color {
-        switch data.state.uppercased() {
-        case "UP":
-            return .green
-        case "DOWN":
-            return .blue
-        case "IDLE":
-            return .gray
-        default:
-            return .orange
-        }
-    }
-    
     var body: some View {
         VStack(spacing: 20) {
             // "REPS" label
@@ -129,16 +116,6 @@ struct RepCountView: View {
                 .font(.system(size: 100, weight: .bold, design: .rounded))
                 .foregroundColor(.blue)
                 .shadow(color: Color.blue.opacity(0.3), radius: 10, x: 0, y: 5)
-            
-            // State indicator
-            Text(data.formattedState)
-                .font(.system(size: 20, weight: .bold, design: .default))
-                .foregroundColor(.white)
-                .tracking(1)
-                .padding(.horizontal, 30)
-                .padding(.vertical, 12)
-                .background(stateColor)
-                .cornerRadius(25)
             
             // Timestamp
             Text("Updated: \(data.formattedTimestamp)")

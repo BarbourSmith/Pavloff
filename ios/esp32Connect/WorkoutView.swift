@@ -253,19 +253,6 @@ struct WorkoutView: View {
                                 .padding(.vertical, 30)
                             }
                             
-                            // Exercise status
-                            if let device = connectedDevice,
-                               let deviceData = bleManager.deviceDataMap[device.id] {
-                                Text(deviceData.accelData.formattedState)
-                                    .font(.system(size: 18, weight: .bold))
-                                    .foregroundColor(.white)
-                                    .tracking(1)
-                                    .padding(.horizontal, 30)
-                                    .padding(.vertical, 12)
-                                    .background(stateColor(deviceData.accelData.state))
-                                    .cornerRadius(25)
-                            }
-                            
                             Spacer()
                                 .frame(height: 30)
                             
@@ -440,19 +427,6 @@ struct WorkoutView: View {
                     exerciseCompleted()
                 }
             }
-        }
-    }
-    
-    private func stateColor(_ state: String) -> Color {
-        switch state.uppercased() {
-        case "UP":
-            return .green
-        case "DOWN":
-            return .blue
-        case "IDLE":
-            return .gray
-        default:
-            return .orange
         }
     }
     
