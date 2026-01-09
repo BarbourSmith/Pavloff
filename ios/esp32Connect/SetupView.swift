@@ -340,7 +340,7 @@ struct ExerciseConfigRow: View {
                     .disabled(exercise.targetDuration <= minDuration)
                     
                     // Duration display
-                    Text(formatDuration(exercise.targetDuration))
+                    Text(exercise.targetDuration.formatAsDuration())
                         .font(.title2)
                         .fontWeight(.bold)
                         .foregroundColor(.blue)
@@ -364,12 +364,6 @@ struct ExerciseConfigRow: View {
         .background(Color.white)
         .cornerRadius(12)
         .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
-    }
-    
-    private func formatDuration(_ seconds: Int) -> String {
-        let minutes = seconds / 60
-        let secs = seconds % 60
-        return String(format: "%d:%02d", minutes, secs)
     }
 }
 
@@ -469,7 +463,7 @@ struct AddExerciseSheet: View {
                             }
                             .disabled(exerciseDuration <= minDuration)
                             
-                            Text(formatDuration(exerciseDuration))
+                            Text(exerciseDuration.formatAsDuration())
                                 .font(.title2)
                                 .fontWeight(.bold)
                                 .foregroundColor(.blue)
@@ -509,12 +503,6 @@ struct AddExerciseSheet: View {
                 }
             }
         }
-    }
-    
-    private func formatDuration(_ seconds: Int) -> String {
-        let minutes = seconds / 60
-        let secs = seconds % 60
-        return String(format: "%d:%02d", minutes, secs)
     }
 }
 

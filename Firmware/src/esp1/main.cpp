@@ -561,11 +561,11 @@ void trackDuration(float linearAccelMag, unsigned long currentTime) {
     // Start tracking if not already active
     if (!isActivityActive) {
       isActivityActive = true;
-      durationStartTime = currentTime;
+      durationStartTime = currentTime - (totalDuration * 1000); // Adjust start time to account for previous duration
       DEBUG_PRINTLN("Duration tracking started");
     }
     
-    // Update total duration
+    // Update total duration (accumulates across pauses)
     totalDuration = (currentTime - durationStartTime) / 1000; // Convert to seconds
   } else {
     // Check for timeout (no vibration detected)

@@ -219,7 +219,7 @@ struct WorkoutView: View {
                                     
                                     // Current duration / Target duration
                                     HStack(alignment: .firstTextBaseline, spacing: 5) {
-                                        Text(formatDuration(currentDuration))
+                                        Text(currentDuration.formatAsDuration())
                                             .font(.system(size: 80, weight: .bold, design: .rounded))
                                             .foregroundColor(.blue)
                                         
@@ -227,7 +227,7 @@ struct WorkoutView: View {
                                             .font(.system(size: 40, weight: .semibold))
                                             .foregroundColor(.gray)
                                         
-                                        Text(formatDuration(currentExercise.targetDuration))
+                                        Text(currentExercise.targetDuration.formatAsDuration())
                                             .font(.system(size: 40, weight: .semibold))
                                             .foregroundColor(.gray)
                                     }
@@ -671,12 +671,6 @@ struct WorkoutView: View {
         userDefaults.set(Date(), forKey: "lastWorkoutActivity")
         userDefaults.set(currentExerciseIndex, forKey: "currentExerciseIndex")
         print("[WORKOUT] Updated last activity timestamp")
-    }
-    
-    private func formatDuration(_ seconds: Int) -> String {
-        let minutes = seconds / 60
-        let secs = seconds % 60
-        return String(format: "%d:%02d", minutes, secs)
     }
     
     private func cleanup() {

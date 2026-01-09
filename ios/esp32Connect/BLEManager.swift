@@ -364,11 +364,13 @@ extension BLEManager: CBPeripheralDelegate {
             }
             
             if var deviceData = self.deviceDataMap[peripheral.identifier] {
-                // Update rep count data (using accelData for rep counting)
+                // Update sensor data based on characteristic type
+                // Note: Both rep and duration data are stored in accelData field since the UI
+                // will only display one type at a time based on the exercise's activityType.
+                // This approach simplifies the UI code and avoids duplication.
                 if characteristic.uuid == chars.accelUUID {
                     deviceData.accelData = sensorData
                 } else if characteristic.uuid == self.durationCharUUID {
-                    // Update duration data (also using accelData to simplify UI)
                     deviceData.accelData = sensorData
                 }
                 
