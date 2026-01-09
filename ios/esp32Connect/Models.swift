@@ -157,6 +157,8 @@ struct Exercise: Identifiable, Equatable, Codable {
 
 struct WorkoutSettings: Codable {
     var exercises: [Exercise]
+    var repSensitivity: Double // Rep detection sensitivity (0.0-1.0, where 1.0 is most sensitive)
+    var vibrationSensitivity: Double // Vibration detection sensitivity (0.0-1.0, where 1.0 is most sensitive)
     
     private static let userDefaultsKey = "workoutSettings"
     
@@ -166,8 +168,14 @@ struct WorkoutSettings: Codable {
         Exercise(name: "Treadmill", targetReps: 10, targetDuration: 60, activityType: .duration)
     ]
     
-    init(exercises: [Exercise] = defaultExercises) {
+    // Default sensitivity values (0.5 = medium sensitivity)
+    static let defaultRepSensitivity = 0.5
+    static let defaultVibrationSensitivity = 0.5
+    
+    init(exercises: [Exercise] = defaultExercises, repSensitivity: Double = defaultRepSensitivity, vibrationSensitivity: Double = defaultVibrationSensitivity) {
         self.exercises = exercises
+        self.repSensitivity = repSensitivity
+        self.vibrationSensitivity = vibrationSensitivity
     }
     
     // Load saved settings from UserDefaults, or return default if none saved

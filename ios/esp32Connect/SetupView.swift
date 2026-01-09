@@ -67,6 +67,96 @@ struct SetupView: View {
                             })
                         }
                         
+                        // Sensitivity Settings Section
+                        VStack(alignment: .leading, spacing: 15) {
+                            Text("Sensitivity Settings")
+                                .font(.headline)
+                                .fontWeight(.bold)
+                                .padding(.top, 10)
+                            
+                            Text("Adjust detection sensitivity for rep counting and vibration tracking")
+                                .font(.subheadline)
+                                .foregroundColor(.gray)
+                                .fixedSize(horizontal: false, vertical: true)
+                            
+                            // Rep Detection Sensitivity
+                            VStack(alignment: .leading, spacing: 8) {
+                                HStack {
+                                    Text("Rep Detection Sensitivity")
+                                        .font(.body)
+                                        .fontWeight(.medium)
+                                    Spacer()
+                                    Text(sensitivityLabel(workoutSettings.repSensitivity))
+                                        .font(.caption)
+                                        .foregroundColor(.blue)
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 4)
+                                        .background(Color.blue.opacity(0.1))
+                                        .cornerRadius(4)
+                                }
+                                
+                                HStack(spacing: 12) {
+                                    Text("Low")
+                                        .font(.caption)
+                                        .foregroundColor(.gray)
+                                    
+                                    Slider(value: $workoutSettings.repSensitivity, in: 0...1, step: 0.1)
+                                        .accentColor(.blue)
+                                    
+                                    Text("High")
+                                        .font(.caption)
+                                        .foregroundColor(.gray)
+                                }
+                                
+                                Text("Higher sensitivity detects smaller movements for rep counting")
+                                    .font(.caption2)
+                                    .foregroundColor(.gray)
+                                    .padding(.top, 2)
+                            }
+                            
+                            Divider()
+                                .padding(.vertical, 5)
+                            
+                            // Vibration Detection Sensitivity
+                            VStack(alignment: .leading, spacing: 8) {
+                                HStack {
+                                    Text("Vibration Detection Sensitivity")
+                                        .font(.body)
+                                        .fontWeight(.medium)
+                                    Spacer()
+                                    Text(sensitivityLabel(workoutSettings.vibrationSensitivity))
+                                        .font(.caption)
+                                        .foregroundColor(.orange)
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 4)
+                                        .background(Color.orange.opacity(0.1))
+                                        .cornerRadius(4)
+                                }
+                                
+                                HStack(spacing: 12) {
+                                    Text("Low")
+                                        .font(.caption)
+                                        .foregroundColor(.gray)
+                                    
+                                    Slider(value: $workoutSettings.vibrationSensitivity, in: 0...1, step: 0.1)
+                                        .accentColor(.orange)
+                                    
+                                    Text("High")
+                                        .font(.caption)
+                                        .foregroundColor(.gray)
+                                }
+                                
+                                Text("Higher sensitivity detects smaller vibrations for duration tracking")
+                                    .font(.caption2)
+                                    .foregroundColor(.gray)
+                                    .padding(.top, 2)
+                            }
+                        }
+                        .padding()
+                        .background(Color.white)
+                        .cornerRadius(12)
+                        .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
+                        
                         // Screen Time Controls Section
                         VStack(alignment: .leading, spacing: 15) {
                             Text("Screen Time Controls")
@@ -197,6 +287,14 @@ struct SetupView: View {
                 // Save settings whenever exercises change
                 workoutSettings.save()
             }
+            .onChange(of: workoutSettings.repSensitivity) { _ in
+                // Save settings whenever rep sensitivity changes
+                workoutSettings.save()
+            }
+            .onChange(of: workoutSettings.vibrationSensitivity) { _ in
+                // Save settings whenever vibration sensitivity changes
+                workoutSettings.save()
+            }
             .onAppear {
                 // Request authorization on appear if not already authorized
                 if !screenTimeManager.isAuthorized {
@@ -242,6 +340,16 @@ struct SetupView: View {
         
         workoutSettings.exercises.removeAll { $0.id == exercise.id }
         workoutSettings.save()
+    }
+    
+    private func sensitivityLabel(_ value: Double) -> String {
+        if value < 0.3 {
+            return "Low"
+        } else if value < 0.7 {
+            return "Medium"
+        } else {
+            return "High"
+        }
     }
 }
 
