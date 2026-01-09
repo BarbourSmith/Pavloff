@@ -174,11 +174,14 @@ struct WorkoutSettings: Codable {
     // - Vibration sensitivity affects the acceleration threshold for detecting duration-based activities
     static let defaultRepSensitivity = 0.5
     static let defaultVibrationSensitivity = 0.5
+    static let minSensitivity = 0.0
+    static let maxSensitivity = 1.0
     
     init(exercises: [Exercise] = defaultExercises, repSensitivity: Double = defaultRepSensitivity, vibrationSensitivity: Double = defaultVibrationSensitivity) {
         self.exercises = exercises
-        self.repSensitivity = repSensitivity
-        self.vibrationSensitivity = vibrationSensitivity
+        // Clamp sensitivity values to valid range [0.0, 1.0]
+        self.repSensitivity = max(WorkoutSettings.minSensitivity, min(WorkoutSettings.maxSensitivity, repSensitivity))
+        self.vibrationSensitivity = max(WorkoutSettings.minSensitivity, min(WorkoutSettings.maxSensitivity, vibrationSensitivity))
     }
     
     // Custom decoder to handle backward compatibility with old saved settings
@@ -186,8 +189,11 @@ struct WorkoutSettings: Codable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         exercises = try container.decode([Exercise].self, forKey: .exercises)
         // Use default values if sensitivity settings are missing (backward compatibility)
-        repSensitivity = try container.decodeIfPresent(Double.self, forKey: .repSensitivity) ?? WorkoutSettings.defaultRepSensitivity
-        vibrationSensitivity = try container.decodeIfPresent(Double.self, forKey: .vibrationSensitivity) ?? WorkoutSettings.defaultVibrationSensitivity
+        let decodedRepSensitivity = try container.decodeIfPresent(Double.self, forKey: .repSensitivity) ?? WorkoutSettings.defaultRepSensitivity
+        let decodedVibrationSensitivity = try container.decodeIfPresent(Double.self, forKey: .vibrationSensitivity) ?? WorkoutSettings.defaultVibrationSensitivity
+        // Clamp decoded values to valid range [0.0, 1.0]
+        repSensitivity = max(WorkoutSettings.minSensitivity, min(WorkoutSettings.maxSensitivity, decodedRepSensitivity))
+        vibrationSensitivity = max(WorkoutSettings.minSensitivity, min(WorkoutSettings.maxSensitivity, decodedVibrationSensitivity))
     }
     
     private enum CodingKeys: String, CodingKey {
