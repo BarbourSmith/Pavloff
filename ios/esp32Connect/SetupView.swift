@@ -16,11 +16,14 @@ struct SetupView: View {
     @State private var showingAddExercise = false
     @State private var newExerciseName = ""
     @State private var newExerciseReps = 10
+    @State private var newExerciseDuration = 60
+    @State private var newExerciseType: ActivityType = .reps
     
     // Exercise rep limits
     private let minExerciseReps = 1
     private let maxExerciseReps = 50
     private let defaultExerciseReps = 10
+    private let defaultDuration = 60
     
     var body: some View {
         NavigationView {
@@ -172,6 +175,8 @@ struct SetupView: View {
                 AddExerciseSheet(
                     exerciseName: $newExerciseName,
                     exerciseReps: $newExerciseReps,
+                    exerciseDuration: $newExerciseDuration,
+                    exerciseType: $newExerciseType,
                     onAdd: {
                         addExercise()
                     },
@@ -209,7 +214,12 @@ struct SetupView: View {
             return
         }
         
-        let exercise = Exercise(name: newExerciseName.trimmingCharacters(in: .whitespaces), targetReps: newExerciseReps)
+        let exercise = Exercise(
+            name: newExerciseName.trimmingCharacters(in: .whitespaces),
+            targetReps: newExerciseReps,
+            targetDuration: newExerciseDuration,
+            activityType: newExerciseType
+        )
         workoutSettings.exercises.append(exercise)
         workoutSettings.save()
         
@@ -220,6 +230,8 @@ struct SetupView: View {
         showingAddExercise = false
         newExerciseName = ""
         newExerciseReps = defaultExerciseReps
+        newExerciseDuration = defaultDuration
+        newExerciseType = .reps
     }
     
     private func deleteExercise(_ exercise: Exercise) {
@@ -240,6 +252,8 @@ struct ExerciseConfigRow: View {
     // Exercise rep limits (matching SetupView constants)
     private let minExerciseReps = 1
     private let maxExerciseReps = 50
+    private let minDuration = 10 // seconds
+    private let maxDuration = 600 // 10 minutes in seconds
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -256,43 +270,94 @@ struct ExerciseConfigRow: View {
                 }
             }
             
-            HStack(spacing: 15) {
-                Text("Target Reps:")
-                    .font(.body)
-                    .foregroundColor(.gray)
-                
-                Spacer()
-                
-                // Decrease button
-                Button(action: {
-                    if exercise.targetReps > minExerciseReps {
-                        exercise.targetReps -= 1
+            // Activity Type Picker
+            Picker("Activity Type", selection: $exercise.activityType) {
+                Text("Reps").tag(ActivityType.reps)
+                Text("Duration").tag(ActivityType.duration)
+            }
+            .pickerStyle(SegmentedPickerStyle())
+            .padding(.vertical, 5)
+            
+            if exercise.activityType == .reps {
+                // Reps control
+                HStack(spacing: 15) {
+                    Text("Target Reps:")
+                        .font(.body)
+                        .foregroundColor(.gray)
+                    
+                    Spacer()
+                    
+                    // Decrease button
+                    Button(action: {
+                        if exercise.targetReps > minExerciseReps {
+                            exercise.targetReps -= 1
+                        }
+                    }) {
+                        Image(systemName: "minus.circle.fill")
+                            .font(.title2)
+                            .foregroundColor(exercise.targetReps > minExerciseReps ? .blue : .gray)
                     }
-                }) {
-                    Image(systemName: "minus.circle.fill")
+                    .disabled(exercise.targetReps <= minExerciseReps)
+                    
+                    // Rep count display
+                    Text("\(exercise.targetReps)")
                         .font(.title2)
-                        .foregroundColor(exercise.targetReps > minExerciseReps ? .blue : .gray)
-                }
-                .disabled(exercise.targetReps <= minExerciseReps)
-                
-                // Rep count display
-                Text("\(exercise.targetReps)")
-                    .font(.title2)
-                    .fontWeight(.bold)
-                    .foregroundColor(.blue)
-                    .frame(minWidth: 50)
-                
-                // Increase button
-                Button(action: {
-                    if exercise.targetReps < maxExerciseReps {
-                        exercise.targetReps += 1
+                        .fontWeight(.bold)
+                        .foregroundColor(.blue)
+                        .frame(minWidth: 50)
+                    
+                    // Increase button
+                    Button(action: {
+                        if exercise.targetReps < maxExerciseReps {
+                            exercise.targetReps += 1
+                        }
+                    }) {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.title2)
+                            .foregroundColor(exercise.targetReps < maxExerciseReps ? .blue : .gray)
                     }
-                }) {
-                    Image(systemName: "plus.circle.fill")
-                        .font(.title2)
-                        .foregroundColor(exercise.targetReps < maxExerciseReps ? .blue : .gray)
+                    .disabled(exercise.targetReps >= maxExerciseReps)
                 }
-                .disabled(exercise.targetReps >= maxExerciseReps)
+            } else {
+                // Duration control
+                HStack(spacing: 15) {
+                    Text("Target Duration:")
+                        .font(.body)
+                        .foregroundColor(.gray)
+                    
+                    Spacer()
+                    
+                    // Decrease button
+                    Button(action: {
+                        if exercise.targetDuration > minDuration {
+                            exercise.targetDuration -= 10
+                        }
+                    }) {
+                        Image(systemName: "minus.circle.fill")
+                            .font(.title2)
+                            .foregroundColor(exercise.targetDuration > minDuration ? .blue : .gray)
+                    }
+                    .disabled(exercise.targetDuration <= minDuration)
+                    
+                    // Duration display
+                    Text(formatDuration(exercise.targetDuration))
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .foregroundColor(.blue)
+                        .frame(minWidth: 70)
+                    
+                    // Increase button
+                    Button(action: {
+                        if exercise.targetDuration < maxDuration {
+                            exercise.targetDuration += 10
+                        }
+                    }) {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.title2)
+                            .foregroundColor(exercise.targetDuration < maxDuration ? .blue : .gray)
+                    }
+                    .disabled(exercise.targetDuration >= maxDuration)
+                }
             }
         }
         .padding()
@@ -300,17 +365,27 @@ struct ExerciseConfigRow: View {
         .cornerRadius(12)
         .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
     }
+    
+    private func formatDuration(_ seconds: Int) -> String {
+        let minutes = seconds / 60
+        let secs = seconds % 60
+        return String(format: "%d:%02d", minutes, secs)
+    }
 }
 
 struct AddExerciseSheet: View {
     @Binding var exerciseName: String
     @Binding var exerciseReps: Int
+    @Binding var exerciseDuration: Int
+    @Binding var exerciseType: ActivityType
     var onAdd: () -> Void
     var onCancel: () -> Void
     
-    // Exercise rep limits (matching SetupView constants)
+    // Exercise limits (matching SetupView constants)
     private let minExerciseReps = 1
     private let maxExerciseReps = 50
+    private let minDuration = 10
+    private let maxDuration = 600
     
     var body: some View {
         NavigationView {
@@ -320,47 +395,99 @@ struct AddExerciseSheet: View {
                         .font(.headline)
                         .foregroundColor(.gray)
                     
-                    TextField("e.g., Squats, Push-ups", text: $exerciseName)
+                    TextField("e.g., Squats, Treadmill", text: $exerciseName)
                         .textFieldStyle(RoundedBorderTextFieldStyle())
                         .padding(.horizontal)
                 }
                 .padding(.top, 20)
                 
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("Target Reps")
+                    Text("Activity Type")
                         .font(.headline)
                         .foregroundColor(.gray)
                     
-                    HStack {
-                        Button(action: {
-                            if exerciseReps > minExerciseReps {
-                                exerciseReps -= 1
-                            }
-                        }) {
-                            Image(systemName: "minus.circle.fill")
-                                .font(.title2)
-                                .foregroundColor(exerciseReps > minExerciseReps ? .blue : .gray)
-                        }
-                        .disabled(exerciseReps <= minExerciseReps)
-                        
-                        Text("\(exerciseReps)")
-                            .font(.title2)
-                            .fontWeight(.bold)
-                            .foregroundColor(.blue)
-                            .frame(minWidth: 50)
-                        
-                        Button(action: {
-                            if exerciseReps < maxExerciseReps {
-                                exerciseReps += 1
-                            }
-                        }) {
-                            Image(systemName: "plus.circle.fill")
-                                .font(.title2)
-                                .foregroundColor(exerciseReps < maxExerciseReps ? .blue : .gray)
-                        }
-                        .disabled(exerciseReps >= maxExerciseReps)
+                    Picker("Activity Type", selection: $exerciseType) {
+                        Text("Reps").tag(ActivityType.reps)
+                        Text("Duration").tag(ActivityType.duration)
                     }
+                    .pickerStyle(SegmentedPickerStyle())
                     .padding(.horizontal)
+                }
+                
+                if exerciseType == .reps {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Target Reps")
+                            .font(.headline)
+                            .foregroundColor(.gray)
+                        
+                        HStack {
+                            Button(action: {
+                                if exerciseReps > minExerciseReps {
+                                    exerciseReps -= 1
+                                }
+                            }) {
+                                Image(systemName: "minus.circle.fill")
+                                    .font(.title2)
+                                    .foregroundColor(exerciseReps > minExerciseReps ? .blue : .gray)
+                            }
+                            .disabled(exerciseReps <= minExerciseReps)
+                            
+                            Text("\(exerciseReps)")
+                                .font(.title2)
+                                .fontWeight(.bold)
+                                .foregroundColor(.blue)
+                                .frame(minWidth: 50)
+                            
+                            Button(action: {
+                                if exerciseReps < maxExerciseReps {
+                                    exerciseReps += 1
+                                }
+                            }) {
+                                Image(systemName: "plus.circle.fill")
+                                    .font(.title2)
+                                    .foregroundColor(exerciseReps < maxExerciseReps ? .blue : .gray)
+                            }
+                            .disabled(exerciseReps >= maxExerciseReps)
+                        }
+                        .padding(.horizontal)
+                    }
+                } else {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Target Duration")
+                            .font(.headline)
+                            .foregroundColor(.gray)
+                        
+                        HStack {
+                            Button(action: {
+                                if exerciseDuration > minDuration {
+                                    exerciseDuration -= 10
+                                }
+                            }) {
+                                Image(systemName: "minus.circle.fill")
+                                    .font(.title2)
+                                    .foregroundColor(exerciseDuration > minDuration ? .blue : .gray)
+                            }
+                            .disabled(exerciseDuration <= minDuration)
+                            
+                            Text(formatDuration(exerciseDuration))
+                                .font(.title2)
+                                .fontWeight(.bold)
+                                .foregroundColor(.blue)
+                                .frame(minWidth: 70)
+                            
+                            Button(action: {
+                                if exerciseDuration < maxDuration {
+                                    exerciseDuration += 10
+                                }
+                            }) {
+                                Image(systemName: "plus.circle.fill")
+                                    .font(.title2)
+                                    .foregroundColor(exerciseDuration < maxDuration ? .blue : .gray)
+                            }
+                            .disabled(exerciseDuration >= maxDuration)
+                        }
+                        .padding(.horizontal)
+                    }
                 }
                 
                 Spacer()
@@ -382,6 +509,12 @@ struct AddExerciseSheet: View {
                 }
             }
         }
+    }
+    
+    private func formatDuration(_ seconds: Int) -> String {
+        let minutes = seconds / 60
+        let secs = seconds % 60
+        return String(format: "%d:%02d", minutes, secs)
     }
 }
 

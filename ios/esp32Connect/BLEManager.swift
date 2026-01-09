@@ -27,6 +27,7 @@ class BLEManager: NSObject, ObservableObject {
     private let imuServiceUUID = CBUUID(string: AppConfig.UUIDs.imuService)
     private let accelCharUUID = CBUUID(string: AppConfig.UUIDs.accelCharacteristic)
     private let gyroCharUUID = CBUUID(string: AppConfig.UUIDs.gyroCharacteristic)
+    private let durationCharUUID = CBUUID(string: AppConfig.UUIDs.durationCharacteristic)
     
     // MARK: - Initialization
     override init() {
@@ -138,9 +139,10 @@ class BLEManager: NSObject, ObservableObject {
         
         var count: Int = 0
         var state: String = "IDLE"
+        var duration: Int = 0
         
-        // Parse format: "Count:value,State:value"
-        // Example: "Count:5,State:UP" or "Count:12,State:DOWN"
+        // Parse format: "Count:value,State:value,Duration:value"
+        // Example: "Count:5,State:UP" or "Count:12,State:DOWN" or "Duration:45,State:ACTIVE"
         let components = dataString.split(separator: ",")
         
         for component in components {
@@ -153,6 +155,8 @@ class BLEManager: NSObject, ObservableObject {
                     count = countValue
                 } else if key == "state" {
                     state = valueStr
+                } else if key == "duration", let durationValue = Int(valueStr) {
+                    duration = durationValue
                 }
             }
         }
@@ -160,6 +164,7 @@ class BLEManager: NSObject, ObservableObject {
         return SensorData(
             count: count,
             state: state,
+            duration: duration,
             timestamp: Date()
         )
     }

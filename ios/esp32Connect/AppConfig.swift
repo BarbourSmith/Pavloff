@@ -28,6 +28,7 @@ struct AppConfig {
         static let imuService = "4fafc201-1fb5-459e-8fcc-c5c9c331914b"
         static let accelCharacteristic = "8d3f7a9e-4b2c-11ef-9f27-0242ac120002"  // Rep count characteristic
         static let gyroCharacteristic = "8d3f7a9e-4b2c-11ef-9f27-0242ac120002"  // Using same for compatibility
+        static let durationCharacteristic = "7a8e6f9d-3c1b-42a8-9e7f-1234567890ab"  // Duration tracking characteristic
     }
     
     // UI Configuration
