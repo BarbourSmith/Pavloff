@@ -385,6 +385,13 @@ struct WorkoutView: View {
                 checkForInactivityAndReset()
                 startAutoConnect()
                 checkAndEnableScreenTimeBlocking()
+                
+                // Request Screen Time authorization on first launch if not already authorized
+                if !screenTimeManager.isAuthorized {
+                    Task {
+                        await screenTimeManager.requestAuthorization()
+                    }
+                }
             }
             .onDisappear {
                 cleanup()
