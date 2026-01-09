@@ -27,6 +27,7 @@ class BLEManager: NSObject, ObservableObject {
     private let imuServiceUUID = CBUUID(string: AppConfig.UUIDs.imuService)
     private let accelCharUUID = CBUUID(string: AppConfig.UUIDs.accelCharacteristic)
     private let gyroCharUUID = CBUUID(string: AppConfig.UUIDs.gyroCharacteristic)
+    private let durationCharUUID = CBUUID(string: AppConfig.UUIDs.durationCharacteristic)
     
     // MARK: - Initialization
     override init() {
@@ -138,9 +139,10 @@ class BLEManager: NSObject, ObservableObject {
         
         var count: Int = 0
         var state: String = "IDLE"
+        var duration: Int = 0
         
-        // Parse format: "Count:value,State:value"
-        // Example: "Count:5,State:UP" or "Count:12,State:DOWN"
+        // Parse format: "Count:value,State:value,Duration:value"
+        // Example: "Count:5,State:UP" or "Count:12,State:DOWN" or "Duration:45,State:ACTIVE"
         let components = dataString.split(separator: ",")
         
         for component in components {
@@ -153,6 +155,8 @@ class BLEManager: NSObject, ObservableObject {
                     count = countValue
                 } else if key == "state" {
                     state = valueStr
+                } else if key == "duration", let durationValue = Int(valueStr) {
+                    duration = durationValue
                 }
             }
         }
@@ -160,6 +164,7 @@ class BLEManager: NSObject, ObservableObject {
         return SensorData(
             count: count,
             state: state,
+            duration: duration,
             timestamp: Date()
         )
     }
@@ -286,11 +291,14 @@ extension BLEManager: CBPeripheralDelegate {
         
         var discoveredChars = DiscoveredCharacteristics()
         
-        // Identify characteristics - looking for rep count characteristic
+        // Identify characteristics - looking for rep count and duration characteristics
         for characteristic in characteristics {
             if characteristic.uuid == accelCharUUID {
                 discoveredChars.accelUUID = characteristic.uuid
                 print("[BLE] Found rep count characteristic")
+                peripheral.setNotifyValue(true, for: characteristic)
+            } else if characteristic.uuid == durationCharUUID {
+                print("[BLE] Found duration characteristic")
                 peripheral.setNotifyValue(true, for: characteristic)
             }
         }
@@ -356,9 +364,26 @@ extension BLEManager: CBPeripheralDelegate {
             }
             
             if var deviceData = self.deviceDataMap[peripheral.identifier] {
-                // Update rep count data (using accelData for rep counting)
+                // Merge sensor data intelligently to avoid flickering
+                // Rep characteristic contains count and state
+                // Duration characteristic contains duration and state
+                // We merge the data to preserve both values
                 if characteristic.uuid == chars.accelUUID {
-                    deviceData.accelData = sensorData
+                    // Rep characteristic: update count and state, but preserve duration
+                    var mergedData = deviceData.accelData
+                    mergedData.count = sensorData.count
+                    mergedData.state = sensorData.state
+                    mergedData.timestamp = sensorData.timestamp
+                    // Keep existing duration value
+                    deviceData.accelData = mergedData
+                } else if characteristic.uuid == self.durationCharUUID {
+                    // Duration characteristic: update duration and state, but preserve count
+                    var mergedData = deviceData.accelData
+                    mergedData.duration = sensorData.duration
+                    mergedData.state = sensorData.state
+                    mergedData.timestamp = sensorData.timestamp
+                    // Keep existing count value
+                    deviceData.accelData = mergedData
                 }
                 
                 deviceData.lastUpdate = Date()

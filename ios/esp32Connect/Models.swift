@@ -60,16 +60,24 @@ enum ConnectionStatus: Equatable {
 struct SensorData: Equatable {
     var count: Int
     var state: String
+    var duration: Int // Duration in seconds for duration-based activities
     var timestamp: Date
     
-    init(count: Int = 0, state: String = "IDLE", timestamp: Date = Date()) {
+    init(count: Int = 0, state: String = "IDLE", duration: Int = 0, timestamp: Date = Date()) {
         self.count = count
         self.state = state
+        self.duration = duration
         self.timestamp = timestamp
     }
     
     var formattedCount: String {
         String(count)
+    }
+    
+    var formattedDuration: String {
+        let minutes = duration / 60
+        let seconds = duration % 60
+        return String(format: "%d:%02d", minutes, seconds)
     }
     
     var formattedState: String {
@@ -90,6 +98,8 @@ struct SensorData: Equatable {
             return "blue"
         case "IDLE":
             return "gray"
+        case "ACTIVE":
+            return "green"
         default:
             return "orange"
         }
@@ -124,15 +134,24 @@ struct DiscoveredCharacteristics {
 }
 
 // MARK: - Workout Models
+enum ActivityType: String, Codable {
+    case reps = "reps"
+    case duration = "duration"
+}
+
 struct Exercise: Identifiable, Equatable, Codable {
     let id: UUID
     let name: String
     var targetReps: Int
+    var targetDuration: Int // in seconds
+    var activityType: ActivityType
     
-    init(id: UUID = UUID(), name: String, targetReps: Int) {
+    init(id: UUID = UUID(), name: String, targetReps: Int, targetDuration: Int = 60, activityType: ActivityType = .reps) {
         self.id = id
         self.name = name
         self.targetReps = targetReps
+        self.targetDuration = targetDuration
+        self.activityType = activityType
     }
 }
 
@@ -142,9 +161,9 @@ struct WorkoutSettings: Codable {
     private static let userDefaultsKey = "workoutSettings"
     
     static let defaultExercises = [
-        Exercise(name: "Bicep Curls", targetReps: 10),
-        Exercise(name: "Shoulder Press", targetReps: 10),
-        Exercise(name: "Lateral Raises", targetReps: 10)
+        Exercise(name: "Bicep Curls", targetReps: 10, activityType: .reps),
+        Exercise(name: "Shoulder Press", targetReps: 10, activityType: .reps),
+        Exercise(name: "Treadmill", targetReps: 10, targetDuration: 60, activityType: .duration)
     ]
     
     init(exercises: [Exercise] = defaultExercises) {
@@ -270,5 +289,15 @@ class StreakManager: ObservableObject {
         default:
             return nil
         }
+    }
+}
+
+// MARK: - Utility Extensions
+extension Int {
+    /// Formats a duration in seconds to MM:SS format
+    func formatAsDuration() -> String {
+        let minutes = self / 60
+        let seconds = self % 60
+        return String(format: "%d:%02d", minutes, seconds)
     }
 }

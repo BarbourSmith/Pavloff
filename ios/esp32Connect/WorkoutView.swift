@@ -53,6 +53,30 @@ struct WorkoutView: View {
         return 0
     }
     
+    private var currentDuration: Int {
+        if let device = connectedDevice,
+           let deviceData = bleManager.deviceDataMap[device.id] {
+            return deviceData.accelData.duration
+        }
+        return 0
+    }
+    
+    private var currentProgress: Double {
+        if currentExercise.activityType == .reps {
+            return Double(currentReps) / Double(currentExercise.targetReps)
+        } else {
+            return Double(currentDuration) / Double(currentExercise.targetDuration)
+        }
+    }
+    
+    private var isTargetReached: Bool {
+        if currentExercise.activityType == .reps {
+            return currentReps >= currentExercise.targetReps
+        } else {
+            return currentDuration >= currentExercise.targetDuration
+        }
+    }
+    
     var body: some View {
         NavigationView {
             VStack(spacing: 0) {
@@ -142,47 +166,92 @@ struct WorkoutView: View {
                             }
                             .padding(.top, 10)
                             
-                            // Rep counter
-                            VStack(spacing: 15) {
-                                Text("REPS")
-                                    .font(.system(size: 16, weight: .semibold))
-                                    .foregroundColor(.gray)
-                                    .tracking(2)
-                                
-                                // Current reps / Target reps
-                                HStack(alignment: .firstTextBaseline, spacing: 5) {
-                                    Text("\(currentReps)")
-                                        .font(.system(size: 80, weight: .bold, design: .rounded))
-                                        .foregroundColor(.blue)
-                                    
-                                    Text("/")
-                                        .font(.system(size: 40, weight: .semibold))
+                            // Activity display (reps or duration)
+                            if currentExercise.activityType == .reps {
+                                // Rep counter
+                                VStack(spacing: 15) {
+                                    Text("REPS")
+                                        .font(.system(size: 16, weight: .semibold))
                                         .foregroundColor(.gray)
+                                        .tracking(2)
                                     
-                                    Text("\(currentExercise.targetReps)")
-                                        .font(.system(size: 40, weight: .semibold))
-                                        .foregroundColor(.gray)
-                                }
-                                
-                                // Progress bar
-                                GeometryReader { geometry in
-                                    ZStack(alignment: .leading) {
-                                        Rectangle()
-                                            .fill(Color.gray.opacity(0.2))
-                                            .frame(height: 8)
-                                            .cornerRadius(4)
+                                    // Current reps / Target reps
+                                    HStack(alignment: .firstTextBaseline, spacing: 5) {
+                                        Text("\(currentReps)")
+                                            .font(.system(size: 80, weight: .bold, design: .rounded))
+                                            .foregroundColor(.blue)
                                         
-                                        Rectangle()
-                                            .fill(Color.blue)
-                                            .frame(width: min(CGFloat(currentReps) / CGFloat(currentExercise.targetReps), 1.0) * geometry.size.width, height: 8)
-                                            .cornerRadius(4)
-                                            .animation(.easeInOut(duration: 0.3), value: currentReps)
+                                        Text("/")
+                                            .font(.system(size: 40, weight: .semibold))
+                                            .foregroundColor(.gray)
+                                        
+                                        Text("\(currentExercise.targetReps)")
+                                            .font(.system(size: 40, weight: .semibold))
+                                            .foregroundColor(.gray)
                                     }
+                                    
+                                    // Progress bar
+                                    GeometryReader { geometry in
+                                        ZStack(alignment: .leading) {
+                                            Rectangle()
+                                                .fill(Color.gray.opacity(0.2))
+                                                .frame(height: 8)
+                                                .cornerRadius(4)
+                                            
+                                            Rectangle()
+                                                .fill(Color.blue)
+                                                .frame(width: min(currentProgress, 1.0) * geometry.size.width, height: 8)
+                                                .cornerRadius(4)
+                                                .animation(.easeInOut(duration: 0.3), value: currentReps)
+                                        }
+                                    }
+                                    .frame(height: 8)
+                                    .padding(.horizontal, 40)
                                 }
-                                .frame(height: 8)
-                                .padding(.horizontal, 40)
+                                .padding(.vertical, 30)
+                            } else {
+                                // Duration timer
+                                VStack(spacing: 15) {
+                                    Text("DURATION")
+                                        .font(.system(size: 16, weight: .semibold))
+                                        .foregroundColor(.gray)
+                                        .tracking(2)
+                                    
+                                    // Current duration / Target duration
+                                    HStack(alignment: .firstTextBaseline, spacing: 5) {
+                                        Text(currentDuration.formatAsDuration())
+                                            .font(.system(size: 80, weight: .bold, design: .rounded))
+                                            .foregroundColor(.blue)
+                                        
+                                        Text("/")
+                                            .font(.system(size: 40, weight: .semibold))
+                                            .foregroundColor(.gray)
+                                        
+                                        Text(currentExercise.targetDuration.formatAsDuration())
+                                            .font(.system(size: 40, weight: .semibold))
+                                            .foregroundColor(.gray)
+                                    }
+                                    
+                                    // Progress bar
+                                    GeometryReader { geometry in
+                                        ZStack(alignment: .leading) {
+                                            Rectangle()
+                                                .fill(Color.gray.opacity(0.2))
+                                                .frame(height: 8)
+                                                .cornerRadius(4)
+                                            
+                                            Rectangle()
+                                                .fill(Color.blue)
+                                                .frame(width: min(currentProgress, 1.0) * geometry.size.width, height: 8)
+                                                .cornerRadius(4)
+                                                .animation(.easeInOut(duration: 0.3), value: currentDuration)
+                                        }
+                                    }
+                                    .frame(height: 8)
+                                    .padding(.horizontal, 40)
+                                }
+                                .padding(.vertical, 30)
                             }
-                            .padding(.vertical, 30)
                             
                             // Exercise status
                             if let device = connectedDevice,
@@ -351,16 +420,25 @@ struct WorkoutView: View {
                 }
             }
             .onChange(of: currentReps) { newReps in
-                // Check if target reached
-                if newReps >= currentExercise.targetReps && newReps > lastRepCount {
-                    exerciseCompleted()
-                }
-                
                 // Update last activity timestamp if reps increased
                 if newReps > lastRepCount {
                     updateLastActivityTimestamp()
+                    
+                    // Check if target reached for rep-based activities
+                    if currentExercise.activityType == .reps && isTargetReached {
+                        exerciseCompleted()
+                    }
                 }
                 lastRepCount = newReps
+            }
+            .onChange(of: currentDuration) { newDuration in
+                // Update last activity timestamp when duration changes
+                updateLastActivityTimestamp()
+                
+                // Check if target reached for duration-based activities
+                if currentExercise.activityType == .duration && isTargetReached {
+                    exerciseCompleted()
+                }
             }
         }
     }
