@@ -27,10 +27,11 @@ Controls how sensitive the sensor is when detecting vibrations for duration-base
 - **Range**: 0.0 (Low) to 1.0 (High)
 - **Default**: 0.5 (Medium)
 - **Effect**: Higher sensitivity detects smaller vibrations as active movement
+- **Timeout**: Activity marked inactive after 5 seconds without vibration (allows brief pauses)
 - **Use Cases**:
   - **Low Sensitivity (0.0-0.3)**: Intense activities with strong vibrations
   - **Medium Sensitivity (0.3-0.7)**: Standard cardio equipment
-  - **High Sensitivity (0.7-1.0)**: Walking or low-impact activities with subtle vibrations
+  - **High Sensitivity (0.7-1.0)**: Walking, gentle cycling, or low-impact activities with very subtle vibrations
 
 ## User Interface
 
@@ -104,10 +105,14 @@ repAccelThreshold = 0.5 - (sensitivity × 0.35)    // Range: 0.15g to 0.5g
 repVelocityThreshold = 0.35 - (sensitivity × 0.25) // Range: 0.10m/s to 0.35m/s
 
 // Vibration detection threshold
-vibrationAccelThreshold = 0.25 - (sensitivity × 0.20) // Range: 0.05g to 0.25g
+vibrationAccelThreshold = 0.25 - (sensitivity × 0.22) // Range: 0.03g to 0.25g
 ```
 
-**Real-time Updates:**
+**Vibration Detection Timeout:**
+- Time without detected vibration before marking activity as inactive: 5 seconds
+- Helps accommodate brief pauses during continuous activities
+
+**Real-time Updates:****
 - Settings take effect immediately after BLE write
 - No device restart required
 - Previous detection state preserved
