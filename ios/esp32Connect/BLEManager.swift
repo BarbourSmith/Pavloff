@@ -291,11 +291,14 @@ extension BLEManager: CBPeripheralDelegate {
         
         var discoveredChars = DiscoveredCharacteristics()
         
-        // Identify characteristics - looking for rep count characteristic
+        // Identify characteristics - looking for rep count and duration characteristics
         for characteristic in characteristics {
             if characteristic.uuid == accelCharUUID {
                 discoveredChars.accelUUID = characteristic.uuid
                 print("[BLE] Found rep count characteristic")
+                peripheral.setNotifyValue(true, for: characteristic)
+            } else if characteristic.uuid == durationCharUUID {
+                print("[BLE] Found duration characteristic")
                 peripheral.setNotifyValue(true, for: characteristic)
             }
         }
@@ -363,6 +366,9 @@ extension BLEManager: CBPeripheralDelegate {
             if var deviceData = self.deviceDataMap[peripheral.identifier] {
                 // Update rep count data (using accelData for rep counting)
                 if characteristic.uuid == chars.accelUUID {
+                    deviceData.accelData = sensorData
+                } else if characteristic.uuid == self.durationCharUUID {
+                    // Update duration data (also using accelData to simplify UI)
                     deviceData.accelData = sensorData
                 }
                 

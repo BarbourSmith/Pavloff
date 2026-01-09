@@ -79,6 +79,7 @@ BLEServer* pServer = NULL;
 BLECharacteristic* pAccelCharacteristic = NULL;
 BLECharacteristic* pGyroCharacteristic = NULL;
 BLECharacteristic* pRepCharacteristic = NULL;
+BLECharacteristic* pDurationCharacteristic = NULL;
 bool deviceConnected = false;
 
 // Position and velocity tracking variables
@@ -87,6 +88,12 @@ float positionX = 0.0, positionY = 0.0, positionZ = 0.0;
 unsigned long lastUpdateTime = 0;
 unsigned long lastReportTime = 0;
 bool firstIteration = true;
+
+// Duration tracking variables for duration-based activities
+unsigned long durationStartTime = 0;
+unsigned long totalDuration = 0; // Total duration in seconds
+bool isActivityActive = false;
+unsigned long lastVibrationTime = 0;
 
 // Low-pass filter state variables for accelerometer
 float filteredAccelX = 0.0f;
@@ -159,12 +166,17 @@ void IRAM_ATTR mpuInterruptISR() {
 #define REP_MIN_DURATION_MS 500           // Minimum duration for each phase (up/down) in milliseconds
 #define REP_REST_TIMEOUT_MS 3000          // Time to reset rep counting if no motion detected
 
+// Duration tracking parameters (for vibration-based activities like treadmill)
+#define VIBRATION_ACCEL_THRESHOLD 0.15f   // Minimum acceleration magnitude (g's) to detect vibration
+#define VIBRATION_TIMEOUT_MS 2000         // Time without vibration before stopping duration counter
+
 // See the following for generating new UUIDs:
 // https://www.uuidgenerator.net/
 #define SERVICE_UUID        "4fafc201-1fb5-459e-8fcc-c5c9c331914b"
 #define ACCEL_CHARACTERISTIC_UUID "beb5483e-36e1-4688-b7f5-ea07361b26a8"
 #define GYRO_CHARACTERISTIC_UUID  "1c95d5e2-0a25-4233-8d6c-613d161c210a"
 #define REP_CHARACTERISTIC_UUID   "8d3f7a9e-4b2c-11ef-9f27-0242ac120002"
+#define DURATION_CHARACTERISTIC_UUID "7a8e6f9d-3c1b-42a8-9e7f-1234567890ab"
 
 // Handles BLE connection and disconnection events
 class MyServerCallbacks: public BLEServerCallbacks {
@@ -202,6 +214,12 @@ class RepCharacteristicCallbacks: public BLECharacteristicCallbacks {
           repCount = 0;
           repState = REP_IDLE;
           phaseStartTime = millis();
+          
+          // Also reset duration tracking
+          totalDuration = 0;
+          isActivityActive = false;
+          durationStartTime = millis();
+          lastVibrationTime = millis();
           
           // Send immediate update with new count
           char repData[30];
@@ -532,6 +550,35 @@ void detectRep(float velX, float velY, float velZ, float linearAccelMag, unsigne
   }
 }
 
+// Duration tracking based on vibration detection (for activities like treadmill)
+void trackDuration(float linearAccelMag, unsigned long currentTime) {
+  // Check if vibration is detected (acceleration above threshold)
+  bool vibrationDetected = (linearAccelMag > VIBRATION_ACCEL_THRESHOLD);
+  
+  if (vibrationDetected) {
+    lastVibrationTime = currentTime;
+    
+    // Start tracking if not already active
+    if (!isActivityActive) {
+      isActivityActive = true;
+      durationStartTime = currentTime;
+      DEBUG_PRINTLN("Duration tracking started");
+    }
+    
+    // Update total duration
+    totalDuration = (currentTime - durationStartTime) / 1000; // Convert to seconds
+  } else {
+    // Check for timeout (no vibration detected)
+    if (isActivityActive && (currentTime - lastVibrationTime > VIBRATION_TIMEOUT_MS)) {
+      // Activity stopped - keep the total duration but mark as inactive
+      isActivityActive = false;
+      DEBUG_PRINT("Duration tracking paused at: ");
+      DEBUG_PRINT(totalDuration);
+      DEBUG_PRINTLN(" seconds");
+    }
+  }
+}
+
 // Put MPU-6050 into low power mode for sleep
 void putMPUToSleep() {
   DEBUG_PRINTLN("Putting MPU into low power mode");
@@ -596,6 +643,12 @@ void resetStateVariables() {
   lastMotionTime = millis();
   phaseStartTime = millis();
   dominantAxisVelocity = 0.0f;
+  
+  // Reset duration tracking state
+  totalDuration = 0;
+  isActivityActive = false;
+  durationStartTime = millis();
+  lastVibrationTime = millis();
   
   // Reset timing variables
   lastUpdateTime = millis();
@@ -991,6 +1044,20 @@ void setup() {
   pRepCharacteristic->setValue("Count:0,State:IDLE");
   DEBUG_PRINTLN("  Rep Counter characteristic configured");
 
+  // Create a BLE Characteristic for Duration Tracking
+  DEBUG_PRINTLN("Creating Duration characteristic");
+  pDurationCharacteristic = pService->createCharacteristic(
+                      DURATION_CHARACTERISTIC_UUID,
+                      BLECharacteristic::PROPERTY_READ |
+                      BLECharacteristic::PROPERTY_WRITE |
+                      BLECharacteristic::PROPERTY_NOTIFY
+                    );
+  pDurationCharacteristic->addDescriptor(new BLE2902());
+  pDurationCharacteristic->setCallbacks(new RepCharacteristicCallbacks()); // Reuse same callbacks for RESET
+  // Set initial value before starting service
+  pDurationCharacteristic->setValue("Duration:0,State:IDLE");
+  DEBUG_PRINTLN("  Duration characteristic configured");
+
   // Start the service
   DEBUG_PRINTLN("Starting BLE service");
   pService->start();
@@ -1204,6 +1271,9 @@ void loop() {
     float linearAccelMag = sqrt(linearAccelX*linearAccelX + linearAccelY*linearAccelY + linearAccelZ*linearAccelZ) / 9.81f;
     detectRep(velocityX, velocityY, velocityZ, linearAccelMag, currentTime);
     
+    // Track duration for vibration-based activities (like treadmill)
+    trackDuration(linearAccelMag, currentTime);
+    
     // Update activity timer if there's motion (not stationary)
     // Note: BLE connection state does not prevent sleep - only motion does
     if (!isStationary) {
@@ -1236,6 +1306,15 @@ void loop() {
     // Set the characteristic value and notify the client
     pRepCharacteristic->setValue(repData);
     pRepCharacteristic->notify();
+    
+    // --- Prepare and Send Duration Data ---
+    char durationData[40];
+    const char* durationStateStr = isActivityActive ? "ACTIVE" : "IDLE";
+    snprintf(durationData, sizeof(durationData), "Duration:%lu,State:%s", totalDuration, durationStateStr);
+    
+    // Set the characteristic value and notify the client
+    pDurationCharacteristic->setValue(durationData);
+    pDurationCharacteristic->notify();
   }
 
   // Short delay for high-frequency position calculation
