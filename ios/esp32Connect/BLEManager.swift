@@ -364,14 +364,26 @@ extension BLEManager: CBPeripheralDelegate {
             }
             
             if var deviceData = self.deviceDataMap[peripheral.identifier] {
-                // Update sensor data based on characteristic type
-                // Note: Both rep and duration data are stored in accelData field since the UI
-                // will only display one type at a time based on the exercise's activityType.
-                // This approach simplifies the UI code and avoids duplication.
+                // Merge sensor data intelligently to avoid flickering
+                // Rep characteristic contains count and state
+                // Duration characteristic contains duration and state
+                // We merge the data to preserve both values
                 if characteristic.uuid == chars.accelUUID {
-                    deviceData.accelData = sensorData
+                    // Rep characteristic: update count and state, but preserve duration
+                    var mergedData = deviceData.accelData
+                    mergedData.count = sensorData.count
+                    mergedData.state = sensorData.state
+                    mergedData.timestamp = sensorData.timestamp
+                    // Keep existing duration value
+                    deviceData.accelData = mergedData
                 } else if characteristic.uuid == self.durationCharUUID {
-                    deviceData.accelData = sensorData
+                    // Duration characteristic: update duration and state, but preserve count
+                    var mergedData = deviceData.accelData
+                    mergedData.duration = sensorData.duration
+                    mergedData.state = sensorData.state
+                    mergedData.timestamp = sensorData.timestamp
+                    // Keep existing count value
+                    deviceData.accelData = mergedData
                 }
                 
                 deviceData.lastUpdate = Date()
