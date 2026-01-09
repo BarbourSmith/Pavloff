@@ -564,13 +564,12 @@ void trackDuration(float linearAccelMag, unsigned long currentTime) {
       durationStartTime = currentTime - (totalDuration * 1000); // Adjust start time to account for previous duration
       DEBUG_PRINTLN("Duration tracking started");
     }
-    
-    // Update total duration (accumulates across pauses)
-    totalDuration = (currentTime - durationStartTime) / 1000; // Convert to seconds
+    // Note: Duration is calculated only when reporting (in main loop) to avoid flickering
   } else {
     // Check for timeout (no vibration detected)
     if (isActivityActive && (currentTime - lastVibrationTime > VIBRATION_TIMEOUT_MS)) {
-      // Activity stopped - keep the total duration but mark as inactive
+      // Activity stopped - calculate final duration before pausing
+      totalDuration = (currentTime - durationStartTime) / 1000;
       isActivityActive = false;
       DEBUG_PRINT("Duration tracking paused at: ");
       DEBUG_PRINT(totalDuration);
@@ -1308,9 +1307,15 @@ void loop() {
     pRepCharacteristic->notify();
     
     // --- Prepare and Send Duration Data ---
+    // Calculate current duration if activity is active (only when reporting to avoid flickering)
+    unsigned long currentDuration = totalDuration;
+    if (isActivityActive) {
+      currentDuration = (currentTime - durationStartTime) / 1000;
+    }
+    
     char durationData[40];
     const char* durationStateStr = isActivityActive ? "ACTIVE" : "IDLE";
-    snprintf(durationData, sizeof(durationData), "Duration:%lu,State:%s", totalDuration, durationStateStr);
+    snprintf(durationData, sizeof(durationData), "Duration:%lu,State:%s", currentDuration, durationStateStr);
     
     // Set the characteristic value and notify the client
     pDurationCharacteristic->setValue(durationData);
