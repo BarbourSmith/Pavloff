@@ -80,6 +80,7 @@ BLECharacteristic* pAccelCharacteristic = NULL;
 BLECharacteristic* pGyroCharacteristic = NULL;
 BLECharacteristic* pRepCharacteristic = NULL;
 BLECharacteristic* pDurationCharacteristic = NULL;
+BLECharacteristic* pSensitivityCharacteristic = NULL;
 bool deviceConnected = false;
 
 // Position and velocity tracking variables
@@ -160,15 +161,26 @@ void IRAM_ATTR mpuInterruptISR() {
 #define ACCEL_STATIONARY_THRESHOLD 0.1f   // Acceleration deviation threshold (g's) for stationary detection
 #define GYRO_STATIONARY_THRESHOLD 0.1f    // Gyroscope threshold (rad/s) for stationary detection
 
-// Rep detection parameters
-#define REP_ACCEL_THRESHOLD 0.3f          // Minimum acceleration magnitude (g's) to consider active motion
-#define REP_VELOCITY_THRESHOLD 0.20f      // Minimum velocity magnitude (m/s) to consider moving
+// Rep detection parameters - now configurable via BLE
+// Default values correspond to medium sensitivity (0.5)
+float repAccelThreshold = 0.3f;           // Minimum acceleration magnitude (g's) to consider active motion
+float repVelocityThreshold = 0.20f;       // Minimum velocity magnitude (m/s) to consider moving
 #define REP_MIN_DURATION_MS 500           // Minimum duration for each phase (up/down) in milliseconds
 #define REP_REST_TIMEOUT_MS 3000          // Time to reset rep counting if no motion detected
 
 // Duration tracking parameters (for vibration-based activities like treadmill)
-#define VIBRATION_ACCEL_THRESHOLD 0.15f   // Minimum acceleration magnitude (g's) to detect vibration
-#define VIBRATION_TIMEOUT_MS 2000         // Time without vibration before stopping duration counter
+// Default value corresponds to medium sensitivity (0.5)
+float vibrationAccelThreshold = 0.15f;    // Minimum acceleration magnitude (g's) to detect vibration
+#define VIBRATION_TIMEOUT_MS 5000         // Time without vibration before stopping duration counter (5 seconds)
+
+// Sensitivity scaling factors (map 0.0-1.0 sensitivity to threshold ranges)
+// Higher sensitivity = lower thresholds (easier to detect)
+#define REP_ACCEL_MIN 0.15f               // Most sensitive rep accel threshold
+#define REP_ACCEL_MAX 0.5f                // Least sensitive rep accel threshold
+#define REP_VELOCITY_MIN 0.10f            // Most sensitive rep velocity threshold
+#define REP_VELOCITY_MAX 0.35f            // Least sensitive rep velocity threshold
+#define VIBRATION_ACCEL_MIN 0.02f         // Most sensitive vibration threshold (ultra sensitive)
+#define VIBRATION_ACCEL_MAX 0.25f         // Least sensitive vibration threshold
 
 // See the following for generating new UUIDs:
 // https://www.uuidgenerator.net/
@@ -177,6 +189,7 @@ void IRAM_ATTR mpuInterruptISR() {
 #define GYRO_CHARACTERISTIC_UUID  "1c95d5e2-0a25-4233-8d6c-613d161c210a"
 #define REP_CHARACTERISTIC_UUID   "8d3f7a9e-4b2c-11ef-9f27-0242ac120002"
 #define DURATION_CHARACTERISTIC_UUID "7a8e6f9d-3c1b-42a8-9e7f-1234567890ab"
+#define SENSITIVITY_CHARACTERISTIC_UUID "9c4a7f2e-5d3b-41a9-8f6e-2345678901bc"
 
 // Handles BLE connection and disconnection events
 class MyServerCallbacks: public BLEServerCallbacks {
@@ -227,6 +240,77 @@ class RepCharacteristicCallbacks: public BLECharacteristicCallbacks {
           pCharacteristic->setValue(repData);
           pCharacteristic->notify();
           DEBUG_PRINTLN("Rep counter reset to 0");
+        }
+      }
+    }
+};
+
+// Handles write events to the sensitivity characteristic
+class SensitivityCharacteristicCallbacks: public BLECharacteristicCallbacks {
+    void onWrite(BLECharacteristic* pCharacteristic) {
+      std::string value = pCharacteristic->getValue();
+      
+      if (value.length() > 0) {
+        DEBUG_PRINT("BLE Sensitivity update received: ");
+        DEBUG_PRINTLN(value.c_str());
+        
+        // Reset activity timer on any BLE interaction
+        lastActivityTime = millis();
+        
+        // Parse format: "RepSens:value,VibSens:value"
+        // Example: "RepSens:0.5,VibSens:0.7"
+        float newRepSens = 0.5f;
+        float newVibSens = 0.5f;
+        bool repParsed = false;
+        bool vibParsed = false;
+        
+        // Simple string parsing
+        const char* str = value.c_str();
+        char* repPos = strstr(str, "RepSens:");
+        char* vibPos = strstr(str, "VibSens:");
+        
+        if (repPos != NULL) {
+          float parsedValue = atof(repPos + 8);  // Skip "RepSens:"
+          if (parsedValue >= 0.0f && parsedValue <= 1.0f) {
+            newRepSens = parsedValue;
+            repParsed = true;
+          }
+        }
+        
+        if (vibPos != NULL) {
+          float parsedValue = atof(vibPos + 8);  // Skip "VibSens:"
+          if (parsedValue >= 0.0f && parsedValue <= 1.0f) {
+            newVibSens = parsedValue;
+            vibParsed = true;
+          }
+        }
+        
+        if (repParsed || vibParsed) {
+          // Update thresholds based on sensitivity
+          // Higher sensitivity (closer to 1.0) = lower thresholds (easier to detect)
+          // Lower sensitivity (closer to 0.0) = higher thresholds (harder to detect)
+          
+          if (repParsed) {
+            // Invert sensitivity: 1.0 sensitivity = minimum threshold, 0.0 = maximum threshold
+            repAccelThreshold = REP_ACCEL_MAX - (newRepSens * (REP_ACCEL_MAX - REP_ACCEL_MIN));
+            repVelocityThreshold = REP_VELOCITY_MAX - (newRepSens * (REP_VELOCITY_MAX - REP_VELOCITY_MIN));
+            DEBUG_PRINT("Updated rep thresholds - Accel: ");
+            DEBUG_PRINT(repAccelThreshold);
+            DEBUG_PRINT("g, Velocity: ");
+            DEBUG_PRINT(repVelocityThreshold);
+            DEBUG_PRINTLN("m/s");
+          }
+          
+          if (vibParsed) {
+            vibrationAccelThreshold = VIBRATION_ACCEL_MAX - (newVibSens * (VIBRATION_ACCEL_MAX - VIBRATION_ACCEL_MIN));
+            DEBUG_PRINT("Updated vibration threshold - Accel: ");
+            DEBUG_PRINT(vibrationAccelThreshold);
+            DEBUG_PRINTLN("g");
+          }
+          
+          DEBUG_PRINTLN("Sensitivity update applied");
+        } else {
+          DEBUG_PRINTLN("Failed to parse sensitivity values");
         }
       }
     }
@@ -494,7 +578,7 @@ void detectRep(float velX, float velY, float velZ, float linearAccelMag, unsigne
   }
   
   // Check if there's significant motion
-  bool isMoving = (velocityMag > REP_VELOCITY_THRESHOLD) && (linearAccelMag > REP_ACCEL_THRESHOLD);
+  bool isMoving = (velocityMag > repVelocityThreshold) && (linearAccelMag > repAccelThreshold);
   
   // Reset if no motion detected for too long
   if (!isMoving && (currentTime - lastMotionTime > REP_REST_TIMEOUT_MS)) {
@@ -516,7 +600,7 @@ void detectRep(float velX, float velY, float velZ, float linearAccelMag, unsigne
   switch (repState) {
     case REP_IDLE:
       // Wait for initial motion to start tracking
-      if (isMoving && velocityMag > REP_VELOCITY_THRESHOLD * 1.5f) {
+      if (isMoving && velocityMag > repVelocityThreshold * 1.5f) {
         // Determine initial direction based on dominant axis
         if (dominantAxisVelocity > 0) {
           repState = REP_MOVING_UP;
@@ -529,7 +613,7 @@ void detectRep(float velX, float velY, float velZ, float linearAccelMag, unsigne
       
     case REP_MOVING_UP:
       // Check for direction change to downward motion
-      if (isMoving && dominantAxisVelocity < -REP_VELOCITY_THRESHOLD * 1.2f && phaseDuration > REP_MIN_DURATION_MS) {
+      if (isMoving && dominantAxisVelocity < -repVelocityThreshold * 1.2f && phaseDuration > REP_MIN_DURATION_MS) {
         repState = REP_MOVING_DOWN;
         repCount++;
         phaseStartTime = currentTime;
@@ -538,7 +622,7 @@ void detectRep(float velX, float velY, float velZ, float linearAccelMag, unsigne
       
     case REP_MOVING_DOWN:
       // Check for direction change to upward motion
-      if (isMoving && dominantAxisVelocity > REP_VELOCITY_THRESHOLD * 1.2f && phaseDuration > REP_MIN_DURATION_MS) {
+      if (isMoving && dominantAxisVelocity > repVelocityThreshold * 1.2f && phaseDuration > REP_MIN_DURATION_MS) {
         repState = REP_MOVING_UP;
         phaseStartTime = currentTime;
       }
@@ -553,7 +637,7 @@ void detectRep(float velX, float velY, float velZ, float linearAccelMag, unsigne
 // Duration tracking based on vibration detection (for activities like treadmill)
 void trackDuration(float linearAccelMag, unsigned long currentTime) {
   // Check if vibration is detected (acceleration above threshold)
-  bool vibrationDetected = (linearAccelMag > VIBRATION_ACCEL_THRESHOLD);
+  bool vibrationDetected = (linearAccelMag > vibrationAccelThreshold);
   
   if (vibrationDetected) {
     lastVibrationTime = currentTime;
@@ -1056,6 +1140,19 @@ void setup() {
   // Set initial value before starting service
   pDurationCharacteristic->setValue("Duration:0,State:IDLE");
   DEBUG_PRINTLN("  Duration characteristic configured");
+
+  // Create a BLE Characteristic for Sensitivity Settings
+  DEBUG_PRINTLN("Creating Sensitivity characteristic");
+  pSensitivityCharacteristic = pService->createCharacteristic(
+                      SENSITIVITY_CHARACTERISTIC_UUID,
+                      BLECharacteristic::PROPERTY_READ |
+                      BLECharacteristic::PROPERTY_WRITE
+                    );
+  pSensitivityCharacteristic->addDescriptor(new BLE2902());
+  pSensitivityCharacteristic->setCallbacks(new SensitivityCharacteristicCallbacks());
+  // Set initial value before starting service
+  pSensitivityCharacteristic->setValue("RepSens:0.5,VibSens:0.5");
+  DEBUG_PRINTLN("  Sensitivity characteristic configured");
 
   // Start the service
   DEBUG_PRINTLN("Starting BLE service");
