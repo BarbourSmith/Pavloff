@@ -169,6 +169,9 @@ struct WorkoutSettings: Codable {
     ]
     
     // Default sensitivity values (0.5 = medium sensitivity)
+    // Range: 0.0 (least sensitive) to 1.0 (most sensitive)
+    // - Rep sensitivity affects the acceleration and velocity thresholds for detecting workout reps
+    // - Vibration sensitivity affects the acceleration threshold for detecting duration-based activities
     static let defaultRepSensitivity = 0.5
     static let defaultVibrationSensitivity = 0.5
     
@@ -176,6 +179,21 @@ struct WorkoutSettings: Codable {
         self.exercises = exercises
         self.repSensitivity = repSensitivity
         self.vibrationSensitivity = vibrationSensitivity
+    }
+    
+    // Custom decoder to handle backward compatibility with old saved settings
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        exercises = try container.decode([Exercise].self, forKey: .exercises)
+        // Use default values if sensitivity settings are missing (backward compatibility)
+        repSensitivity = try container.decodeIfPresent(Double.self, forKey: .repSensitivity) ?? WorkoutSettings.defaultRepSensitivity
+        vibrationSensitivity = try container.decodeIfPresent(Double.self, forKey: .vibrationSensitivity) ?? WorkoutSettings.defaultVibrationSensitivity
+    }
+    
+    private enum CodingKeys: String, CodingKey {
+        case exercises
+        case repSensitivity
+        case vibrationSensitivity
     }
     
     // Load saved settings from UserDefaults, or return default if none saved
