@@ -28,6 +28,7 @@ class BLEManager: NSObject, ObservableObject {
     private let accelCharUUID = CBUUID(string: AppConfig.UUIDs.accelCharacteristic)
     private let gyroCharUUID = CBUUID(string: AppConfig.UUIDs.gyroCharacteristic)
     private let durationCharUUID = CBUUID(string: AppConfig.UUIDs.durationCharacteristic)
+    private let sensitivityCharUUID = CBUUID(string: AppConfig.UUIDs.sensitivityCharacteristic)
     
     // MARK: - Initialization
     override init() {
@@ -129,6 +130,31 @@ class BLEManager: NSObject, ObservableObject {
         let resetData = "RESET".data(using: .utf8)!
         peripheral.writeValue(resetData, for: characteristic, type: .withResponse)
         print("[BLE] Sent RESET command to device: \(peripheral.name ?? "Unknown")")
+    }
+    
+    /// Send sensitivity settings to a connected device
+    func sendSensitivitySettings(for deviceId: UUID, repSensitivity: Double, vibrationSensitivity: Double) {
+        guard let peripheral = connectedPeripherals[deviceId] else {
+            print("[BLE] Cannot send sensitivity - device not found")
+            return
+        }
+        
+        // Find the sensitivity characteristic
+        guard let service = peripheral.services?.first(where: { $0.uuid == imuServiceUUID }),
+              let characteristic = service.characteristics?.first(where: { $0.uuid == sensitivityCharUUID }) else {
+            print("[BLE] Cannot find sensitivity characteristic")
+            return
+        }
+        
+        // Format: "RepSens:value,VibSens:value"
+        let sensitivityString = String(format: "RepSens:%.2f,VibSens:%.2f", repSensitivity, vibrationSensitivity)
+        guard let sensitivityData = sensitivityString.data(using: .utf8) else {
+            print("[BLE] Failed to encode sensitivity data")
+            return
+        }
+        
+        peripheral.writeValue(sensitivityData, for: characteristic, type: .withResponse)
+        print("[BLE] Sent sensitivity settings to device: \(peripheral.name ?? "Unknown") - Rep: \(repSensitivity), Vib: \(vibrationSensitivity)")
     }
     
     /// Parse sensor data from characteristic value

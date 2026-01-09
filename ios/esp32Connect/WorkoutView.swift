@@ -440,6 +440,18 @@ struct WorkoutView: View {
                     exerciseCompleted()
                 }
             }
+            .onChange(of: workoutSettings.repSensitivity) { _ in
+                // Send updated sensitivity to device when changed
+                if isConnected {
+                    sendSensitivityToDevice()
+                }
+            }
+            .onChange(of: workoutSettings.vibrationSensitivity) { _ in
+                // Send updated sensitivity to device when changed
+                if isConnected {
+                    sendSensitivityToDevice()
+                }
+            }
         }
     }
     
@@ -621,6 +633,9 @@ struct WorkoutView: View {
                 UIApplication.shared.isIdleTimerDisabled = true
                 print("[WORKOUT] Screen idle timer disabled")
                 
+                // Send sensitivity settings to device after connection
+                sendSensitivityToDevice()
+                
             case .pending, .connecting, .discovering:
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
                     checkConnectionStatus(device)
@@ -678,6 +693,20 @@ struct WorkoutView: View {
         userDefaults.set(Date(), forKey: "lastWorkoutActivity")
         userDefaults.set(currentExerciseIndex, forKey: "currentExerciseIndex")
         print("[WORKOUT] Updated last activity timestamp")
+    }
+    
+    private func sendSensitivityToDevice() {
+        guard let device = connectedDevice else {
+            print("[WORKOUT] No connected device to send sensitivity")
+            return
+        }
+        
+        print("[WORKOUT] Sending sensitivity settings - Rep: \(workoutSettings.repSensitivity), Vib: \(workoutSettings.vibrationSensitivity)")
+        bleManager.sendSensitivitySettings(
+            for: device.id,
+            repSensitivity: workoutSettings.repSensitivity,
+            vibrationSensitivity: workoutSettings.vibrationSensitivity
+        )
     }
     
     private func cleanup() {
