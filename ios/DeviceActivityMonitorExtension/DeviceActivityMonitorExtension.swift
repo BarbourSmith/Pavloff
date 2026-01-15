@@ -12,17 +12,19 @@ import ManagedSettings
 
 // The DeviceActivityMonitor is called by the system when schedule events occur
 class DeviceActivityMonitorExtension: DeviceActivityMonitor {
-    let store = ManagedSettingsStore()
+    let store = ManagedSettingsStore(named: ManagedSettingsStore.Name("workoutShields"))
     
     // Called when the schedule interval starts (at midnight for our daily schedule)
     override func intervalDidStart(for activity: DeviceActivityName) {
         super.intervalDidStart(for: activity)
         
-        print("[DeviceActivityMonitor] Interval started for activity: \(activity)")
+        NSLog("[DeviceActivityMonitor] ⏰ Interval started for activity: \(activity)")
         
         // Check if this is our workout schedule
         if activity == DeviceActivityName("workoutSchedule") {
             handleMidnightReset()
+        } else {
+            NSLog("[DeviceActivityMonitor] ⚠️ Unknown activity name: \(activity)")
         }
     }
     
@@ -30,16 +32,16 @@ class DeviceActivityMonitorExtension: DeviceActivityMonitor {
     override func intervalDidEnd(for activity: DeviceActivityName) {
         super.intervalDidEnd(for: activity)
         
-        print("[DeviceActivityMonitor] Interval ended for activity: \(activity)")
+        NSLog("[DeviceActivityMonitor] 🌙 Interval ended for activity: \(activity)")
     }
     
     // Handle the midnight reset - re-enable app blocking for the new day
     private func handleMidnightReset() {
-        print("[DeviceActivityMonitor] Midnight reset triggered - checking if shields should be reapplied")
+        NSLog("[DeviceActivityMonitor] 🔄 Midnight reset triggered - checking if shields should be reapplied")
         
         // Use App Group UserDefaults
         guard let userDefaults = UserDefaults(suiteName: "group.com.maslowcnc.Tides") else {
-            print("[DeviceActivityMonitor] Error: Failed to access App Group UserDefaults")
+            NSLog("[DeviceActivityMonitor] ❌ Error: Failed to access App Group UserDefaults")
             return
         }
         
@@ -50,16 +52,19 @@ class DeviceActivityMonitorExtension: DeviceActivityMonitor {
         if let lastCompletionDate = userDefaults.object(forKey: "lastWorkoutCompletion") as? Date {
             let lastCompletionDay = calendar.startOfDay(for: lastCompletionDate)
             
+            NSLog("[DeviceActivityMonitor] 📅 Last workout completion: \(lastCompletionDate)")
+            NSLog("[DeviceActivityMonitor] 📅 Today: \(today)")
+            
             // If workout was completed yesterday, it's now a new day and shields should be reapplied
             if !calendar.isDate(lastCompletionDay, inSameDayAs: today) {
-                print("[DeviceActivityMonitor] Workout not completed today yet - reapplying shields")
+                NSLog("[DeviceActivityMonitor] ✅ Workout not completed today yet - reapplying shields")
                 reapplyShields(userDefaults: userDefaults)
             } else {
-                print("[DeviceActivityMonitor] Workout already completed today - shields stay off")
+                NSLog("[DeviceActivityMonitor] ℹ️ Workout already completed today - shields stay off")
             }
         } else {
             // No workout completion recorded, reapply shields
-            print("[DeviceActivityMonitor] No workout completion found - reapplying shields")
+            NSLog("[DeviceActivityMonitor] ⚠️ No workout completion found - reapplying shields")
             reapplyShields(userDefaults: userDefaults)
         }
     }
@@ -68,15 +73,17 @@ class DeviceActivityMonitorExtension: DeviceActivityMonitor {
     private func reapplyShields(userDefaults: UserDefaults) {
         // Check if we have apps selected
         guard userDefaults.bool(forKey: "hasAppSelection") else {
-            print("[DeviceActivityMonitor] No apps selected, skipping shield application")
+            NSLog("[DeviceActivityMonitor] ℹ️ No apps selected, skipping shield application")
             return
         }
         
         // Try to load the saved selection
         guard let data = userDefaults.data(forKey: "savedAppSelection") else {
-            print("[DeviceActivityMonitor] No saved selection data found")
+            NSLog("[DeviceActivityMonitor] ❌ No saved selection data found")
             return
         }
+        
+        NSLog("[DeviceActivityMonitor] 📦 Found saved selection data (\(data.count) bytes)")
         
         do {
             let decoder = JSONDecoder()
@@ -85,16 +92,20 @@ class DeviceActivityMonitorExtension: DeviceActivityMonitor {
             // Apply shields
             if !selection.applicationTokens.isEmpty {
                 store.shield.applications = selection.applicationTokens
-                print("[DeviceActivityMonitor] Reapplied shields for \(selection.applicationTokens.count) apps")
+                NSLog("[DeviceActivityMonitor] 🛡️ Reapplied shields for \(selection.applicationTokens.count) apps")
             }
             
             if !selection.categoryTokens.isEmpty {
                 store.shield.applicationCategories = .specific(selection.categoryTokens)
-                print("[DeviceActivityMonitor] Reapplied shields for \(selection.categoryTokens.count) categories")
+                NSLog("[DeviceActivityMonitor] 🛡️ Reapplied shields for \(selection.categoryTokens.count) categories")
+            }
+            
+            if selection.applicationTokens.isEmpty && selection.categoryTokens.isEmpty {
+                NSLog("[DeviceActivityMonitor] ⚠️ Selection loaded but no tokens found - tokens may have expired")
             }
             
         } catch {
-            print("[DeviceActivityMonitor] Failed to decode selection: \(error)")
+            NSLog("[DeviceActivityMonitor] ❌ Failed to decode selection: \(error)")
         }
     }
 }

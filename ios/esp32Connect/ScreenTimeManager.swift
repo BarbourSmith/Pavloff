@@ -27,7 +27,7 @@ class ScreenTimeManager: ObservableObject {
         }
     }
     
-    private let store = ManagedSettingsStore()
+    private let store = ManagedSettingsStore(named: ManagedSettingsStore.Name("workoutShields"))
     private let center = AuthorizationCenter.shared
     private let activityCenter = DeviceActivityCenter()
     
