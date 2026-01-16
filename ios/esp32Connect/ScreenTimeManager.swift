@@ -169,6 +169,9 @@ class ScreenTimeManager: ObservableObject {
     
     // Set up daily monitoring schedule to automatically re-enable blocking at midnight
     private func setupDailyMonitoring() {
+        // Stop any existing monitoring first to ensure clean state
+        activityCenter.stopMonitoring([scheduleId])
+        
         // Create a schedule that runs from midnight to 11:59 PM every day
         let schedule = DeviceActivitySchedule(
             intervalStart: DateComponents(hour: 0, minute: 0),
@@ -179,10 +182,13 @@ class ScreenTimeManager: ObservableObject {
         do {
             // Start monitoring - this will trigger at the start of each interval (midnight)
             // When the interval starts, shields need to be reapplied
+            // Note: If we're currently inside the interval (00:00-23:59), intervalDidStart
+            // won't fire until the next occurrence at midnight tomorrow
             try activityCenter.startMonitoring(scheduleId, during: schedule)
-            print("[ScreenTime] Daily monitoring schedule established for midnight re-lock")
+            print("[ScreenTime] ✅ Daily monitoring schedule established for midnight re-lock")
+            print("[ScreenTime] ⏰ Next interval start will be at 00:00 (midnight)")
         } catch {
-            print("[ScreenTime] Failed to start monitoring: \(error)")
+            print("[ScreenTime] ❌ Failed to start monitoring: \(error)")
         }
     }
     
@@ -206,7 +212,8 @@ class ScreenTimeManager: ObservableObject {
         store.shield.applications = nil
         store.shield.applicationCategories = nil
         
-        print("[ScreenTime] App blocking disabled - workout completed!")
+        print("[ScreenTime] ✅ App blocking disabled - workout completed!")
+        print("[ScreenTime] ⏰ Monitoring schedule remains active - will re-lock at midnight")
     }
     
     // Check if blocking is currently active
