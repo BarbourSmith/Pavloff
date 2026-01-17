@@ -172,6 +172,12 @@ class ScreenTimeManager: ObservableObject {
         // Stop any existing monitoring first to ensure clean state
         activityCenter.stopMonitoring([scheduleId])
         
+        print("[ScreenTime] ========================================")
+        print("[ScreenTime] 🔧 SETUP DAILY MONITORING")
+        print("[ScreenTime] ⏰ Current time: \(Date())")
+        print("[ScreenTime] 🎯 Schedule ID: \(scheduleId)")
+        print("[ScreenTime] ========================================")
+        
         // Create a schedule that runs from midnight to 11:59 PM every day
         let schedule = DeviceActivitySchedule(
             intervalStart: DateComponents(hour: 0, minute: 0),
@@ -187,8 +193,10 @@ class ScreenTimeManager: ObservableObject {
             try activityCenter.startMonitoring(scheduleId, during: schedule)
             print("[ScreenTime] ✅ Daily monitoring schedule established for midnight re-lock")
             print("[ScreenTime] ⏰ Next interval start will be at 00:00 (midnight)")
+            print("[ScreenTime] 📋 Schedule: 00:00-23:59, repeats daily")
         } catch {
             print("[ScreenTime] ❌ Failed to start monitoring: \(error)")
+            print("[ScreenTime] ⚠️  Error details: \(error.localizedDescription)")
         }
     }
     

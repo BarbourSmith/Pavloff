@@ -18,13 +18,18 @@ class DeviceActivityMonitorExtension: DeviceActivityMonitor {
     override func intervalDidStart(for activity: DeviceActivityName) {
         super.intervalDidStart(for: activity)
         
-        NSLog("[DeviceActivityMonitor] ⏰ Interval started for activity: \(activity)")
+        // Enhanced logging for diagnostics
+        NSLog("[DeviceActivityMonitor] ========================================")
+        NSLog("[DeviceActivityMonitor] ⏰ INTERVAL START - Time: \(Date())")
+        NSLog("[DeviceActivityMonitor] 🎯 Activity name: \(activity)")
+        NSLog("[DeviceActivityMonitor] ========================================")
         
         // Check if this is our workout schedule
         if activity == DeviceActivityName("workoutSchedule") {
             handleMidnightReset()
         } else {
             NSLog("[DeviceActivityMonitor] ⚠️ Unknown activity name: \(activity)")
+            NSLog("[DeviceActivityMonitor] Expected: 'workoutSchedule'")
         }
     }
     
