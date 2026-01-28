@@ -18,7 +18,7 @@
 		60D7C94F2EB536510076DBF0 /* DeviceActivity.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 60D7C94E2EB536510076DBF0 /* DeviceActivity.framework */; };
 		60D7C9602EB5382B0076DBF0 /* FamilyControls.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 60D7C95F2EB5382B0076DBF0 /* FamilyControls.framework */; };
 		60D7C9622EB5383B0076DBF0 /* ManagedSettings.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 60D7C9612EB5383B0076DBF0 /* ManagedSettings.framework */; };
-		60D7C96A2EB5800A0076DBF0 /* DeviceActivityMonitorExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 60D7C94D2EB536510076DBF0 /* DeviceActivityMonitorExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, CodeSignOnCopy, ); }; };
+		60D7C96A2EB5800A0076DBF0 /* DeviceActivityMonitorExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 60D7C94D2EB536510076DBF0 /* DeviceActivityMonitorExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, CodeSignOnCopy); }; };
 		6C583A8B36864E37BF51FCB3 /* AppConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100ACD91ACB46818A92AA8D /* AppConfig.swift */; };
 		7BB22A351210489DBA13106B /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21CBFCE60C3741839789F448 /* SceneDelegate.swift */; };
 		7E5DB21B30764AC9B4D6263A /* WorkoutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B8414B5B1FB40519788E100 /* WorkoutView.swift */; };
