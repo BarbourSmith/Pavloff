@@ -123,12 +123,14 @@ class ScreenTimeManager: ObservableObject {
     func enableAppBlocking() {
         guard isAuthorized else {
             print("[ScreenTime] Not authorized to enable app blocking")
+            EventLogManager.shared.log(source: "ScreenTimeManager", type: .info, message: "Cannot enable blocking - not authorized")
             return
         }
         
         // Check if we have apps selected (persisted flag)
         guard hasAppsSelected else {
             print("[ScreenTime] No apps have been selected for blocking")
+            EventLogManager.shared.log(source: "ScreenTimeManager", type: .info, message: "Cannot enable blocking - no apps selected")
             return
         }
         
@@ -141,6 +143,7 @@ class ScreenTimeManager: ObservableObject {
             if selectedApps.applicationTokens.isEmpty && selectedApps.categoryTokens.isEmpty {
                 print("[ScreenTime] Warning: Tokens could not be restored from storage")
                 print("[ScreenTime] User may need to reselect apps in Workout Settings")
+                EventLogManager.shared.log(source: "ScreenTimeManager", type: .extensionError, message: "Failed to restore app tokens - user may need to reselect apps")
                 
                 // Try to apply shields one more time in case they're still in the store
                 // (ManagedSettingsStore persists shields even if we don't have tokens)
@@ -163,7 +166,10 @@ class ScreenTimeManager: ObservableObject {
             // Set up daily monitoring schedule to re-enable blocking at midnight
             setupDailyMonitoring()
             
-            print("[ScreenTime] App blocking enabled with \(selectedApps.applicationTokens.count) apps and \(selectedApps.categoryTokens.count) categories")
+            let appCount = selectedApps.applicationTokens.count
+            let catCount = selectedApps.categoryTokens.count
+            print("[ScreenTime] App blocking enabled with \(appCount) apps and \(catCount) categories")
+            EventLogManager.shared.log(source: "ScreenTimeManager", type: .appsBlocked, message: "App blocking enabled: \(appCount) apps, \(catCount) categories")
         }
     }
     
@@ -207,6 +213,7 @@ class ScreenTimeManager: ObservableObject {
         store.shield.applicationCategories = nil
         
         print("[ScreenTime] App blocking disabled - workout completed!")
+        EventLogManager.shared.log(source: "ScreenTimeManager", type: .appsUnblocked, message: "Apps unlocked - workout completed")
     }
     
     // Check if blocking is currently active

@@ -22,6 +22,7 @@ struct WorkoutView: View {
     @State private var isScanning: Bool = false
     @State private var showingSetup = false
     @State private var showingCongratulations = false
+    @State private var showingEventLog = false
     @State private var lastRepCount = 0
     @State private var workoutStartedToday = false
     
@@ -274,6 +275,22 @@ struct WorkoutView: View {
                                     .cornerRadius(8)
                                 }
                                 
+                                // Event Log button
+                                Button(action: {
+                                    showingEventLog = true
+                                }) {
+                                    HStack {
+                                        Image(systemName: "doc.text.fill")
+                                        Text("Event Log")
+                                    }
+                                    .fontWeight(.semibold)
+                                    .frame(maxWidth: .infinity)
+                                    .padding()
+                                    .background(Color.gray.opacity(0.2))
+                                    .foregroundColor(.blue)
+                                    .cornerRadius(8)
+                                }
+                                
                                 // Reset button
                                 Button(action: {
                                     resetCurrentExercise()
@@ -352,6 +369,23 @@ struct WorkoutView: View {
                             }
                             .padding(.top, 30)
                             
+                            // Event Log button for debugging
+                            Button(action: {
+                                showingEventLog = true
+                            }) {
+                                HStack {
+                                    Image(systemName: "doc.text.fill")
+                                    Text("Event Log")
+                                }
+                                .fontWeight(.semibold)
+                                .frame(maxWidth: 200)
+                                .padding()
+                                .background(Color.gray)
+                                .foregroundColor(.white)
+                                .cornerRadius(8)
+                            }
+                            .padding(.top, 10)
+                            
                             Spacer()
                         }
                         .frame(maxWidth: .infinity)
@@ -362,6 +396,9 @@ struct WorkoutView: View {
             .navigationBarHidden(true)
             .sheet(isPresented: $showingSetup) {
                 SetupView(workoutSettings: $workoutSettings)
+            }
+            .sheet(isPresented: $showingEventLog) {
+                EventLogView()
             }
             .sheet(isPresented: $showingCongratulations) {
                 CongratulationsView(workoutSettings: workoutSettings, onRestart: {
@@ -495,9 +532,11 @@ struct WorkoutView: View {
         // Enable blocking if workout not completed today
         if !workoutStartedToday {
             print("[WORKOUT] Workout not completed today, enabling app blocking")
+            EventLogManager.shared.log(source: "WorkoutView", type: .info, message: "App launched - workout not completed today, enabling blocking")
             screenTimeManager.enableAppBlocking()
         } else {
             print("[WORKOUT] Workout already completed today, apps remain unblocked")
+            EventLogManager.shared.log(source: "WorkoutView", type: .info, message: "App launched - workout already completed today")
         }
     }
     
@@ -510,6 +549,9 @@ struct WorkoutView: View {
         userDefaults.removeObject(forKey: "lastWorkoutActivity")
         userDefaults.removeObject(forKey: "currentExerciseIndex")
         print("[WORKOUT] Cleared workout state after completion")
+        
+        // Log the workout completion event
+        EventLogManager.shared.log(source: "WorkoutView", type: .workoutCompleted, message: "Workout completed for today - apps unlocked")
         
         // Update streak
         streakManager.checkAndUpdateStreak()
