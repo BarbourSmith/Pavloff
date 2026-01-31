@@ -46,13 +46,13 @@ class EventLogManager {
     static let shared = EventLogManager()
     
     private let maxLogEntries = 100
-    private let logKey = "eventLogEntries"
+    private let logKey = AppGroupConstants.Keys.eventLogEntries
     
     private let userDefaults: UserDefaults
     
     private init() {
         // Use App Group UserDefaults for sharing logs between app and extension
-        if let defaults = UserDefaults(suiteName: "group.com.maslowcnc.Tides") {
+        if let defaults = UserDefaults(suiteName: AppGroupConstants.appGroupIdentifier) {
             self.userDefaults = defaults
         } else {
             print("[EventLog] Warning: Failed to create App Group UserDefaults, falling back to standard")

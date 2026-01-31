@@ -33,7 +33,7 @@ struct EventLogView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     List {
-                        ForEach(events.reversed()) { event in
+                        ForEach(events) { event in
                             EventRowView(event: event)
                         }
                     }
@@ -69,7 +69,7 @@ struct EventLogView: View {
     }
     
     private func loadEvents() {
-        events = EventLogManager.shared.getEvents()
+        events = EventLogManager.shared.getEvents().reversed()
     }
 }
 

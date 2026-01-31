@@ -286,8 +286,8 @@ struct WorkoutView: View {
                                     .fontWeight(.semibold)
                                     .frame(maxWidth: .infinity)
                                     .padding()
-                                    .background(Color.gray.opacity(0.2))
-                                    .foregroundColor(.blue)
+                                    .background(Color.gray)
+                                    .foregroundColor(.white)
                                     .cornerRadius(8)
                                 }
                                 

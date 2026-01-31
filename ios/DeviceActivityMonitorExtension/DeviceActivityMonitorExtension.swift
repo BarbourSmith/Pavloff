@@ -40,7 +40,7 @@ class DeviceActivityMonitorExtension: DeviceActivityMonitor {
         EventLogManager.shared.log(source: "Extension", type: .info, message: "Midnight reset triggered - checking workout completion status")
         
         // Use App Group UserDefaults
-        guard let userDefaults = UserDefaults(suiteName: "group.com.maslowcnc.Tides") else {
+        guard let userDefaults = UserDefaults(suiteName: AppGroupConstants.appGroupIdentifier) else {
             print("[DeviceActivityMonitor] Error: Failed to access App Group UserDefaults")
             EventLogManager.shared.log(source: "Extension", type: .extensionError, message: "Failed to access App Group UserDefaults")
             return
@@ -50,7 +50,7 @@ class DeviceActivityMonitorExtension: DeviceActivityMonitor {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
         
-        if let lastCompletionDate = userDefaults.object(forKey: "lastWorkoutCompletion") as? Date {
+        if let lastCompletionDate = userDefaults.object(forKey: AppGroupConstants.Keys.lastWorkoutCompletion) as? Date {
             let lastCompletionDay = calendar.startOfDay(for: lastCompletionDate)
             
             // If workout was completed yesterday, it's now a new day and shields should be reapplied
@@ -73,14 +73,14 @@ class DeviceActivityMonitorExtension: DeviceActivityMonitor {
     // Reapply shields from the shared app group storage
     private func reapplyShields(userDefaults: UserDefaults) {
         // Check if we have apps selected
-        guard userDefaults.bool(forKey: "hasAppSelection") else {
+        guard userDefaults.bool(forKey: AppGroupConstants.Keys.hasAppSelection) else {
             print("[DeviceActivityMonitor] No apps selected, skipping shield application")
             EventLogManager.shared.log(source: "Extension", type: .info, message: "No apps selected - skipping shield application")
             return
         }
         
         // Try to load the saved selection
-        guard let data = userDefaults.data(forKey: "savedAppSelection") else {
+        guard let data = userDefaults.data(forKey: AppGroupConstants.Keys.savedAppSelection) else {
             print("[DeviceActivityMonitor] No saved selection data found")
             EventLogManager.shared.log(source: "Extension", type: .extensionError, message: "No saved app selection data found in UserDefaults")
             return
