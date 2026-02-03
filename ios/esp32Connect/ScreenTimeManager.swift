@@ -187,8 +187,10 @@ class ScreenTimeManager: ObservableObject {
             // When the interval starts, shields need to be reapplied
             try activityCenter.startMonitoring(scheduleId, during: schedule)
             print("[ScreenTime] Daily monitoring schedule established for midnight re-lock")
+            EventLogManager.shared.log(source: "ScreenTimeManager", type: .info, message: "Daily monitoring schedule registered successfully - extension should trigger at midnight")
         } catch {
             print("[ScreenTime] Failed to start monitoring: \(error)")
+            EventLogManager.shared.log(source: "ScreenTimeManager", type: .extensionError, message: "Failed to register monitoring schedule: \(error.localizedDescription)")
         }
     }
     
