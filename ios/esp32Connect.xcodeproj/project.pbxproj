@@ -28,7 +28,13 @@
 		AC01234567890ABCDEF12345 /* AutoConnectDataDisplayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC01234567890ABCDEF12345 /* AutoConnectDataDisplayView.swift */; };
 		E20F79DAFA5042F18286D991 /* ConnectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B700AC7A3B1F495C80E42D88 /* ConnectionView.swift */; };
 		F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11748412D0307B40044C1D9 /* AppDelegate.swift */; };
-/* End PBXBuildFile section */
+		653661636439623233386564 /* EventLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 376537633732383834393162 /* EventLog.swift */; };
+		333437303363633931626162 /* EventLogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 633832633761633864323261 /* EventLogView.swift */; };
+		363962643231633364366535 /* AppGroupConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = 633538613163353536363266 /* AppGroupConstants.swift */; };
+			303637353764306363633861 /* DeviceActivityMonitorExtension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 626437653938643366613665 /* DeviceActivityMonitorExtension.swift */; };
+		623665316433376430626363 /* EventLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 393530393730346439363164 /* EventLog.swift */; };
+		616664306136643830636466 /* AppGroupConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = 346263393033376463393430 /* AppGroupConstants.swift */; };
+	/* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
 		60D7C9642EB570B10076DBF0 /* PBXContainerItemProxy */ = {
@@ -99,7 +105,13 @@
 		F100ACD91ACB46818A92AA8D /* AppConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppConfig.swift; path = esp32Connect/AppConfig.swift; sourceTree = "<group>"; };
 		F11748412D0307B40044C1D9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = esp32Connect/AppDelegate.swift; sourceTree = "<group>"; };
 		F11748442D0722820044C1D9 /* esp32Connect-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "esp32Connect-Bridging-Header.h"; path = "esp32Connect/esp32Connect-Bridging-Header.h"; sourceTree = "<group>"; };
-/* End PBXFileReference section */
+		376537633732383834393162 /* EventLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = EventLog.swift; path = esp32Connect/EventLog.swift; sourceTree = "<group>"; };
+		633832633761633864323261 /* EventLogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = EventLogView.swift; path = esp32Connect/EventLogView.swift; sourceTree = "<group>"; };
+		633538613163353536363266 /* AppGroupConstants.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppGroupConstants.swift; path = esp32Connect/AppGroupConstants.swift; sourceTree = "<group>"; };
+			626437653938643366613665 /* DeviceActivityMonitorExtension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceActivityMonitorExtension/DeviceActivityMonitorExtension.swift; sourceTree = "<group>"; };
+		393530393730346439363164 /* EventLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceActivityMonitorExtension/EventLog.swift; sourceTree = "<group>"; };
+		346263393033376463393430 /* AppGroupConstants.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceActivityMonitorExtension/AppGroupConstants.swift; sourceTree = "<group>"; };
+	/* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
 		60D7C95B2EB536510076DBF0 /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
@@ -151,6 +163,9 @@
 				BC01234567890ABCDEF12345 /* AutoConnectDataDisplayView.swift */,
 				1F0018F7811041CEBE34E61D /* BLEManager.swift */,
 				8C7D6E5A0B1C2D3E4F506071 /* ScreenTimeManager.swift */,
+				376537633732383834393162 /* EventLog.swift */,
+				633832633761633864323261 /* EventLogView.swift */,
+				633538613163353536363266 /* AppGroupConstants.swift */,
 				2B3C4D5E6F708192A3B4C5D6 /* HoldToConfirmButton.swift */,
 				AE50CB5574214F99A14202C6 /* Models.swift */,
 				F100ACD91ACB46818A92AA8D /* AppConfig.swift */,
@@ -333,6 +348,9 @@
 				AC01234567890ABCDEF12345 /* AutoConnectDataDisplayView.swift in Sources */,
 				443106508C3E4493B30DC867 /* BLEManager.swift in Sources */,
 				9D8E7F6A1B2C3D4E5F607182 /* ScreenTimeManager.swift in Sources */,
+				653661636439623233386564 /* EventLog.swift in Sources */,
+				333437303363633931626162 /* EventLogView.swift in Sources */,
+				363962643231633364366535 /* AppGroupConstants.swift in Sources */,
 				1A2B3C4D5E6F708192A3B4C6 /* HoldToConfirmButton.swift in Sources */,
 				5FC18872C91D4936AAF94B4C /* Models.swift in Sources */,
 				6C583A8B36864E37BF51FCB3 /* AppConfig.swift in Sources */,
@@ -344,6 +362,10 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+			,
+				303637353764306363633861 /* DeviceActivityMonitorExtension.swift in Sources */,
+				623665316433376430626363 /* EventLog.swift in Sources */,
+				616664306136643830636466 /* AppGroupConstants.swift in Sources */
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
