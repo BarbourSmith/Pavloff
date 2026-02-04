@@ -10,6 +10,8 @@ import SwiftUI
 struct EventLogView: View {
     @State private var events: [LogEvent] = []
     @State private var showingClearConfirmation = false
+    @State private var showingShareSheet = false
+    @State private var showingCopyConfirmation = false
     
     var body: some View {
         NavigationView {
@@ -43,6 +45,25 @@ struct EventLogView: View {
             .navigationTitle("Event Log")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Menu {
+                        Button(action: {
+                            copyToClipboard()
+                        }) {
+                            Label("Copy to Clipboard", systemImage: "doc.on.clipboard")
+                        }
+                        
+                        Button(action: {
+                            showingShareSheet = true
+                        }) {
+                            Label("Share Log", systemImage: "square.and.arrow.up")
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                    }
+                    .disabled(events.isEmpty)
+                }
+                
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: {
                         showingClearConfirmation = true
@@ -62,6 +83,14 @@ struct EventLogView: View {
             } message: {
                 Text("This will delete all logged events.")
             }
+            .alert("Copied!", isPresented: $showingCopyConfirmation) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text("Event log has been copied to clipboard.")
+            }
+            .sheet(isPresented: $showingShareSheet) {
+                ActivityViewController(activityItems: [formatEventsAsText()])
+            }
         }
         .onAppear {
             loadEvents()
@@ -70,6 +99,27 @@ struct EventLogView: View {
     
     private func loadEvents() {
         events = EventLogManager.shared.getEvents().reversed()
+    }
+    
+    private func formatEventsAsText() -> String {
+        var text = "Pavloff Event Log\n"
+        text += "==================\n"
+        text += "Exported: \(Date().formatted(date: .long, time: .standard))\n"
+        text += "Total Events: \(events.count)\n\n"
+        
+        for event in events {
+            text += "[\(event.formattedTimestamp)] \(event.eventType.rawValue)\n"
+            text += "Source: \(event.source)\n"
+            text += "Message: \(event.message)\n"
+            text += "---\n\n"
+        }
+        
+        return text
+    }
+    
+    private func copyToClipboard() {
+        UIPasteboard.general.string = formatEventsAsText()
+        showingCopyConfirmation = true
     }
 }
 
@@ -119,6 +169,20 @@ struct EventRowView: View {
         case .info:
             return .gray
         }
+    }
+}
+
+// UIKit wrapper for UIActivityViewController (iOS share sheet)
+struct ActivityViewController: UIViewControllerRepresentable {
+    let activityItems: [Any]
+    
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        let controller = UIActivityViewController(activityItems: activityItems, applicationActivities: nil)
+        return controller
+    }
+    
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {
+        // No update needed
     }
 }
 
