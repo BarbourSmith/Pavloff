@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		9A9CBB526DCB540B12D0FACA /* DeviceActivityMonitorExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 60D7C94D2EB536510076DBF0 /* DeviceActivityMonitorExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
 		18232EB0B9A34A5B8107564F /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0392C39A3DE641EE9DBCA3F5 /* HomeView.swift */; };
 		1A2B3C4D5E6F708192A3B4C6 /* HoldToConfirmButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B3C4D5E6F708192A3B4C5D6 /* HoldToConfirmButton.swift */; };
@@ -60,6 +61,7 @@
 			dstPath = "";
 			dstSubfolderSpec = 13;
 			files = (
+			9A9CBB526DCB540B12D0FACA /* DeviceActivityMonitorExtension.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
