@@ -14,12 +14,12 @@ import ManagedSettings
 class DeviceActivityMonitorExtension: DeviceActivityMonitor {
     let store = ManagedSettingsStore()
     
-    // Called when the schedule interval starts (at midnight for our daily schedule)
+    // Called when the schedule interval starts (every hour for debugging)
     override func intervalDidStart(for activity: DeviceActivityName) {
         super.intervalDidStart(for: activity)
         
         print("[DeviceActivityMonitor] Interval started for activity: \(activity)")
-        EventLogManager.shared.log(source: "Extension", type: .midnightTrigger, message: "Midnight interval started for activity: \(activity)")
+        EventLogManager.shared.log(source: "Extension", type: .midnightTrigger, message: "Hourly interval started for activity: \(activity) [Debug Mode]")
         
         // Check if this is our workout schedule
         if activity == DeviceActivityName("workoutSchedule") {
@@ -27,17 +27,18 @@ class DeviceActivityMonitorExtension: DeviceActivityMonitor {
         }
     }
     
-    // Called when the schedule interval ends (at 11:59 PM for our daily schedule)
+    // Called when the schedule interval ends (at 59 minutes for hourly schedule)
     override func intervalDidEnd(for activity: DeviceActivityName) {
         super.intervalDidEnd(for: activity)
         
         print("[DeviceActivityMonitor] Interval ended for activity: \(activity)")
     }
     
-    // Handle the midnight reset - re-enable app blocking for the new day
+    // Handle the reset - re-enable app blocking if workout not completed
+    // NOTE: This now runs every hour for easier debugging
     private func handleMidnightReset() {
-        print("[DeviceActivityMonitor] Midnight reset triggered - checking if shields should be reapplied")
-        EventLogManager.shared.log(source: "Extension", type: .info, message: "Midnight reset triggered - checking workout completion status")
+        print("[DeviceActivityMonitor] Hourly reset triggered - checking if shields should be reapplied")
+        EventLogManager.shared.log(source: "Extension", type: .info, message: "Hourly check triggered - checking workout completion status [Debug Mode]")
         
         // Use App Group UserDefaults
         guard let userDefaults = UserDefaults(suiteName: AppGroupConstants.appGroupIdentifier) else {

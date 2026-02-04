@@ -173,21 +173,23 @@ class ScreenTimeManager: ObservableObject {
         }
     }
     
-    // Set up daily monitoring schedule to automatically re-enable blocking at midnight
+    // Set up hourly monitoring schedule for easier debugging (triggers every hour)
+    // NOTE: For production, this should be changed to daily (midnight only) for battery efficiency
     private func setupDailyMonitoring() {
-        // Create a schedule that runs from midnight to 11:59 PM every day
+        // Create a schedule that triggers every hour (00:00 to 00:59, repeating)
+        // This allows for easier debugging without waiting until midnight
         let schedule = DeviceActivitySchedule(
-            intervalStart: DateComponents(hour: 0, minute: 0),
-            intervalEnd: DateComponents(hour: 23, minute: 59),
+            intervalStart: DateComponents(minute: 0),
+            intervalEnd: DateComponents(minute: 59),
             repeats: true
         )
         
         do {
-            // Start monitoring - this will trigger at the start of each interval (midnight)
-            // When the interval starts, shields need to be reapplied
+            // Start monitoring - this will trigger at the start of each hour
+            // When the interval starts, shields are checked and reapplied if needed
             try activityCenter.startMonitoring(scheduleId, during: schedule)
-            print("[ScreenTime] Daily monitoring schedule established for midnight re-lock")
-            EventLogManager.shared.log(source: "ScreenTimeManager", type: .info, message: "Daily monitoring schedule registered successfully - extension should trigger at midnight")
+            print("[ScreenTime] Hourly monitoring schedule established for debugging (triggers every hour)")
+            EventLogManager.shared.log(source: "ScreenTimeManager", type: .info, message: "Hourly monitoring schedule registered successfully - extension should trigger every hour for debugging")
         } catch {
             print("[ScreenTime] Failed to start monitoring: \(error)")
             EventLogManager.shared.log(source: "ScreenTimeManager", type: .extensionError, message: "Failed to register monitoring schedule: \(error.localizedDescription)")
