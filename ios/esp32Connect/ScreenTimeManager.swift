@@ -173,23 +173,27 @@ class ScreenTimeManager: ObservableObject {
         }
     }
     
-    // Set up hourly monitoring schedule for easier debugging (triggers every hour)
-    // NOTE: For production, this should be changed to daily (midnight only) for battery efficiency
+    // Set up daily monitoring schedule (triggers at midnight)
+    // NOTE: iOS DeviceActivity framework does NOT reliably support schedules shorter than daily.
+    // Hourly or other frequent schedules may be silently ignored or heavily throttled by the system.
+    // This has been changed back to daily (midnight only) as that's what iOS supports reliably.
     private func setupDailyMonitoring() {
-        // Create a schedule that triggers every hour (00:00 to 00:59, repeating)
-        // This allows for easier debugging without waiting until midnight
+        // Create a schedule that triggers at midnight (00:00)
+        // intervalStart: midnight (00:00)
+        // intervalEnd: 23:59 (one minute before next midnight)
+        // repeats: true (daily)
         let schedule = DeviceActivitySchedule(
-            intervalStart: DateComponents(minute: 0),
-            intervalEnd: DateComponents(minute: 59),
+            intervalStart: DateComponents(hour: 0, minute: 0),
+            intervalEnd: DateComponents(hour: 23, minute: 59),
             repeats: true
         )
         
         do {
-            // Start monitoring - this will trigger at the start of each hour
+            // Start monitoring - this will trigger at midnight each day
             // When the interval starts, shields are checked and reapplied if needed
             try activityCenter.startMonitoring(scheduleId, during: schedule)
-            print("[ScreenTime] Hourly monitoring schedule established for debugging (triggers every hour)")
-            EventLogManager.shared.log(source: "ScreenTimeManager", type: .info, message: "Hourly monitoring schedule registered successfully - extension should trigger every hour for debugging")
+            print("[ScreenTime] Daily monitoring schedule established (triggers at midnight)")
+            EventLogManager.shared.log(source: "ScreenTimeManager", type: .info, message: "Daily monitoring schedule registered successfully - extension will trigger at midnight")
         } catch {
             print("[ScreenTime] Failed to start monitoring: \(error)")
             EventLogManager.shared.log(source: "ScreenTimeManager", type: .extensionError, message: "Failed to register monitoring schedule: \(error.localizedDescription)")

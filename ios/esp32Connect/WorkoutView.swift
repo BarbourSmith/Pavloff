@@ -23,6 +23,7 @@ struct WorkoutView: View {
     @State private var showingSetup = false
     @State private var showingCongratulations = false
     @State private var showingEventLog = false
+    @State private var showingDiagnostics = false
     @State private var lastRepCount = 0
     @State private var workoutStartedToday = false
     
@@ -291,6 +292,22 @@ struct WorkoutView: View {
                                     .cornerRadius(8)
                                 }
                                 
+                                // Extension Diagnostics button
+                                Button(action: {
+                                    showingDiagnostics = true
+                                }) {
+                                    HStack {
+                                        Image(systemName: "stethoscope")
+                                        Text("Extension Diagnostics")
+                                    }
+                                    .fontWeight(.semibold)
+                                    .frame(maxWidth: .infinity)
+                                    .padding()
+                                    .background(Color.purple)
+                                    .foregroundColor(.white)
+                                    .cornerRadius(8)
+                                }
+                                
                                 // Reset button
                                 Button(action: {
                                     resetCurrentExercise()
@@ -386,6 +403,23 @@ struct WorkoutView: View {
                             }
                             .padding(.top, 10)
                             
+                            // Extension Diagnostics button for debugging
+                            Button(action: {
+                                showingDiagnostics = true
+                            }) {
+                                HStack {
+                                    Image(systemName: "stethoscope")
+                                    Text("Extension Diagnostics")
+                                }
+                                .fontWeight(.semibold)
+                                .frame(maxWidth: 200)
+                                .padding()
+                                .background(Color.purple)
+                                .foregroundColor(.white)
+                                .cornerRadius(8)
+                            }
+                            .padding(.top, 10)
+                            
                             Spacer()
                         }
                         .frame(maxWidth: .infinity)
@@ -399,6 +433,9 @@ struct WorkoutView: View {
             }
             .sheet(isPresented: $showingEventLog) {
                 EventLogView()
+            }
+            .sheet(isPresented: $showingDiagnostics) {
+                ExtensionDiagnosticsView()
             }
             .sheet(isPresented: $showingCongratulations) {
                 CongratulationsView(workoutSettings: workoutSettings, onRestart: {
