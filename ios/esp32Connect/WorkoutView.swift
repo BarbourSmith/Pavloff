@@ -97,9 +97,8 @@ struct WorkoutView: View {
                         }
                         
                         Text(connectionStatus)
-                            .font(.subheadline)
-                            .foregroundColor(isConnected ? Color.white.opacity(0.9) : Color.white.opacity(0.8))
                             .font(isConnected ? .subheadline.weight(.semibold) : .subheadline.weight(.regular))
+                            .foregroundColor(isConnected ? Color.white.opacity(0.9) : Color.white.opacity(0.8))
                     }
                     
                     // Streak Indicator
