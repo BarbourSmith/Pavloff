@@ -174,26 +174,32 @@ class ScreenTimeManager: ObservableObject {
     }
     
     // Set up daily monitoring schedule (triggers at midnight)
-    // NOTE: iOS DeviceActivity framework does NOT reliably support schedules shorter than daily.
-    // Hourly or other frequent schedules may be silently ignored or heavily throttled by the system.
-    // This has been changed back to daily (midnight only) as that's what iOS supports reliably.
+    // IMPORTANT: Use a SHORT interval for reliable triggering!
+    // Long intervals (24 hours) can cause iOS to not fire intervalDidStart reliably.
+    // Solution: Use a very short interval (1 minute) at midnight that repeats daily.
+    // This ensures intervalDidStart fires consistently at midnight every day.
     private func setupDailyMonitoring() {
-        // Create a schedule that triggers at midnight (00:00)
-        // intervalStart: midnight (00:00)
-        // intervalEnd: 23:59 (one minute before next midnight)
+        // Create a schedule with a SHORT 1-minute interval starting at midnight
+        // intervalStart: 00:00:00 (midnight)
+        // intervalEnd: 00:00:59 (59 seconds later)
         // repeats: true (daily)
+        // 
+        // WHY: iOS DeviceActivity is more reliable with short intervals.
+        // The intervalDidStart will fire at 00:00, then the interval ends at 00:01,
+        // then it repeats the next day. This is a proven pattern for daily triggers.
         let schedule = DeviceActivitySchedule(
-            intervalStart: DateComponents(hour: 0, minute: 0),
-            intervalEnd: DateComponents(hour: 23, minute: 59),
-            repeats: true
+            intervalStart: DateComponents(hour: 0, minute: 0, second: 0),
+            intervalEnd: DateComponents(hour: 0, minute: 0, second: 59),
+            repeats: true,
+            warningTime: nil
         )
         
         do {
-            // Start monitoring - this will trigger at midnight each day
-            // When the interval starts, shields are checked and reapplied if needed
+            // Start monitoring - intervalDidStart will fire at midnight (00:00:00)
+            // This happens daily due to repeats: true
             try activityCenter.startMonitoring(scheduleId, during: schedule)
-            print("[ScreenTime] Daily monitoring schedule established (triggers at midnight)")
-            EventLogManager.shared.log(source: "ScreenTimeManager", type: .info, message: "Daily monitoring schedule registered successfully - extension will trigger at midnight")
+            print("[ScreenTime] Daily monitoring schedule established (1-minute interval at midnight)")
+            EventLogManager.shared.log(source: "ScreenTimeManager", type: .info, message: "Daily monitoring schedule registered successfully - extension will trigger at midnight with 1-minute interval")
         } catch {
             print("[ScreenTime] Failed to start monitoring: \(error)")
             EventLogManager.shared.log(source: "ScreenTimeManager", type: .extensionError, message: "Failed to register monitoring schedule: \(error.localizedDescription)")
