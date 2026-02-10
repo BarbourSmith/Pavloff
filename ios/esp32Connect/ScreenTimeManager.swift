@@ -31,7 +31,7 @@ class ScreenTimeManager: ObservableObject {
     private let center = AuthorizationCenter.shared
     private let activityCenter = DeviceActivityCenter()
     
-    private let scheduleId = DeviceActivityName("workoutSchedule")
+    private let scheduleId = DeviceActivityName.workoutSchedule
     
     // Use App Group UserDefaults for sharing data with extension
     private let userDefaults: UserDefaults = {

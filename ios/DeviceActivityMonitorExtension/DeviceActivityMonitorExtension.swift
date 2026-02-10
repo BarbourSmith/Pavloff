@@ -11,7 +11,7 @@ import FamilyControls
 import ManagedSettings
 
 // The DeviceActivityMonitor is called by the system when schedule events occur
-class DeviceActivityMonitorExtension: DeviceActivityMonitor {
+public class DeviceActivityMonitorExtension: DeviceActivityMonitor {
     let store = ManagedSettingsStore()
     
     // Called when the schedule interval starts (at midnight for our daily schedule)
@@ -21,7 +21,7 @@ class DeviceActivityMonitorExtension: DeviceActivityMonitor {
         print("[DeviceActivityMonitor] Interval started for activity: \(activity)")
         
         // Check if this is our workout schedule
-        if activity == DeviceActivityName("workoutSchedule") {
+        if activity == .workoutSchedule {
             handleMidnightReset()
         }
     }
