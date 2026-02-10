@@ -2,7 +2,7 @@
 
 ## Problem
 
-Apps were not automatically re-locking at midnight. The blocking only happened when the user manually opened the Pavloff app after midnight.
+Apps were not automatically re-locking at midnight. The blocking only happened when the user manually opened the app (Pavloff Workout, internally known as esp32Connect in the Xcode project) after midnight.
 
 ## Root Cause
 
