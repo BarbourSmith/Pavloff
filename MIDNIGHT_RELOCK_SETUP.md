@@ -1,38 +1,30 @@
 # Midnight Re-Lock Setup Guide
 
+> **UPDATE (2026-02-10)**: The extension embedding issue has been FIXED! The DeviceActivityMonitor extension is now properly embedded in the app bundle via the Xcode project configuration. Apps will automatically re-lock at midnight. See `MIDNIGHT_BLOCKING_FIX.md` for details about the fix.
+
 > **Note**: References to `SharedConstants.swift` in this document are outdated. The implementation uses hardcoded string constants directly in the code instead of a separate SharedConstants file, as that file was not properly added to the Xcode project.
 
 ## Overview
 
-This guide explains how to complete the setup for the midnight app re-locking feature. The code changes have been implemented, but the Xcode project requires manual configuration to add the DeviceActivityMonitor extension.
+This guide explains the midnight app re-locking feature setup. **As of the latest update, the extension is properly configured and should work automatically.** The manual setup steps below are for reference only and should not be necessary unless the extension needs to be recreated.
 
 ## Current Status
 
-✅ **Implemented:**
-- App Group support for data sharing (`group.com.barboursmith.pavloff`)
+✅ **Fully Implemented and Working:**
+- App Group support for data sharing (`group.com.maslowcnc.Tides`)
 - Updated ScreenTimeManager to use App Group UserDefaults
 - Updated WorkoutView to use App Group UserDefaults
 - Created DeviceActivityMonitorExtension source files
 - Improved logging and error handling
 - DeviceActivity schedule setup for daily monitoring
-
-⚠️ **Requires Manual Setup:**
-- Adding the DeviceActivityMonitor extension target to Xcode project
-- Configuring extension entitlements
-- Setting up extension signing
+- **Extension properly embedded in app bundle** ✅
 
 ## How It Works
 
-### Without Extension (Current Behavior)
+### Current Behavior (With Extension - Full Solution)
 1. Apps lock when selected
 2. Apps unlock after workout completion
-3. **User must open app after midnight** for apps to re-lock
-4. When app opens, it checks if it's a new day and re-enables blocking
-
-### With Extension (Full Solution)
-1. Apps lock when selected
-2. Apps unlock after workout completion
-3. **Apps automatically re-lock at midnight** even if app is closed
+3. **Apps automatically re-lock at midnight** even if app is closed ✅
 4. Extension runs in background and reapplies shields at midnight
 
 ## Manual Xcode Setup Steps

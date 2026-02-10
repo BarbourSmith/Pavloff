@@ -1,5 +1,7 @@
 # Midnight Re-Lock Solution Summary
 
+> **UPDATE (2026-02-10)**: The extension embedding issue has been FIXED! The DeviceActivityMonitor extension is now properly embedded in the app bundle. See `MIDNIGHT_BLOCKING_FIX.md` for details.
+
 > **Note**: References to `SharedConstants.swift` in this document are outdated. The implementation uses hardcoded string constants directly in the code instead of a separate SharedConstants file, as that file was not properly added to the Xcode project.
 
 ## Problem Statement
