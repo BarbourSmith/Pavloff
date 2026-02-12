@@ -10,6 +10,11 @@ import DeviceActivity
 import FamilyControls
 import ManagedSettings
 
+// Shared DeviceActivityName constant to ensure consistency between app and extension
+extension DeviceActivityName {
+    static let workoutSchedule = Self("workoutSchedule")
+}
+
 // The DeviceActivityMonitor is called by the system when schedule events occur
 public class DeviceActivityMonitorExtension: DeviceActivityMonitor {
     let store = ManagedSettingsStore()

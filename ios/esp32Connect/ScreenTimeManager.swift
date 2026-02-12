@@ -11,6 +11,11 @@ import ManagedSettings
 import DeviceActivity
 import SwiftUI
 
+// Shared DeviceActivityName constant to ensure consistency between app and extension
+extension DeviceActivityName {
+    static let workoutSchedule = Self("workoutSchedule")
+}
+
 @MainActor
 class ScreenTimeManager: ObservableObject {
     static let shared = ScreenTimeManager()
