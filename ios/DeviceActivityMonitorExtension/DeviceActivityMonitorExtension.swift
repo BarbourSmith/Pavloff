@@ -15,7 +15,7 @@ public class DeviceActivityMonitorExtension: DeviceActivityMonitor {
     let store = ManagedSettingsStore()
     
     // Called when the schedule interval starts (at midnight for our daily schedule)
-    override func intervalDidStart(for activity: DeviceActivityName) {
+    public override func intervalDidStart(for activity: DeviceActivityName) {
         super.intervalDidStart(for: activity)
         
         print("[DeviceActivityMonitor] Interval started for activity: \(activity)")
@@ -27,7 +27,7 @@ public class DeviceActivityMonitorExtension: DeviceActivityMonitor {
     }
     
     // Called when the schedule interval ends (at 11:59 PM for our daily schedule)
-    override func intervalDidEnd(for activity: DeviceActivityName) {
+    public override func intervalDidEnd(for activity: DeviceActivityName) {
         super.intervalDidEnd(for: activity)
         
         print("[DeviceActivityMonitor] Interval ended for activity: \(activity)")
