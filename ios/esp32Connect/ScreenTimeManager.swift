@@ -11,9 +11,13 @@ import ManagedSettings
 import DeviceActivity
 import SwiftUI
 
-// Shared DeviceActivityName constant to ensure consistency between app and extension
+// Shared constants to ensure consistency between app and extension
 extension DeviceActivityName {
     static let workoutSchedule = Self("workoutSchedule")
+}
+
+extension DeviceActivityEvent.Name {
+    static let midnightBlock = Self("midnightBlock")
 }
 
 @MainActor
@@ -174,17 +178,33 @@ class ScreenTimeManager: ObservableObject {
     
     // Set up daily monitoring schedule to automatically re-enable blocking at midnight
     private func setupDailyMonitoring() {
-        // Create a schedule that runs from midnight to 11:59 PM every day
+        // Use a schedule from 00:00 to 23:00 with a clear gap before the next day.
+        // This ensures the system recognizes a distinct interval boundary each day
+        // and reliably fires intervalDidStart at midnight.
         let schedule = DeviceActivitySchedule(
             intervalStart: DateComponents(hour: 0, minute: 0),
-            intervalEnd: DateComponents(hour: 23, minute: 59),
+            intervalEnd: DateComponents(hour: 23, minute: 0),
             repeats: true
         )
-        
+
+        // Also register an event that fires at the start of each interval as a backup.
+        // The event threshold of 0 seconds means it fires immediately when the interval starts.
+        let midnightEvent = DeviceActivityEvent(
+            applications: selectedApps.applicationTokens,
+            categories: selectedApps.categoryTokens,
+            threshold: DateComponents(minute: 1)
+        )
+
         do {
-            // Start monitoring - this will trigger at the start of each interval (midnight)
-            // When the interval starts, shields need to be reapplied
-            try activityCenter.startMonitoring(scheduleId, during: schedule)
+            // Stop any existing monitoring first to ensure clean state
+            activityCenter.stopMonitoring([scheduleId])
+
+            // Start monitoring with both interval callbacks and the event
+            try activityCenter.startMonitoring(
+                scheduleId,
+                during: schedule,
+                events: [.midnightBlock: midnightEvent]
+            )
             print("[ScreenTime] Daily monitoring schedule established for midnight re-lock")
         } catch {
             print("[ScreenTime] Failed to start monitoring: \(error)")
