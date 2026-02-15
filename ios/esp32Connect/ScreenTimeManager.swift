@@ -222,6 +222,7 @@ class ScreenTimeManager: ObservableObject {
         do {
             // Stop any existing monitoring first to ensure clean state
             activityCenter.stopMonitoring([scheduleId])
+            logger.log("Stopped existing monitoring")
 
             // Start monitoring with interval callbacks + threshold event
             try activityCenter.startMonitoring(
@@ -229,7 +230,8 @@ class ScreenTimeManager: ObservableObject {
                 during: schedule,
                 events: [.midnightBlock: midnightEvent]
             )
-            logger.log("Daily monitoring schedule established (00:00–23:00, warningTime=5min, repeats=true)")
+            logger.log("Daily monitoring schedule established (00:00-23:00, warningTime=5min, repeats=true)")
+            logger.log("Event threshold: \(midnightEvent.threshold), monitoring apps: \(midnightEvent.applications.count), categories: \(midnightEvent.categories.count)")
         } catch {
             logger.error("Failed to start monitoring: \(error.localizedDescription, privacy: .public)")
         }
