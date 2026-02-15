@@ -178,26 +178,27 @@ class ScreenTimeManager: ObservableObject {
     
     // Set up daily monitoring schedule to automatically re-enable blocking at midnight
     private func setupDailyMonitoring() {
-        // Use a schedule from 00:00 to 23:00 with a clear gap before the next day.
+        // Use a schedule from 00:00 to 23:59 with minimal gap before the next day.
         // This ensures the system recognizes a distinct interval boundary each day
         // and reliably fires intervalDidStart at midnight.
         let schedule = DeviceActivitySchedule(
             intervalStart: DateComponents(hour: 0, minute: 0),
-            intervalEnd: DateComponents(hour: 23, minute: 0),
+            intervalEnd: DateComponents(hour: 23, minute: 59),
             repeats: true
         )
 
         // Also register an event that fires at the start of each interval as a backup.
-        // The event threshold of 0 seconds means it fires immediately when the interval starts.
+        // The event threshold of 0 minutes means it fires immediately when the interval starts.
         let midnightEvent = DeviceActivityEvent(
             applications: selectedApps.applicationTokens,
             categories: selectedApps.categoryTokens,
-            threshold: DateComponents(minute: 1)
+            threshold: DateComponents(minute: 0)
         )
 
         do {
             // Stop any existing monitoring first to ensure clean state
             activityCenter.stopMonitoring([scheduleId])
+            print("[ScreenTime] Stopped existing monitoring")
 
             // Start monitoring with both interval callbacks and the event
             try activityCenter.startMonitoring(
@@ -205,9 +206,13 @@ class ScreenTimeManager: ObservableObject {
                 during: schedule,
                 events: [.midnightBlock: midnightEvent]
             )
-            print("[ScreenTime] Daily monitoring schedule established for midnight re-lock")
+            print("[ScreenTime] ✅ Daily monitoring schedule established for midnight re-lock")
+            print("[ScreenTime] Schedule: \(schedule.intervalStart) to \(schedule.intervalEnd), repeats: \(schedule.repeats)")
+            print("[ScreenTime] Event threshold: \(midnightEvent.threshold)")
+            print("[ScreenTime] Monitoring apps: \(midnightEvent.applications.count), categories: \(midnightEvent.categories.count)")
         } catch {
-            print("[ScreenTime] Failed to start monitoring: \(error)")
+            print("[ScreenTime] ❌ Failed to start monitoring: \(error)")
+            print("[ScreenTime] Error details: \(error.localizedDescription)")
         }
     }
     
