@@ -10,6 +10,7 @@ import FamilyControls
 import ManagedSettings
 import DeviceActivity
 import SwiftUI
+import os.log
 
 // Shared constants to ensure consistency between app and extension
 extension DeviceActivityName {
@@ -23,144 +24,160 @@ extension DeviceActivityEvent.Name {
 @MainActor
 class ScreenTimeManager: ObservableObject {
     static let shared = ScreenTimeManager()
-    
+
+    private let logger = Logger(subsystem: "com.maslowcnc.Tides", category: "ScreenTimeManager")
+
     @Published var isAuthorized = false
     @Published var selectedApps: FamilyActivitySelection = FamilyActivitySelection() {
         didSet {
             // Save the fact that we have a selection
             let hasSelection = !selectedApps.applicationTokens.isEmpty || !selectedApps.categoryTokens.isEmpty
             userDefaults.set(hasSelection, forKey: "hasAppSelection")
-            
+
             // Persist the selection for app restarts
             saveSelection()
         }
     }
-    
+
     private let store = ManagedSettingsStore()
     private let center = AuthorizationCenter.shared
     private let activityCenter = DeviceActivityCenter()
-    
+
     private let scheduleId = DeviceActivityName.workoutSchedule
-    
+
     // Use App Group UserDefaults for sharing data with extension
     private let userDefaults: UserDefaults = {
         guard let defaults = UserDefaults(suiteName: "group.com.maslowcnc.Tides") else {
-            print("[ScreenTime] Warning: Failed to create App Group UserDefaults, falling back to standard")
             return UserDefaults.standard
         }
         return defaults
     }()
-    
+
     private init() {
-        print("[ScreenTime] Initializing ScreenTimeManager...")
-        
+        logger.log("Initializing ScreenTimeManager...")
+
         // Check initial authorization status
         Task {
             await checkAuthorizationStatus()
         }
-        
+
         // Load persisted selection
         loadSelection()
-        
-        print("[ScreenTime] After loadSelection, tokens count: apps=\(selectedApps.applicationTokens.count), categories=\(selectedApps.categoryTokens.count)")
-        
-        // If we have a saved selection, ensure monitoring is active
+
+        logger.log("After loadSelection, tokens count: apps=\(self.selectedApps.applicationTokens.count), categories=\(self.selectedApps.categoryTokens.count)")
+
+        // If we have a saved selection, ensure monitoring is active and shields are applied
         if hasAppsSelected {
-            print("[ScreenTime] Has app selection flag is true")
+            logger.log("Has app selection flag is true")
             if !selectedApps.applicationTokens.isEmpty || !selectedApps.categoryTokens.isEmpty {
-                print("[ScreenTime] Tokens are available, setting up monitoring")
+                logger.log("Tokens are available, setting up monitoring")
                 setupDailyMonitoring()
+
+                // Proactively apply shields on init if workout not completed today.
+                // This is critical because the DeviceActivityMonitor extension callbacks
+                // (intervalDidStart, intervalDidEnd) are unreliable and may not fire.
+                // By applying shields here, we ensure blocking is active whenever the app
+                // process starts (app launch, foreground, or system restart).
+                if !isWorkoutCompletedToday() {
+                    logger.log("Workout not completed today — applying shields proactively on init")
+                    store.shield.applications = selectedApps.applicationTokens
+                    if !selectedApps.categoryTokens.isEmpty {
+                        store.shield.applicationCategories = .specific(selectedApps.categoryTokens)
+                    }
+                } else {
+                    logger.log("Workout already completed today — leaving shields off")
+                }
             } else {
-                print("[ScreenTime] Warning: hasAppSelection is true but no tokens loaded")
+                logger.warning("hasAppSelection is true but no tokens loaded")
             }
         }
     }
-    
+
+    // Check if workout was completed today (shared logic for init and extension)
+    private func isWorkoutCompletedToday() -> Bool {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+
+        if let lastCompletionDate = userDefaults.object(forKey: "lastWorkoutCompletion") as? Date {
+            let lastCompletionDay = calendar.startOfDay(for: lastCompletionDate)
+            return calendar.isDate(lastCompletionDay, inSameDayAs: today)
+        }
+        return false
+    }
+
     // Save the selection to UserDefaults
     private func saveSelection() {
         let encoder = JSONEncoder()
         let data = try? encoder.encode(selectedApps)
         if let data = data {
             userDefaults.set(data, forKey: "savedAppSelection")
-            print("[ScreenTime] Selection saved successfully to App Group")
+            logger.log("Selection saved successfully to App Group")
         } else {
-            print("[ScreenTime] Failed to encode selection")
+            logger.error("Failed to encode selection")
         }
     }
-    
+
     // Load the selection from UserDefaults
     private func loadSelection() {
         guard let data = userDefaults.data(forKey: "savedAppSelection") else {
-            print("[ScreenTime] No saved selection found in UserDefaults")
+            logger.log("No saved selection found in UserDefaults")
             return
         }
-        
-        print("[ScreenTime] Found saved selection data (\(data.count) bytes), attempting to decode...")
-        
+
+        logger.log("Found saved selection data (\(data.count) bytes), attempting to decode...")
+
         do {
             let decoder = JSONDecoder()
             selectedApps = try decoder.decode(FamilyActivitySelection.self, from: data)
-            print("[ScreenTime] Selection loaded successfully:")
-            print("[ScreenTime] - Application tokens: \(selectedApps.applicationTokens.count)")
-            print("[ScreenTime] - Category tokens: \(selectedApps.categoryTokens.count)")
-            print("[ScreenTime] - Web domain tokens: \(selectedApps.webDomainTokens.count)")
+            logger.log("Selection loaded: \(self.selectedApps.applicationTokens.count) apps, \(self.selectedApps.categoryTokens.count) categories, \(self.selectedApps.webDomainTokens.count) web domains")
         } catch {
-            print("[ScreenTime] Failed to decode selection: \(error)")
-            print("[ScreenTime] Error details: \(error.localizedDescription)")
+            logger.error("Failed to decode selection: \(error.localizedDescription, privacy: .public)")
         }
     }
-    
+
     // Request authorization from the user
     func requestAuthorization() async {
         do {
             try await center.requestAuthorization(for: .individual)
             await checkAuthorizationStatus()
         } catch {
-            print("[ScreenTime] Authorization failed: \(error)")
+            logger.error("Authorization failed: \(error.localizedDescription, privacy: .public)")
             isAuthorized = false
         }
     }
-    
+
     // Check current authorization status
     private func checkAuthorizationStatus() async {
         let status = center.authorizationStatus
         isAuthorized = (status == .approved)
-        print("[ScreenTime] Authorization status: \(status)")
+        logger.log("Authorization status: \(String(describing: status), privacy: .public)")
     }
-    
+
     // Enable app blocking from midnight until workout is completed
     func enableAppBlocking() {
         guard isAuthorized else {
-            print("[ScreenTime] Not authorized to enable app blocking")
+            logger.log("Not authorized to enable app blocking")
             return
         }
-        
+
         // Check if we have apps selected (persisted flag)
         guard hasAppsSelected else {
-            print("[ScreenTime] No apps have been selected for blocking")
+            logger.log("No apps have been selected for blocking")
             return
         }
-        
+
         // Try to reload selection if tokens are empty
         if selectedApps.applicationTokens.isEmpty && selectedApps.categoryTokens.isEmpty {
-            print("[ScreenTime] Tokens are empty, attempting to reload selection...")
+            logger.log("Tokens are empty, attempting to reload selection...")
             loadSelection()
-            
+
             // If still empty after reload, the tokens have expired
             if selectedApps.applicationTokens.isEmpty && selectedApps.categoryTokens.isEmpty {
-                print("[ScreenTime] Warning: Tokens could not be restored from storage")
-                print("[ScreenTime] User may need to reselect apps in Workout Settings")
-                
-                // Try to apply shields one more time in case they're still in the store
-                // (ManagedSettingsStore persists shields even if we don't have tokens)
-                print("[ScreenTime] Attempting to verify if shields are still active in ManagedSettingsStore...")
-                
-                // We can't directly read shield settings, but we can try to set them again
-                // If tokens are truly gone, this won't work, but it's worth trying
+                logger.warning("Tokens could not be restored from storage — user may need to reselect apps")
                 return
             }
         }
-        
+
         // Set shields if we have selection tokens in memory
         if !selectedApps.applicationTokens.isEmpty || !selectedApps.categoryTokens.isEmpty {
             // Set shields for selected apps
@@ -168,27 +185,34 @@ class ScreenTimeManager: ObservableObject {
             if !selectedApps.categoryTokens.isEmpty {
                 store.shield.applicationCategories = .specific(selectedApps.categoryTokens)
             }
-            
+
             // Set up daily monitoring schedule to re-enable blocking at midnight
             setupDailyMonitoring()
-            
-            print("[ScreenTime] App blocking enabled with \(selectedApps.applicationTokens.count) apps and \(selectedApps.categoryTokens.count) categories")
+
+            logger.log("App blocking enabled with \(self.selectedApps.applicationTokens.count) apps and \(self.selectedApps.categoryTokens.count) categories")
         }
     }
-    
+
     // Set up daily monitoring schedule to automatically re-enable blocking at midnight
     private func setupDailyMonitoring() {
-        // Use a schedule from 00:00 to 23:00 with a clear gap before the next day.
+        // Schedule from 00:00 to 23:00 with a 1-hour gap before the next day.
         // This ensures the system recognizes a distinct interval boundary each day
         // and reliably fires intervalDidStart at midnight.
+        //
+        // warningTime fires intervalWillEndWarning 5 minutes before intervalEnd (at 22:55),
+        // giving us a 4th callback opportunity to reapply shields.
         let schedule = DeviceActivitySchedule(
             intervalStart: DateComponents(hour: 0, minute: 0),
             intervalEnd: DateComponents(hour: 23, minute: 0),
-            repeats: true
+            repeats: true,
+            warningTime: DateComponents(minute: 5)
         )
 
-        // Also register an event that fires at the start of each interval as a backup.
-        // The event threshold of 0 seconds means it fires immediately when the interval starts.
+        // Register an event that fires after 1 minute of cumulative usage of the
+        // selected apps within the schedule interval. Note: this fires based on
+        // actual app usage time, NOT wall-clock time after midnight. It serves as
+        // a backup to re-shield apps if the user starts using them before the
+        // interval callbacks have fired.
         let midnightEvent = DeviceActivityEvent(
             applications: selectedApps.applicationTokens,
             categories: selectedApps.categoryTokens,
@@ -199,51 +223,50 @@ class ScreenTimeManager: ObservableObject {
             // Stop any existing monitoring first to ensure clean state
             activityCenter.stopMonitoring([scheduleId])
 
-            // Start monitoring with both interval callbacks and the event
+            // Start monitoring with interval callbacks + threshold event
             try activityCenter.startMonitoring(
                 scheduleId,
                 during: schedule,
                 events: [.midnightBlock: midnightEvent]
             )
-            print("[ScreenTime] Daily monitoring schedule established for midnight re-lock")
+            logger.log("Daily monitoring schedule established (00:00–23:00, warningTime=5min, repeats=true)")
         } catch {
-            print("[ScreenTime] Failed to start monitoring: \(error)")
+            logger.error("Failed to start monitoring: \(error.localizedDescription, privacy: .public)")
         }
     }
-    
+
     // Stop daily monitoring schedule
     private func stopDailyMonitoring() {
         activityCenter.stopMonitoring([scheduleId])
-        print("[ScreenTime] Daily monitoring stopped")
+        logger.log("Daily monitoring stopped")
     }
-    
+
     // Disable app blocking when workout is completed
     func disableAppBlocking() {
         guard isAuthorized else {
-            print("[ScreenTime] Not authorized to disable app blocking")
+            logger.log("Not authorized to disable app blocking")
             return
         }
-        
-        // Remove shields to unlock apps for the user after workout completion
-        // Note: This means shields must be reapplied at midnight for the next day
-        // With the DeviceActivityMonitor extension, this happens automatically
-        // Without the extension, shields are reapplied when user opens the app
+
+        // Remove shields to unlock apps for the user after workout completion.
+        // The DeviceActivityMonitor extension will reapply shields at midnight,
+        // and the app will also reapply them on next launch/foreground if needed.
         store.shield.applications = nil
         store.shield.applicationCategories = nil
-        
-        print("[ScreenTime] App blocking disabled - workout completed!")
+
+        logger.log("App blocking disabled — workout completed!")
     }
-    
+
     // Check if blocking is currently active
     var isBlockingEnabled: Bool {
         return store.shield.applications != nil || store.shield.applicationCategories != nil
     }
-    
+
     // Check if we have apps selected
     var hasAppsSelected: Bool {
         return userDefaults.bool(forKey: "hasAppSelection")
     }
-    
+
     // Clear all selected apps
     func clearSelection() {
         selectedApps = FamilyActivitySelection()
@@ -251,7 +274,6 @@ class ScreenTimeManager: ObservableObject {
         stopDailyMonitoring()
         userDefaults.set(false, forKey: "hasAppSelection")
         userDefaults.removeObject(forKey: "savedAppSelection")
-        print("[ScreenTime] Selection cleared")
+        logger.log("Selection cleared")
     }
 }
-

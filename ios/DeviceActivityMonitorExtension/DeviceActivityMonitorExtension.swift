@@ -9,6 +9,7 @@ import Foundation
 import DeviceActivity
 import FamilyControls
 import ManagedSettings
+import os.log
 
 // Shared constants to ensure consistency between app and extension
 extension DeviceActivityName {
@@ -21,25 +22,37 @@ extension DeviceActivityEvent.Name {
 
 // The DeviceActivityMonitor is called by the system when schedule events occur
 public class DeviceActivityMonitorExtension: DeviceActivityMonitor {
+    private let logger = Logger(subsystem: "com.maslowcnc.Tides", category: "DeviceActivityMonitor")
     let store = ManagedSettingsStore()
 
-    // Called when the schedule interval starts
+    // Called when the schedule interval starts (midnight)
     public override func intervalDidStart(for activity: DeviceActivityName) {
         super.intervalDidStart(for: activity)
 
-        print("[DeviceActivityMonitor] Interval started for activity: \(activity)")
+        logger.log("Interval started for activity: \(activity.rawValue, privacy: .public)")
 
         if activity == .workoutSchedule {
             handleMidnightReset()
         }
     }
 
-    // Called when the schedule interval ends — also reapply shields as a safety net
+    // Called when the schedule interval ends (23:00) — also reapply shields as a safety net
     // in case intervalDidStart doesn't fire reliably on the next day
     public override func intervalDidEnd(for activity: DeviceActivityName) {
         super.intervalDidEnd(for: activity)
 
-        print("[DeviceActivityMonitor] Interval ended for activity: \(activity)")
+        logger.log("Interval ended for activity: \(activity.rawValue, privacy: .public)")
+
+        if activity == .workoutSchedule {
+            handleMidnightReset()
+        }
+    }
+
+    // Called when the schedule's warning time is reached (23:55)
+    public override func intervalWillEndWarning(for activity: DeviceActivityName) {
+        super.intervalWillEndWarning(for: activity)
+
+        logger.log("Interval will end warning for activity: \(activity.rawValue, privacy: .public)")
 
         if activity == .workoutSchedule {
             handleMidnightReset()
@@ -50,7 +63,7 @@ public class DeviceActivityMonitorExtension: DeviceActivityMonitor {
     public override func eventDidReachThreshold(_ event: DeviceActivityEvent.Name, activity: DeviceActivityName) {
         super.eventDidReachThreshold(event, activity: activity)
 
-        print("[DeviceActivityMonitor] Event \(event) reached threshold for activity: \(activity)")
+        logger.log("Event \(event.rawValue, privacy: .public) reached threshold for activity: \(activity.rawValue, privacy: .public)")
 
         if activity == .workoutSchedule && event == .midnightBlock {
             handleMidnightReset()
@@ -59,11 +72,11 @@ public class DeviceActivityMonitorExtension: DeviceActivityMonitor {
 
     // Handle the midnight reset - re-enable app blocking for the new day
     private func handleMidnightReset() {
-        print("[DeviceActivityMonitor] Midnight reset triggered - checking if shields should be reapplied")
+        logger.log("Midnight reset triggered - checking if shields should be reapplied")
 
         // Use App Group UserDefaults
         guard let userDefaults = UserDefaults(suiteName: "group.com.maslowcnc.Tides") else {
-            print("[DeviceActivityMonitor] Error: Failed to access App Group UserDefaults")
+            logger.error("Failed to access App Group UserDefaults")
             return
         }
 
@@ -75,14 +88,14 @@ public class DeviceActivityMonitorExtension: DeviceActivityMonitor {
             let lastCompletionDay = calendar.startOfDay(for: lastCompletionDate)
 
             if !calendar.isDate(lastCompletionDay, inSameDayAs: today) {
-                print("[DeviceActivityMonitor] Workout not completed today yet - reapplying shields")
+                logger.log("Workout not completed today yet - reapplying shields")
                 reapplyShields(userDefaults: userDefaults)
             } else {
-                print("[DeviceActivityMonitor] Workout already completed today - shields stay off")
+                logger.log("Workout already completed today - shields stay off")
             }
         } else {
             // No workout completion recorded, reapply shields
-            print("[DeviceActivityMonitor] No workout completion found - reapplying shields")
+            logger.log("No workout completion found - reapplying shields")
             reapplyShields(userDefaults: userDefaults)
         }
     }
@@ -91,13 +104,13 @@ public class DeviceActivityMonitorExtension: DeviceActivityMonitor {
     private func reapplyShields(userDefaults: UserDefaults) {
         // Check if we have apps selected
         guard userDefaults.bool(forKey: "hasAppSelection") else {
-            print("[DeviceActivityMonitor] No apps selected, skipping shield application")
+            logger.log("No apps selected, skipping shield application")
             return
         }
 
         // Try to load the saved selection
         guard let data = userDefaults.data(forKey: "savedAppSelection") else {
-            print("[DeviceActivityMonitor] No saved selection data found")
+            logger.log("No saved selection data found")
             return
         }
 
@@ -108,20 +121,20 @@ public class DeviceActivityMonitorExtension: DeviceActivityMonitor {
             // Apply shields
             if !selection.applicationTokens.isEmpty {
                 store.shield.applications = selection.applicationTokens
-                print("[DeviceActivityMonitor] Reapplied shields for \(selection.applicationTokens.count) apps")
+                logger.log("Reapplied shields for \(selection.applicationTokens.count) apps")
             }
 
             if !selection.categoryTokens.isEmpty {
                 store.shield.applicationCategories = .specific(selection.categoryTokens)
-                print("[DeviceActivityMonitor] Reapplied shields for \(selection.categoryTokens.count) categories")
+                logger.log("Reapplied shields for \(selection.categoryTokens.count) categories")
             }
 
             if selection.applicationTokens.isEmpty && selection.categoryTokens.isEmpty {
-                print("[DeviceActivityMonitor] Warning: Selection decoded but contains no tokens")
+                logger.warning("Selection decoded but contains no tokens")
             }
 
         } catch {
-            print("[DeviceActivityMonitor] Failed to decode selection: \(error)")
+            logger.error("Failed to decode selection: \(error.localizedDescription, privacy: .public)")
         }
     }
 }
