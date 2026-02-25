@@ -117,7 +117,13 @@ public class DeviceActivityMonitorExtension: DeviceActivityMonitor {
                 logger.log("Workout not completed today yet - reapplying shields")
                 reapplyShields(userDefaults: userDefaults)
             } else {
-                logger.log("Workout already completed today - shields stay off")
+                // Workout already completed today — actively clear any shields this
+                // extension previously applied. The extension holds its own
+                // ManagedSettingsStore instance, so the host app clearing its store
+                // does not remove shields written here; we must clear them ourselves.
+                logger.log("Workout already completed today - clearing extension shields")
+                store.shield.applications = nil
+                store.shield.applicationCategories = nil
             }
         } else {
             // No workout completion recorded, reapply shields

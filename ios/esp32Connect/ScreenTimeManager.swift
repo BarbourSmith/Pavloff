@@ -245,16 +245,20 @@ class ScreenTimeManager: ObservableObject {
 
     // Disable app blocking when workout is completed
     func disableAppBlocking() {
-        guard isAuthorized else {
-            logger.log("Not authorized to disable app blocking")
-            return
-        }
+        // NOTE: Do NOT guard on isAuthorized here. isAuthorized is an in-memory cache
+        // set by an async task in init(), so it can be stale/false even when the
+        // FamilyControls framework is fully authorized (e.g. granted in a prior session).
+        // Shields are applied in init() without this check for the same reason.
+        // Clearing shields is always safe and should never be blocked by a stale flag.
 
-        // Remove shields to unlock apps for the user after workout completion.
-        // The DeviceActivityMonitor extension will reapply shields at midnight,
-        // and the app will also reapply them on next launch/foreground if needed.
+        // Clear this process's ManagedSettingsStore.
         store.shield.applications = nil
         store.shield.applicationCategories = nil
+
+        // Restart monitoring so the DeviceActivityMonitor extension receives
+        // intervalDidStart and actively clears any shields it independently applied
+        // (the extension maintains its own ManagedSettingsStore instance).
+        setupDailyMonitoring()
 
         logger.log("App blocking disabled — workout completed!")
     }
