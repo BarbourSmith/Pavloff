@@ -17,9 +17,6 @@ extension DeviceActivityName {
     static let workoutSchedule = Self("workoutSchedule")
 }
 
-extension DeviceActivityEvent.Name {
-    static let midnightBlock = Self("midnightBlock")
-}
 
 @MainActor
 class ScreenTimeManager: ObservableObject {
@@ -208,30 +205,25 @@ class ScreenTimeManager: ObservableObject {
             warningTime: DateComponents(minute: 5)
         )
 
-        // Register an event that fires after 1 minute of cumulative usage of the
-        // selected apps within the schedule interval. Note: this fires based on
-        // actual app usage time, NOT wall-clock time after midnight. It serves as
-        // a backup to re-shield apps if the user starts using them before the
-        // interval callbacks have fired.
-        let midnightEvent = DeviceActivityEvent(
-            applications: selectedApps.applicationTokens,
-            categories: selectedApps.categoryTokens,
-            threshold: DateComponents(minute: 1)
-        )
-
         do {
             // Stop any existing monitoring first to ensure clean state
             activityCenter.stopMonitoring([scheduleId])
             logger.log("Stopped existing monitoring")
 
-            // Start monitoring with interval callbacks + threshold event
+            // Start monitoring with interval callbacks only (no threshold events).
+            // DeviceActivityEvent thresholds share iOS Screen Time's usage-limit
+            // accounting layer; registering a 1-minute threshold for an app that
+            // the user also has a built-in App Limit on causes the "time's up"
+            // banner to appear after just 1 minute of use, even after Pavloff
+            // removes its own ManagedSettings shield. Interval callbacks
+            // (intervalDidStart, intervalDidEnd, intervalWillEndWarning) are
+            // sufficient — proactive shield application in the main app covers
+            // any gap at midnight.
             try activityCenter.startMonitoring(
                 scheduleId,
-                during: schedule,
-                events: [.midnightBlock: midnightEvent]
+                during: schedule
             )
             logger.log("Daily monitoring schedule established (00:00-23:00, warningTime=5min, repeats=true)")
-            logger.log("Event threshold: \(midnightEvent.threshold), monitoring apps: \(midnightEvent.applications.count), categories: \(midnightEvent.categories.count)")
         } catch {
             logger.error("Failed to start monitoring: \(error.localizedDescription, privacy: .public)")
         }

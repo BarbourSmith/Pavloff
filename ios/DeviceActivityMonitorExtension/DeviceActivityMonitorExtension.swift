@@ -16,9 +16,6 @@ extension DeviceActivityName {
     static let workoutSchedule = Self("workoutSchedule")
 }
 
-extension DeviceActivityEvent.Name {
-    static let midnightBlock = Self("midnightBlock")
-}
 
 // The DeviceActivityMonitor is called by the system when schedule events occur
 public class DeviceActivityMonitorExtension: DeviceActivityMonitor {
@@ -68,19 +65,6 @@ public class DeviceActivityMonitorExtension: DeviceActivityMonitor {
             handleMidnightReset()
         } else {
             logger.warning("Ignoring unknown activity: \(activity.rawValue, privacy: .public)")
-        }
-    }
-
-    // Called when a threshold event is reached within the schedule
-    public override func eventDidReachThreshold(_ event: DeviceActivityEvent.Name, activity: DeviceActivityName) {
-        super.eventDidReachThreshold(event, activity: activity)
-
-        logger.log("Event \(event.rawValue, privacy: .public) reached threshold for activity: \(activity.rawValue, privacy: .public), matches midnightBlock: \(event == .midnightBlock)")
-
-        if activity == .workoutSchedule && event == .midnightBlock {
-            handleMidnightReset()
-        } else {
-            logger.warning("Ignoring unknown activity/event combination")
         }
     }
 
