@@ -16,9 +16,6 @@ extension DeviceActivityName {
     static let workoutSchedule = Self("workoutSchedule")
 }
 
-extension DeviceActivityEvent.Name {
-    static let midnightBlock = Self("midnightBlock")
-}
 
 // The DeviceActivityMonitor is called by the system when schedule events occur
 public class DeviceActivityMonitorExtension: DeviceActivityMonitor {
@@ -71,19 +68,6 @@ public class DeviceActivityMonitorExtension: DeviceActivityMonitor {
         }
     }
 
-    // Called when a threshold event is reached within the schedule
-    public override func eventDidReachThreshold(_ event: DeviceActivityEvent.Name, activity: DeviceActivityName) {
-        super.eventDidReachThreshold(event, activity: activity)
-
-        logger.log("Event \(event.rawValue, privacy: .public) reached threshold for activity: \(activity.rawValue, privacy: .public), matches midnightBlock: \(event == .midnightBlock)")
-
-        if activity == .workoutSchedule && event == .midnightBlock {
-            handleMidnightReset()
-        } else {
-            logger.warning("Ignoring unknown activity/event combination")
-        }
-    }
-
     // Handle the midnight reset - re-enable app blocking for the new day
     private func handleMidnightReset() {
         logger.log("Midnight reset triggered - checking if shields should be reapplied")
@@ -117,7 +101,13 @@ public class DeviceActivityMonitorExtension: DeviceActivityMonitor {
                 logger.log("Workout not completed today yet - reapplying shields")
                 reapplyShields(userDefaults: userDefaults)
             } else {
-                logger.log("Workout already completed today - shields stay off")
+                // Workout already completed today — actively clear any shields this
+                // extension previously applied. The extension holds its own
+                // ManagedSettingsStore instance, so the host app clearing its store
+                // does not remove shields written here; we must clear them ourselves.
+                logger.log("Workout already completed today - clearing extension shields")
+                store.shield.applications = nil
+                store.shield.applicationCategories = nil
             }
         } else {
             // No workout completion recorded, reapply shields
