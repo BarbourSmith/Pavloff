@@ -101,11 +101,13 @@ public class DeviceActivityMonitorExtension: DeviceActivityMonitor {
                 logger.log("Workout not completed today yet - reapplying shields")
                 reapplyShields(userDefaults: userDefaults)
             } else {
-                // Workout already completed today — actively clear any shields this
-                // extension previously applied. The extension holds its own
-                // ManagedSettingsStore instance, so the host app clearing its store
-                // does not remove shields written here; we must clear them ourselves.
-                logger.log("Workout already completed today - clearing extension shields")
+                // Workout already completed today — clear shields. The default
+                // ManagedSettingsStore() is shared across all processes in the
+                // same app group (WWDC 2021 "Meet the Screen Time API"), so the
+                // host app clearing its store already cleared these. Clearing
+                // again here is a no-op safety net in case this callback fires
+                // before the host app has had a chance to run.
+                logger.log("Workout already completed today - clearing shields")
                 store.shield.applications = nil
                 store.shield.applicationCategories = nil
             }

@@ -183,8 +183,15 @@ class ScreenTimeManager: ObservableObject {
                 store.shield.applicationCategories = .specific(selectedApps.categoryTokens)
             }
 
-            // Set up daily monitoring schedule to re-enable blocking at midnight
-            setupDailyMonitoring()
+            // Only start monitoring if it isn't already running. Calling
+            // stopMonitoring + startMonitoring mid-interval (e.g. on every
+            // foreground event) disrupts iOS Screen Time's internal accounting
+            // and causes "time's up" banners to appear on apps that have
+            // built-in App Limits, even with zero actual usage. The monitoring
+            // schedule handles its own daily reset via intervalDidStart.
+            if !activityCenter.activities.contains(scheduleId) {
+                setupDailyMonitoring()
+            }
 
             logger.log("App blocking enabled with \(self.selectedApps.applicationTokens.count) apps and \(self.selectedApps.categoryTokens.count) categories")
         }
@@ -243,14 +250,19 @@ class ScreenTimeManager: ObservableObject {
         // Shields are applied in init() without this check for the same reason.
         // Clearing shields is always safe and should never be blocked by a stale flag.
 
-        // Clear this process's ManagedSettingsStore.
+        // Clear the shared ManagedSettingsStore. Per Apple WWDC 2021 "Meet the
+        // Screen Time API", the default ManagedSettingsStore() is shared across
+        // all processes in the same app group — so clearing it here also clears
+        // any shields the DeviceActivityMonitor extension applied.
+        //
+        // Do NOT call setupDailyMonitoring() here. Stopping and restarting
+        // monitoring mid-interval (after each workout) disrupts iOS Screen Time's
+        // internal accounting and causes "time's up" banners to appear on apps
+        // that have built-in App Limits, even when those apps have 0 actual usage.
+        // The already-running monitoring schedule will fire intervalDidStart at
+        // midnight to re-enable blocking for the next day.
         store.shield.applications = nil
         store.shield.applicationCategories = nil
-
-        // Restart monitoring so the DeviceActivityMonitor extension receives
-        // intervalDidStart and actively clears any shields it independently applied
-        // (the extension maintains its own ManagedSettingsStore instance).
-        setupDailyMonitoring()
 
         logger.log("App blocking disabled — workout completed!")
     }
