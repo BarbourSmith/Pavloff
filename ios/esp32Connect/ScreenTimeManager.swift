@@ -67,8 +67,20 @@ class ScreenTimeManager: ObservableObject {
         if hasAppsSelected {
             logger.log("Has app selection flag is true")
             if !selectedApps.applicationTokens.isEmpty || !selectedApps.categoryTokens.isEmpty {
-                logger.log("Tokens are available, setting up monitoring")
-                setupDailyMonitoring()
+                logger.log("Tokens are available, checking monitoring state")
+
+                // Only start monitoring if it isn't already running. Every call to
+                // setupDailyMonitoring() issues stopMonitoring + startMonitoring.
+                // Doing that mid-interval (e.g. whenever the user opens the app during
+                // the day) disrupts iOS Screen Time's internal accounting and causes
+                // "time's up" banners to appear even with zero actual app usage.
+                // The same guard exists in enableAppBlocking() for the same reason.
+                if !activityCenter.activities.contains(scheduleId) {
+                    logger.log("Monitoring not active — starting daily monitoring")
+                    setupDailyMonitoring()
+                } else {
+                    logger.log("Monitoring already active — skipping setupDailyMonitoring()")
+                }
 
                 // Proactively apply shields on init if workout not completed today.
                 // This is critical because the DeviceActivityMonitor extension callbacks
