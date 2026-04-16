@@ -93,6 +93,12 @@ float gyroXoffset = 0.0f;
 float gyroYoffset = 0.0f;
 float gyroZoffset = 0.0f;
 
+// Accelerometer offset values (in g's) for software calibration
+// When flat, we expect (0, 0, 1g). Offsets are the deviation from that.
+float accelXoffset = 0.0f;
+float accelYoffset = 0.0f;
+float accelZoffset = 0.0f;
+
 // Preferences object for storing calibration data
 Preferences preferences;
 
@@ -196,7 +202,7 @@ void IRAM_ATTR mpuInterruptISR() {
 #define ACCEL_MAX_G 2.0f             // Maximum acceleration clamp (in g's)
 
 // Stationary detection thresholds
-#define ACCEL_STATIONARY_THRESHOLD 0.3f   // Acceleration deviation from 1g (accommodates MPU6050 offset error)
+#define ACCEL_STATIONARY_THRESHOLD 0.1f   // Acceleration deviation from 1g (tight — accel is now calibrated)
 #define GYRO_STATIONARY_THRESHOLD 0.15f   // Gyroscope threshold (rad/s) for stationary detection
 
 // Rep detection parameters - now configurable via BLE
@@ -399,39 +405,61 @@ float invSqrt(float x) {
   return y;
 }
 
-// Save gyro calibration offsets to persistent storage
-void saveGyroOffsets(float offsetX, float offsetY, float offsetZ) {
+// Save calibration offsets to persistent storage
+void saveCalibrationOffsets(float gOffX, float gOffY, float gOffZ, float aOffX, float aOffY, float aOffZ) {
   preferences.begin("mpu6050", false);  // Open in read-write mode
-  preferences.putFloat("gyroOffsetX", offsetX);
-  preferences.putFloat("gyroOffsetY", offsetY);
-  preferences.putFloat("gyroOffsetZ", offsetZ);
+  preferences.putFloat("gyroOffsetX", gOffX);
+  preferences.putFloat("gyroOffsetY", gOffY);
+  preferences.putFloat("gyroOffsetZ", gOffZ);
+  preferences.putFloat("accelOffsetX", aOffX);
+  preferences.putFloat("accelOffsetY", aOffY);
+  preferences.putFloat("accelOffsetZ", aOffZ);
   preferences.putBool("hasOffsets", true);
-  preferences.putInt("calVersion", 2);  // Version 2 = ElectronicCats library with software offsets
+  preferences.putInt("calVersion", 3);  // Version 3 = gyro + accel offsets
   preferences.end();
 }
 
-// Load gyro calibration offsets from persistent storage
-bool loadGyroOffsets(float* offsetX, float* offsetY, float* offsetZ) {
+// Legacy save for backwards compatibility
+void saveGyroOffsets(float offsetX, float offsetY, float offsetZ) {
+  saveCalibrationOffsets(offsetX, offsetY, offsetZ, accelXoffset, accelYoffset, accelZoffset);
+}
+
+// Load calibration offsets from persistent storage
+bool loadCalibrationOffsets(float* gOffX, float* gOffY, float* gOffZ, float* aOffX, float* aOffY, float* aOffZ) {
   preferences.begin("mpu6050", true);  // Open in read-only mode
   
-  // Check calibration version to ensure compatibility
-  // Version 2 = ElectronicCats library with software offsets
   int calVersion = preferences.getInt("calVersion", 0);
   bool hasOffsets = preferences.getBool("hasOffsets", false);
   
-  if (hasOffsets && calVersion == 2) {
-    *offsetX = preferences.getFloat("gyroOffsetX", 0.0f);
-    *offsetY = preferences.getFloat("gyroOffsetY", 0.0f);
-    *offsetZ = preferences.getFloat("gyroOffsetZ", 0.0f);
+  if (hasOffsets && calVersion >= 2) {
+    *gOffX = preferences.getFloat("gyroOffsetX", 0.0f);
+    *gOffY = preferences.getFloat("gyroOffsetY", 0.0f);
+    *gOffZ = preferences.getFloat("gyroOffsetZ", 0.0f);
+    
+    if (calVersion >= 3) {
+      // Version 3+: has accel offsets too
+      *aOffX = preferences.getFloat("accelOffsetX", 0.0f);
+      *aOffY = preferences.getFloat("accelOffsetY", 0.0f);
+      *aOffZ = preferences.getFloat("accelOffsetZ", 0.0f);
+    } else {
+      // Version 2: gyro only, zero accel offsets
+      *aOffX = 0.0f;
+      *aOffY = 0.0f;
+      *aOffZ = 0.0f;
+    }
+    
     preferences.end();
     return true;
   }
   
   preferences.end();
-  if (hasOffsets && calVersion != 2) {
-  } else {
-  }
   return false;
+}
+
+// Legacy wrapper
+bool loadGyroOffsets(float* offsetX, float* offsetY, float* offsetZ) {
+  float aX, aY, aZ;
+  return loadCalibrationOffsets(offsetX, offsetY, offsetZ, &aX, &aY, &aZ);
 }
 
 // Save wake-on-movement setting to persistent storage
@@ -466,12 +494,15 @@ void flashLedCalibration() {
 }
 
 void performCalibration() {
-  DEBUG_PRINTLN("\n=== Starting Gyro Calibration ===");
+  DEBUG_PRINTLN("\n=== Starting Gyro + Accel Calibration ===");
   DEBUG_PRINTLN("Collecting 3000 samples...");
+  DEBUG_PRINTLN("Keep device FLAT and STATIONARY!");
   
-  // Calculate gyro offsets by averaging readings (same as tockn library: 3000 samples)
-  float x = 0.0f, y = 0.0f, z = 0.0f;
+  // Accumulate both gyro and accel readings
+  float gx = 0.0f, gy = 0.0f, gz = 0.0f;
+  float ax_sum = 0.0f, ay_sum = 0.0f, az_sum = 0.0f;
   int16_t rx, ry, rz;
+  int16_t acx, acy, acz;
   
   delay(1000);  // Wait for device to settle
   
@@ -481,38 +512,47 @@ void performCalibration() {
       DEBUG_PRINT(i);
       DEBUG_PRINTLN("...");
     }
-    mpu.getRotation(&rx, &ry, &rz);
+    mpu.getMotion6(&acx, &acy, &acz, &rx, &ry, &rz);
     
     // Flash LED during calibration
     flashLedCalibration();
     
-    // Convert to degrees/s and accumulate (matching tockn library)
-    x += ((float)rx) * GYRO_SCALE;
-    y += ((float)ry) * GYRO_SCALE;
-    z += ((float)rz) * GYRO_SCALE;
+    // Accumulate gyro (degrees/s)
+    gx += ((float)rx) * GYRO_SCALE;
+    gy += ((float)ry) * GYRO_SCALE;
+    gz += ((float)rz) * GYRO_SCALE;
+    
+    // Accumulate accel (g's)
+    ax_sum += ((float)acx) * ACCEL_SCALE;
+    ay_sum += ((float)acy) * ACCEL_SCALE;
+    az_sum += ((float)acz) * ACCEL_SCALE;
   }
   
   // Turn LED off when done
   ledcWrite(LED_PWM_CHANNEL, 0);
   
-  // Calculate average offsets (in degrees/s)
-  gyroXoffset = x / 3000.0f;
-  gyroYoffset = y / 3000.0f;
-  gyroZoffset = z / 3000.0f;
+  // Calculate average gyro offsets (in degrees/s)
+  gyroXoffset = gx / 3000.0f;
+  gyroYoffset = gy / 3000.0f;
+  gyroZoffset = gz / 3000.0f;
+  
+  // Calculate average accel offsets (in g's)
+  // When flat and stationary, expected reading is (0, 0, 1g)
+  accelXoffset = ax_sum / 3000.0f;         // Expected ~0, offset = actual
+  accelYoffset = ay_sum / 3000.0f;         // Expected ~0, offset = actual
+  accelZoffset = (az_sum / 3000.0f) - 1.0f; // Expected ~1g, offset = actual - 1.0
   
   DEBUG_PRINTLN("\nCalibration complete!");
-  DEBUG_PRINTLN("Gyro offsets calculated:");
-  DEBUG_PRINT("  X: ");
-  DEBUG_PRINT(gyroXoffset);
-  DEBUG_PRINTLN(" °/s");
-  DEBUG_PRINT("  Y: ");
-  DEBUG_PRINT(gyroYoffset);
-  DEBUG_PRINTLN(" °/s");
-  DEBUG_PRINT("  Z: ");
-  DEBUG_PRINT(gyroZoffset);
-  DEBUG_PRINTLN(" °/s");
+  DEBUG_PRINTLN("Gyro offsets:");
+  DEBUG_PRINT("  X: "); DEBUG_PRINT(gyroXoffset); DEBUG_PRINTLN(" deg/s");
+  DEBUG_PRINT("  Y: "); DEBUG_PRINT(gyroYoffset); DEBUG_PRINTLN(" deg/s");
+  DEBUG_PRINT("  Z: "); DEBUG_PRINT(gyroZoffset); DEBUG_PRINTLN(" deg/s");
+  DEBUG_PRINTLN("Accel offsets:");
+  DEBUG_PRINT("  X: "); DEBUG_PRINT(accelXoffset); DEBUG_PRINTLN(" g");
+  DEBUG_PRINT("  Y: "); DEBUG_PRINT(accelYoffset); DEBUG_PRINTLN(" g");
+  DEBUG_PRINT("  Z: "); DEBUG_PRINT(accelZoffset); DEBUG_PRINTLN(" g");
   
-  saveGyroOffsets(gyroXoffset, gyroYoffset, gyroZoffset);
+  saveCalibrationOffsets(gyroXoffset, gyroYoffset, gyroZoffset, accelXoffset, accelYoffset, accelZoffset);
   DEBUG_PRINTLN("Offsets saved to persistent storage");
   calibrationComplete = true;
   
@@ -1345,29 +1385,29 @@ void setup() {
   DEBUG_PRINTLN("DHPF configured to HOLD mode");
   
   
-  // Try to load stored calibration offsets (software offsets in degrees/s)
-  DEBUG_PRINTLN("\n--- Loading Gyro Calibration ---");
-  if (loadGyroOffsets(&gyroXoffset, &gyroYoffset, &gyroZoffset)) {
+  // Try to load stored calibration offsets
+  DEBUG_PRINTLN("\n--- Loading Calibration ---");
+  if (loadCalibrationOffsets(&gyroXoffset, &gyroYoffset, &gyroZoffset, &accelXoffset, &accelYoffset, &accelZoffset)) {
     DEBUG_PRINTLN("Loaded stored calibration offsets:");
-    DEBUG_PRINT("  X offset: ");
-    DEBUG_PRINT(gyroXoffset);
-    DEBUG_PRINTLN(" °/s");
-    DEBUG_PRINT("  Y offset: ");
-    DEBUG_PRINT(gyroYoffset);
-    DEBUG_PRINTLN(" °/s");
-    DEBUG_PRINT("  Z offset: ");
-    DEBUG_PRINT(gyroZoffset);
-    DEBUG_PRINTLN(" °/s");
+    DEBUG_PRINT("  Gyro X: "); DEBUG_PRINT(gyroXoffset); DEBUG_PRINTLN(" deg/s");
+    DEBUG_PRINT("  Gyro Y: "); DEBUG_PRINT(gyroYoffset); DEBUG_PRINTLN(" deg/s");
+    DEBUG_PRINT("  Gyro Z: "); DEBUG_PRINT(gyroZoffset); DEBUG_PRINTLN(" deg/s");
+    DEBUG_PRINT("  Accel X: "); DEBUG_PRINT(accelXoffset); DEBUG_PRINTLN(" g");
+    DEBUG_PRINT("  Accel Y: "); DEBUG_PRINT(accelYoffset); DEBUG_PRINTLN(" g");
+    DEBUG_PRINT("  Accel Z: "); DEBUG_PRINT(accelZoffset); DEBUG_PRINTLN(" g");
     calibrationComplete = true;
   } else {
     // No stored offsets - perform calibration immediately on startup
     DEBUG_PRINTLN("No stored calibration found");
     DEBUG_PRINTLN("Starting calibration in 2 seconds...");
-    DEBUG_PRINTLN("*** KEEP DEVICE STATIONARY ***");
+    DEBUG_PRINTLN("*** KEEP DEVICE FLAT AND STATIONARY ***");
     calibrationComplete = false;
     gyroXoffset = 0.0f;
     gyroYoffset = 0.0f;
     gyroZoffset = 0.0f;
+    accelXoffset = 0.0f;
+    accelYoffset = 0.0f;
+    accelZoffset = 0.0f;
     delay(2000);  // Give user time to read message and stabilize device
     performCalibration();
   }
@@ -1597,9 +1637,9 @@ void loop() {
   mpu.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
   
   // Convert to physical units
-  float rawAccelX = ax * ACCEL_SCALE;  // in g's
-  float rawAccelY = ay * ACCEL_SCALE;
-  float rawAccelZ = az * ACCEL_SCALE;
+  float rawAccelX = ax * ACCEL_SCALE - accelXoffset;  // in g's, offset-corrected
+  float rawAccelY = ay * ACCEL_SCALE - accelYoffset;
+  float rawAccelZ = az * ACCEL_SCALE - accelZoffset;
   
   // Compute raw magnitude for stationary detection (before filtering distorts it)
   float rawAccelMagForSleep = sqrt(rawAccelX*rawAccelX + rawAccelY*rawAccelY + rawAccelZ*rawAccelZ);
