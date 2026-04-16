@@ -30,6 +30,7 @@ struct AppConfig {
         static let gyroCharacteristic = "8d3f7a9e-4b2c-11ef-9f27-0242ac120002"  // Using same for compatibility
         static let durationCharacteristic = "7a8e6f9d-3c1b-42a8-9e7f-1234567890ab"  // Duration tracking characteristic
         static let sensitivityCharacteristic = "9c4a7f2e-5d3b-41a9-8f6e-2345678901bc"  // Sensitivity settings characteristic
+        static let batteryCharacteristic = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"  // Battery voltage characteristic
     }
     
     // UI Configuration

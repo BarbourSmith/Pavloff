@@ -29,6 +29,7 @@ class BLEManager: NSObject, ObservableObject {
     private let gyroCharUUID = CBUUID(string: AppConfig.UUIDs.gyroCharacteristic)
     private let durationCharUUID = CBUUID(string: AppConfig.UUIDs.durationCharacteristic)
     private let sensitivityCharUUID = CBUUID(string: AppConfig.UUIDs.sensitivityCharacteristic)
+    private let batteryCharUUID = CBUUID(string: AppConfig.UUIDs.batteryCharacteristic)
     
     // MARK: - Initialization
     override init() {
@@ -194,6 +195,34 @@ class BLEManager: NSObject, ObservableObject {
             timestamp: Date()
         )
     }
+
+    /// Parse battery data from characteristic value
+    private func parseBatteryData(from data: Data) -> BatteryData? {
+        guard let dataString = String(data: data, encoding: .utf8) else {
+            return nil
+        }
+
+        // Parse format: "Voltage:X.XX,Percent:Y"
+        var voltage: Float = 0.0
+        var percentage: Int = 0
+
+        let components = dataString.split(separator: ",")
+        for component in components {
+            let keyValue = component.split(separator: ":")
+            if keyValue.count == 2 {
+                let key = keyValue.first?.trimmingCharacters(in: .whitespaces).lowercased() ?? ""
+                let valueStr = keyValue.last?.trimmingCharacters(in: .whitespaces) ?? ""
+
+                if key == "voltage", let v = Float(valueStr) {
+                    voltage = v
+                } else if key == "percent", let p = Int(valueStr) {
+                    percentage = p
+                }
+            }
+        }
+
+        return BatteryData(voltage: voltage, percentage: percentage, timestamp: Date())
+    }
 }
 
 // MARK: - CBCentralManagerDelegate
@@ -326,6 +355,9 @@ extension BLEManager: CBPeripheralDelegate {
             } else if characteristic.uuid == durationCharUUID {
                 print("[BLE] Found duration characteristic")
                 peripheral.setNotifyValue(true, for: characteristic)
+            } else if characteristic.uuid == batteryCharUUID {
+                print("[BLE] Found battery characteristic")
+                peripheral.setNotifyValue(true, for: characteristic)
             }
         }
         
@@ -373,13 +405,37 @@ extension BLEManager: CBPeripheralDelegate {
             print("[BLE] Error updating value: \(error.localizedDescription)")
             return
         }
-        
-        guard let data = characteristic.value,
-              let sensorData = parseSensorData(from: data),
+
+        guard let data = characteristic.value else {
+            return
+        }
+
+        // Handle battery characteristic separately
+        if characteristic.uuid == batteryCharUUID {
+            guard let batteryData = parseBatteryData(from: data) else { return }
+
+            DispatchQueue.main.async {
+                if self.deviceDataMap[peripheral.identifier] == nil {
+                    self.deviceDataMap[peripheral.identifier] = DeviceData(
+                        id: peripheral.identifier,
+                        name: peripheral.name ?? "Unknown Device"
+                    )
+                }
+
+                if var deviceData = self.deviceDataMap[peripheral.identifier] {
+                    deviceData.batteryData = batteryData
+                    deviceData.lastUpdate = Date()
+                    self.deviceDataMap[peripheral.identifier] = deviceData
+                }
+            }
+            return
+        }
+
+        guard let sensorData = parseSensorData(from: data),
               let chars = characteristicMap[peripheral.identifier] else {
             return
         }
-        
+
         DispatchQueue.main.async {
             // Ensure device data exists
             if self.deviceDataMap[peripheral.identifier] == nil {
@@ -388,7 +444,7 @@ extension BLEManager: CBPeripheralDelegate {
                     name: peripheral.name ?? "Unknown Device"
                 )
             }
-            
+
             if var deviceData = self.deviceDataMap[peripheral.identifier] {
                 // Merge sensor data intelligently to avoid flickering
                 // Rep characteristic contains count and state
@@ -411,7 +467,7 @@ extension BLEManager: CBPeripheralDelegate {
                     // Keep existing count value
                     deviceData.accelData = mergedData
                 }
-                
+
                 deviceData.lastUpdate = Date()
                 self.deviceDataMap[peripheral.identifier] = deviceData
             }

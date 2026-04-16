@@ -61,6 +61,14 @@ struct WorkoutView: View {
         return 0
     }
     
+    private var batteryData: BatteryData? {
+        if let device = connectedDevice,
+           let deviceData = bleManager.deviceDataMap[device.id] {
+            return deviceData.batteryData
+        }
+        return nil
+    }
+
     private var currentProgress: Double {
         if currentExercise.activityType == .reps {
             return Double(currentReps) / Double(currentExercise.targetReps)
@@ -135,6 +143,21 @@ struct WorkoutView: View {
                 .padding()
                 .frame(maxWidth: .infinity)
                 .background(Color.blue)
+
+                // Low battery warning banner
+                if let battery = batteryData, battery.isLow {
+                    HStack(spacing: 8) {
+                        Image(systemName: battery.isCritical ? "battery.0" : "battery.25")
+                            .font(.subheadline)
+                        Text(battery.isCritical ? "Sensor battery critical: \(battery.formattedPercentage)" : "Sensor battery low: \(battery.formattedPercentage)")
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                    }
+                    .foregroundColor(.white)
+                    .padding(.vertical, 8)
+                    .frame(maxWidth: .infinity)
+                    .background(battery.isCritical ? Color.red : Color.orange)
+                }
                 
                 // Content area
                 ScrollView {
@@ -361,7 +384,7 @@ struct WorkoutView: View {
             }
             .navigationBarHidden(true)
             .sheet(isPresented: $showingSetup) {
-                SetupView(workoutSettings: $workoutSettings)
+                SetupView(workoutSettings: $workoutSettings, batteryData: batteryData)
             }
             .sheet(isPresented: $showingCongratulations) {
                 CongratulationsView(workoutSettings: workoutSettings, onRestart: {

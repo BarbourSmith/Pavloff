@@ -106,19 +106,50 @@ struct SensorData: Equatable {
     }
 }
 
+// MARK: - Battery Data Model
+struct BatteryData: Equatable {
+    var voltage: Float
+    var percentage: Int
+    var timestamp: Date
+
+    init(voltage: Float = 0.0, percentage: Int = 0, timestamp: Date = Date()) {
+        self.voltage = voltage
+        self.percentage = percentage
+        self.timestamp = timestamp
+    }
+
+    var isLow: Bool {
+        percentage <= 20
+    }
+
+    var isCritical: Bool {
+        percentage <= 10
+    }
+
+    var formattedVoltage: String {
+        String(format: "%.2fV", voltage)
+    }
+
+    var formattedPercentage: String {
+        "\(percentage)%"
+    }
+}
+
 // MARK: - Device Data Container
 struct DeviceData: Identifiable {
     let id: UUID
     let name: String
     var accelData: SensorData
     var gyroData: SensorData
+    var batteryData: BatteryData
     var lastUpdate: Date
-    
+
     init(id: UUID, name: String) {
         self.id = id
         self.name = name
         self.accelData = SensorData()
         self.gyroData = SensorData()
+        self.batteryData = BatteryData()
         self.lastUpdate = Date()
     }
 }

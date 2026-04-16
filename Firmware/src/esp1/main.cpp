@@ -31,6 +31,22 @@
 #define SCL_PIN 9   // I2C SCL pin
 #define INT_PIN 18  // MPU6050 INT pin connected to ESP32 GPIO 18
 
+// Battery voltage monitor pin configuration
+#define BATTERY_PIN 7    // GPIO 7 - ADC input for battery voltage
+// Voltage divider: R1 = 27k (Battery to Pin), R2 = 68k (Pin to GND)
+const float BATTERY_R1 = 27000.0f;
+const float BATTERY_R2 = 68000.0f;
+const float BATTERY_DIVIDER_RATIO = BATTERY_R2 / (BATTERY_R1 + BATTERY_R2);
+
+// LiPo battery voltage thresholds
+#define BATTERY_VOLTAGE_FULL 4.20f    // Fully charged
+#define BATTERY_VOLTAGE_NOMINAL 3.70f // Nominal voltage
+#define BATTERY_VOLTAGE_LOW 3.30f     // Low battery warning
+#define BATTERY_VOLTAGE_EMPTY 3.00f   // Empty / cutoff
+
+// Battery reading interval (read every 10 seconds to save power)
+#define BATTERY_READ_INTERVAL_MS 10000
+
 // Status LED pin configuration
 #define BLUE_LED_PIN 47  // Blue status LED
 #define LED_PWM_CHANNEL 0  // LEDC channel for LED PWM
@@ -81,6 +97,7 @@ BLECharacteristic* pGyroCharacteristic = NULL;
 BLECharacteristic* pRepCharacteristic = NULL;
 BLECharacteristic* pDurationCharacteristic = NULL;
 BLECharacteristic* pSensitivityCharacteristic = NULL;
+BLECharacteristic* pBatteryCharacteristic = NULL;
 bool deviceConnected = false;
 
 // Position and velocity tracking variables
@@ -124,6 +141,11 @@ unsigned long lastActivityTime = 0;  // Track last time there was activity
 unsigned long lastStillTime = 0;     // Track when device became stationary
 bool wasStationary = false;          // Track if device was stationary in previous iteration
 bool calibrationComplete = false;    // Track if calibration has been done
+
+// Battery voltage monitoring variables
+unsigned long lastBatteryReadTime = 0;  // Track last battery voltage read
+float batteryVoltage = 0.0f;           // Current battery voltage
+int batteryPercentage = 0;              // Current battery percentage (0-100)
 
 // Blue LED heartbeat variables
 unsigned long lastLedUpdate = 0;     // Track last LED update time
@@ -190,6 +212,7 @@ float vibrationAccelThreshold = 0.15f;    // Minimum acceleration magnitude (g's
 #define REP_CHARACTERISTIC_UUID   "8d3f7a9e-4b2c-11ef-9f27-0242ac120002"
 #define DURATION_CHARACTERISTIC_UUID "7a8e6f9d-3c1b-42a8-9e7f-1234567890ab"
 #define SENSITIVITY_CHARACTERISTIC_UUID "9c4a7f2e-5d3b-41a9-8f6e-2345678901bc"
+#define BATTERY_CHARACTERISTIC_UUID "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
 
 // Handles BLE connection and disconnection events
 class MyServerCallbacks: public BLEServerCallbacks {
@@ -806,6 +829,31 @@ void updateLedHeartbeat() {
   }
 }
 
+// Read battery voltage from ADC and calculate percentage
+void readBatteryVoltage() {
+  // Read calibrated millivolts directly from the pin (more accurate than analogRead on ESP32)
+  uint32_t pinMilliVolts = analogReadMilliVolts(BATTERY_PIN);
+
+  // Calculate battery voltage: V_bat = V_pin / divider_ratio
+  batteryVoltage = (pinMilliVolts / 1000.0f) / BATTERY_DIVIDER_RATIO;
+
+  // Calculate battery percentage using LiPo discharge curve approximation
+  if (batteryVoltage >= BATTERY_VOLTAGE_FULL) {
+    batteryPercentage = 100;
+  } else if (batteryVoltage <= BATTERY_VOLTAGE_EMPTY) {
+    batteryPercentage = 0;
+  } else {
+    // Linear interpolation between empty and full
+    batteryPercentage = (int)(((batteryVoltage - BATTERY_VOLTAGE_EMPTY) / (BATTERY_VOLTAGE_FULL - BATTERY_VOLTAGE_EMPTY)) * 100.0f);
+  }
+
+  DEBUG_PRINT("Battery: ");
+  DEBUG_PRINT(batteryVoltage);
+  DEBUG_PRINT("V (");
+  DEBUG_PRINT(batteryPercentage);
+  DEBUG_PRINTLN("%)");
+}
+
 // Enter deep sleep mode with interrupt wake
 void enterDeepSleep() {
   DEBUG_PRINTLN("\n=== Entering Deep Sleep ===");
@@ -889,6 +937,9 @@ void enterDeepSleep() {
 }
 
 void setup() {
+  // Initialize battery voltage ADC
+  analogReadResolution(12);  // 12-bit resolution (0-4095)
+
   // Initialize blue LED with LEDC PWM
   ledcSetup(LED_PWM_CHANNEL, LED_PWM_FREQ, LED_PWM_RESOLUTION);
   ledcAttachPin(BLUE_LED_PIN, LED_PWM_CHANNEL);
@@ -1154,6 +1205,21 @@ void setup() {
   pSensitivityCharacteristic->setValue("RepSens:0.5,VibSens:0.5");
   DEBUG_PRINTLN("  Sensitivity characteristic configured");
 
+  // Create a BLE Characteristic for Battery Voltage
+  DEBUG_PRINTLN("Creating Battery characteristic");
+  pBatteryCharacteristic = pService->createCharacteristic(
+                      BATTERY_CHARACTERISTIC_UUID,
+                      BLECharacteristic::PROPERTY_READ |
+                      BLECharacteristic::PROPERTY_NOTIFY
+                    );
+  pBatteryCharacteristic->addDescriptor(new BLE2902());
+  // Read initial battery voltage and set value
+  readBatteryVoltage();
+  char batteryData[40];
+  snprintf(batteryData, sizeof(batteryData), "Voltage:%.2f,Percent:%d", batteryVoltage, batteryPercentage);
+  pBatteryCharacteristic->setValue(batteryData);
+  DEBUG_PRINTLN("  Battery characteristic configured");
+
   // Start the service
   DEBUG_PRINTLN("Starting BLE service");
   pService->start();
@@ -1417,6 +1483,17 @@ void loop() {
     // Set the characteristic value and notify the client
     pDurationCharacteristic->setValue(durationData);
     pDurationCharacteristic->notify();
+
+    // --- Read and Send Battery Voltage Data ---
+    if (currentTime - lastBatteryReadTime >= BATTERY_READ_INTERVAL_MS) {
+      lastBatteryReadTime = currentTime;
+      readBatteryVoltage();
+    }
+
+    char batteryData[40];
+    snprintf(batteryData, sizeof(batteryData), "Voltage:%.2f,Percent:%d", batteryVoltage, batteryPercentage);
+    pBatteryCharacteristic->setValue(batteryData);
+    pBatteryCharacteristic->notify();
   }
 
   // Short delay for high-frequency position calculation

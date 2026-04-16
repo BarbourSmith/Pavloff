@@ -10,6 +10,7 @@ import FamilyControls
 
 struct SetupView: View {
     @Binding var workoutSettings: WorkoutSettings
+    var batteryData: BatteryData? = nil
     @Environment(\.dismiss) var dismiss
     @StateObject private var screenTimeManager = ScreenTimeManager.shared
     @State private var showingAppPicker = false
@@ -67,6 +68,65 @@ struct SetupView: View {
                             })
                         }
                         
+                        // Battery Status Section
+                        if let battery = batteryData, battery.voltage > 0 {
+                            VStack(alignment: .leading, spacing: 15) {
+                                Text("Sensor Battery")
+                                    .font(.headline)
+                                    .fontWeight(.bold)
+                                    .padding(.top, 10)
+
+                                HStack(spacing: 12) {
+                                    // Battery icon
+                                    Image(systemName: batteryIconName(battery.percentage))
+                                        .font(.system(size: 28))
+                                        .foregroundColor(batteryColor(battery.percentage))
+
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text("\(battery.formattedPercentage)")
+                                            .font(.title2)
+                                            .fontWeight(.bold)
+                                            .foregroundColor(batteryColor(battery.percentage))
+
+                                        Text(battery.formattedVoltage)
+                                            .font(.caption)
+                                            .foregroundColor(.gray)
+                                    }
+
+                                    Spacer()
+
+                                    // Battery level bar
+                                    GeometryReader { geometry in
+                                        ZStack(alignment: .leading) {
+                                            RoundedRectangle(cornerRadius: 4)
+                                                .fill(Color.gray.opacity(0.2))
+                                                .frame(height: 12)
+
+                                            RoundedRectangle(cornerRadius: 4)
+                                                .fill(batteryColor(battery.percentage))
+                                                .frame(width: max(0, CGFloat(battery.percentage) / 100.0 * geometry.size.width), height: 12)
+                                        }
+                                    }
+                                    .frame(height: 12)
+                                    .frame(maxWidth: 120)
+                                }
+
+                                if battery.isLow {
+                                    HStack(spacing: 6) {
+                                        Image(systemName: "exclamationmark.triangle.fill")
+                                            .foregroundColor(.orange)
+                                        Text(battery.isCritical ? "Battery critically low. Please charge soon." : "Battery is getting low. Consider charging.")
+                                            .font(.caption)
+                                            .foregroundColor(.orange)
+                                    }
+                                }
+                            }
+                            .padding()
+                            .background(Color.white)
+                            .cornerRadius(12)
+                            .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
+                        }
+
                         // Sensitivity Settings Section
                         VStack(alignment: .leading, spacing: 15) {
                             Text("Sensitivity Settings")
@@ -342,6 +402,25 @@ struct SetupView: View {
         workoutSettings.save()
     }
     
+    private func batteryIconName(_ percentage: Int) -> String {
+        switch percentage {
+        case 76...100: return "battery.100"
+        case 51...75: return "battery.75"
+        case 26...50: return "battery.50"
+        case 11...25: return "battery.25"
+        default: return "battery.0"
+        }
+    }
+
+    private func batteryColor(_ percentage: Int) -> Color {
+        switch percentage {
+        case 51...100: return .green
+        case 21...50: return .yellow
+        case 11...20: return .orange
+        default: return .red
+        }
+    }
+
     private func sensitivityLabel(_ value: Double) -> String {
         if value < 0.3 {
             return "Low"
@@ -615,5 +694,5 @@ struct AddExerciseSheet: View {
 }
 
 #Preview {
-    SetupView(workoutSettings: .constant(WorkoutSettings()))
+    SetupView(workoutSettings: .constant(WorkoutSettings()), batteryData: BatteryData(voltage: 3.85, percentage: 71))
 }
