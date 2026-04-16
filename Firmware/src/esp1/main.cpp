@@ -1243,10 +1243,10 @@ void setup() {
   // Release GPIO hold from deep sleep so LED pin can be reused by LEDC
   gpio_hold_dis((gpio_num_t)BLUE_LED_PIN);
 
-  // Initialize blue LED with LEDC PWM
+  // Initialize blue LED with LEDC PWM and turn on immediately to signal wake
   ledcSetup(LED_PWM_CHANNEL, LED_PWM_FREQ, LED_PWM_RESOLUTION);
   ledcAttachPin(BLUE_LED_PIN, LED_PWM_CHANNEL);
-  ledcWrite(LED_PWM_CHANNEL, 0);  // Start with LED off
+  ledcWrite(LED_PWM_CHANNEL, 200);  // LED on immediately to show board is awake
   
   #if ENABLE_SERIAL_DEBUG
   // Initialize Serial communication for debugging
