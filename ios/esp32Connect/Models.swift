@@ -190,6 +190,7 @@ struct WorkoutSettings: Codable {
     var exercises: [Exercise]
     var repSensitivity: Double // Rep detection sensitivity (0.0-1.0, where 1.0 is most sensitive)
     var vibrationSensitivity: Double // Vibration detection sensitivity (0.0-1.0, where 1.0 is most sensitive)
+    var wakeOnMovement: Bool // When true, sensor wakes from sleep on motion. When false, only hardware reset wakes it.
     
     private static let userDefaultsKey = "workoutSettings"
     
@@ -207,30 +208,34 @@ struct WorkoutSettings: Codable {
     static let defaultVibrationSensitivity = 0.5
     static let minSensitivity = 0.0
     static let maxSensitivity = 1.0
-    
-    init(exercises: [Exercise] = defaultExercises, repSensitivity: Double = defaultRepSensitivity, vibrationSensitivity: Double = defaultVibrationSensitivity) {
+    static let defaultWakeOnMovement = false
+
+    init(exercises: [Exercise] = defaultExercises, repSensitivity: Double = defaultRepSensitivity, vibrationSensitivity: Double = defaultVibrationSensitivity, wakeOnMovement: Bool = defaultWakeOnMovement) {
         self.exercises = exercises
         // Clamp sensitivity values to valid range [0.0, 1.0]
         self.repSensitivity = max(WorkoutSettings.minSensitivity, min(WorkoutSettings.maxSensitivity, repSensitivity))
         self.vibrationSensitivity = max(WorkoutSettings.minSensitivity, min(WorkoutSettings.maxSensitivity, vibrationSensitivity))
+        self.wakeOnMovement = wakeOnMovement
     }
     
     // Custom decoder to handle backward compatibility with old saved settings
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         exercises = try container.decode([Exercise].self, forKey: .exercises)
-        // Use default values if sensitivity settings are missing (backward compatibility)
+        // Use default values if settings are missing (backward compatibility)
         let decodedRepSensitivity = try container.decodeIfPresent(Double.self, forKey: .repSensitivity) ?? WorkoutSettings.defaultRepSensitivity
         let decodedVibrationSensitivity = try container.decodeIfPresent(Double.self, forKey: .vibrationSensitivity) ?? WorkoutSettings.defaultVibrationSensitivity
         // Clamp decoded values to valid range [0.0, 1.0]
         repSensitivity = max(WorkoutSettings.minSensitivity, min(WorkoutSettings.maxSensitivity, decodedRepSensitivity))
         vibrationSensitivity = max(WorkoutSettings.minSensitivity, min(WorkoutSettings.maxSensitivity, decodedVibrationSensitivity))
+        wakeOnMovement = try container.decodeIfPresent(Bool.self, forKey: .wakeOnMovement) ?? WorkoutSettings.defaultWakeOnMovement
     }
-    
+
     private enum CodingKeys: String, CodingKey {
         case exercises
         case repSensitivity
         case vibrationSensitivity
+        case wakeOnMovement
     }
     
     // Load saved settings from UserDefaults, or return default if none saved

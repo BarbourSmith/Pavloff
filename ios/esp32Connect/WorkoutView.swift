@@ -384,7 +384,7 @@ struct WorkoutView: View {
             }
             .navigationBarHidden(true)
             .sheet(isPresented: $showingSetup) {
-                SetupView(workoutSettings: $workoutSettings, batteryData: batteryData)
+                SetupView(workoutSettings: $workoutSettings, batteryData: batteryData, bleManager: bleManager, deviceId: connectedDevice?.id)
             }
             .sheet(isPresented: $showingCongratulations) {
                 CongratulationsView(workoutSettings: workoutSettings, onRestart: {
@@ -458,6 +458,11 @@ struct WorkoutView: View {
             }
             .onChange(of: workoutSettings.vibrationSensitivity) { _ in
                 // Send updated sensitivity to device when changed
+                if isConnected {
+                    sendSensitivityToDevice()
+                }
+            }
+            .onChange(of: workoutSettings.wakeOnMovement) { _ in
                 if isConnected {
                     sendSensitivityToDevice()
                 }
@@ -698,11 +703,12 @@ struct WorkoutView: View {
             return
         }
         
-        print("[WORKOUT] Sending sensitivity settings - Rep: \(workoutSettings.repSensitivity), Vib: \(workoutSettings.vibrationSensitivity)")
+        print("[WORKOUT] Sending sensitivity settings - Rep: \(workoutSettings.repSensitivity), Vib: \(workoutSettings.vibrationSensitivity), Wake: \(workoutSettings.wakeOnMovement)")
         bleManager.sendSensitivitySettings(
             for: device.id,
             repSensitivity: workoutSettings.repSensitivity,
-            vibrationSensitivity: workoutSettings.vibrationSensitivity
+            vibrationSensitivity: workoutSettings.vibrationSensitivity,
+            wakeOnMovement: workoutSettings.wakeOnMovement
         )
     }
     

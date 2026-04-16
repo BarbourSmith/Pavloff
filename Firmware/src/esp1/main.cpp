@@ -10,6 +10,12 @@
 #include <esp_sleep.h>
 #include <esp_wifi.h>
 #include <Preferences.h>
+#include <WiFi.h>
+#include <WebServer.h>
+#include <Update.h>
+
+// Firmware version (bump this with each release)
+#define FIRMWARE_VERSION "1.0.0"
 
 // Debug configuration
 // Set to 1 to enable serial debug output, 0 to disable
@@ -98,6 +104,7 @@ BLECharacteristic* pRepCharacteristic = NULL;
 BLECharacteristic* pDurationCharacteristic = NULL;
 BLECharacteristic* pSensitivityCharacteristic = NULL;
 BLECharacteristic* pBatteryCharacteristic = NULL;
+BLECharacteristic* pVersionCharacteristic = NULL;
 bool deviceConnected = false;
 
 // Position and velocity tracking variables
@@ -146,6 +153,14 @@ bool calibrationComplete = false;    // Track if calibration has been done
 unsigned long lastBatteryReadTime = 0;  // Track last battery voltage read
 float batteryVoltage = 0.0f;           // Current battery voltage
 int batteryPercentage = 0;              // Current battery percentage (0-100)
+
+// Wake on movement setting (persisted to Preferences)
+bool wakeOnMovement = false;            // When false, deep sleep requires hardware reset to wake
+
+// OTA update configuration
+#define OTA_AP_SSID "Pavloff-Update"
+#define OTA_AP_PASSWORD "pavloff123"
+bool otaRequested = false;              // Flag set by BLE command to enter OTA mode
 
 // Blue LED heartbeat variables
 unsigned long lastLedUpdate = 0;     // Track last LED update time
@@ -213,6 +228,7 @@ float vibrationAccelThreshold = 0.15f;    // Minimum acceleration magnitude (g's
 #define DURATION_CHARACTERISTIC_UUID "7a8e6f9d-3c1b-42a8-9e7f-1234567890ab"
 #define SENSITIVITY_CHARACTERISTIC_UUID "9c4a7f2e-5d3b-41a9-8f6e-2345678901bc"
 #define BATTERY_CHARACTERISTIC_UUID "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+#define VERSION_CHARACTERISTIC_UUID "b2c3d4e5-f6a7-8901-bcde-f12345678901"
 
 // Handles BLE connection and disconnection events
 class MyServerCallbacks: public BLEServerCallbacks {
@@ -264,9 +280,20 @@ class RepCharacteristicCallbacks: public BLECharacteristicCallbacks {
           pCharacteristic->notify();
           DEBUG_PRINTLN("Rep counter reset to 0");
         }
+        
+        // Check for OTA update command
+        if (value == "OTA" || value == "ota") {
+          DEBUG_PRINTLN("OTA update mode requested via BLE");
+          pCharacteristic->setValue("OTA:STARTING");
+          pCharacteristic->notify();
+          otaRequested = true;
+        }
       }
     }
 };
+
+// Forward declarations
+void saveWakeOnMovement(bool enabled);
 
 // Handles write events to the sensitivity characteristic
 class SensitivityCharacteristicCallbacks: public BLECharacteristicCallbacks {
@@ -280,17 +307,18 @@ class SensitivityCharacteristicCallbacks: public BLECharacteristicCallbacks {
         // Reset activity timer on any BLE interaction
         lastActivityTime = millis();
         
-        // Parse format: "RepSens:value,VibSens:value"
-        // Example: "RepSens:0.5,VibSens:0.7"
+        // Parse format: "RepSens:value,VibSens:value,Wake:0or1"
+        // Example: "RepSens:0.5,VibSens:0.7,Wake:1"
         float newRepSens = 0.5f;
         float newVibSens = 0.5f;
         bool repParsed = false;
         bool vibParsed = false;
-        
+
         // Simple string parsing
         const char* str = value.c_str();
         char* repPos = strstr(str, "RepSens:");
         char* vibPos = strstr(str, "VibSens:");
+        char* wakePos = strstr(str, "Wake:");
         
         if (repPos != NULL) {
           float parsedValue = atof(repPos + 8);  // Skip "RepSens:"
@@ -308,6 +336,18 @@ class SensitivityCharacteristicCallbacks: public BLECharacteristicCallbacks {
           }
         }
         
+        // Parse wake-on-movement setting
+        if (wakePos != NULL) {
+          int wakeValue = atoi(wakePos + 5);  // Skip "Wake:"
+          bool newWake = (wakeValue != 0);
+          if (newWake != wakeOnMovement) {
+            wakeOnMovement = newWake;
+            saveWakeOnMovement(wakeOnMovement);
+          }
+          DEBUG_PRINT("Wake on movement: ");
+          DEBUG_PRINTLN(wakeOnMovement ? "ENABLED" : "DISABLED");
+        }
+
         if (repParsed || vibParsed) {
           // Update thresholds based on sensitivity
           // Higher sensitivity (closer to 1.0) = lower thresholds (easier to detect)
@@ -383,6 +423,24 @@ bool loadGyroOffsets(float* offsetX, float* offsetY, float* offsetZ) {
   } else {
   }
   return false;
+}
+
+// Save wake-on-movement setting to persistent storage
+void saveWakeOnMovement(bool enabled) {
+  preferences.begin("settings", false);
+  preferences.putBool("wakeOnMove", enabled);
+  preferences.end();
+  DEBUG_PRINT("Wake on movement saved: ");
+  DEBUG_PRINTLN(enabled ? "ENABLED" : "DISABLED");
+}
+
+// Load wake-on-movement setting from persistent storage
+void loadWakeOnMovement() {
+  preferences.begin("settings", true);
+  wakeOnMovement = preferences.getBool("wakeOnMove", false);  // Default: disabled
+  preferences.end();
+  DEBUG_PRINT("Wake on movement loaded: ");
+  DEBUG_PRINTLN(wakeOnMovement ? "ENABLED" : "DISABLED");
 }
 
 // Perform gyro calibration and save results (matches tockn library behavior)
@@ -854,38 +912,210 @@ void readBatteryVoltage() {
   DEBUG_PRINTLN("%)");
 }
 
-// Enter deep sleep mode with interrupt wake
+// HTML page served during OTA update mode
+static const char OTA_PAGE[] PROGMEM = R"rawliteral(
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pavloff Firmware Update</title>
+<style>
+body{font-family:sans-serif;max-width:480px;margin:40px auto;padding:0 20px;background:#1a1a2e;color:#e0e0e0}
+h1{color:#0ff;font-size:1.4em}
+.box{background:#16213e;border-radius:8px;padding:20px;margin:20px 0}
+input[type=file]{margin:10px 0;color:#e0e0e0}
+input[type=submit]{background:#0ff;color:#1a1a2e;border:none;padding:12px 24px;border-radius:4px;font-size:1em;cursor:pointer;font-weight:bold}
+input[type=submit]:hover{background:#00cccc}
+#progress{display:none;margin-top:15px}
+.bar{background:#333;border-radius:4px;overflow:hidden;height:24px}
+.bar div{background:#0ff;height:100%;width:0%;transition:width 0.3s}
+.msg{margin-top:10px;padding:10px;border-radius:4px;display:none}
+.ok{background:#0a3d0a;color:#4f4}.err{background:#3d0a0a;color:#f44}
+</style>
+</head>
+<body>
+<h1>Pavloff Firmware Update</h1>
+<div class="box">
+<p>Select a firmware .bin file to upload:</p>
+<form id="f" method="POST" action="/update" enctype="multipart/form-data">
+<input type="file" name="firmware" accept=".bin" required><br>
+<input type="submit" value="Upload &amp; Install">
+</form>
+<div id="progress"><div class="bar"><div id="pbar"></div></div><span id="ptxt">0%</span></div>
+<div id="ok" class="msg ok">Update successful! Rebooting...</div>
+<div id="err" class="msg err">Update failed. Please try again.</div>
+</div>
+<script>
+document.getElementById('f').addEventListener('submit',function(e){
+  e.preventDefault();
+  var f=new FormData(this);
+  var x=new XMLHttpRequest();
+  document.getElementById('progress').style.display='block';
+  x.upload.addEventListener('progress',function(e){
+    if(e.lengthComputable){
+      var p=Math.round(e.loaded/e.total*100);
+      document.getElementById('pbar').style.width=p+'%';
+      document.getElementById('ptxt').textContent=p+'%';
+    }
+  });
+  x.onreadystatechange=function(){
+    if(x.readyState==4){
+      if(x.status==200){
+        document.getElementById('ok').style.display='block';
+      }else{
+        document.getElementById('err').style.display='block';
+      }
+    }
+  };
+  x.open('POST','/update',true);
+  x.send(f);
+});
+</script>
+</body>
+</html>
+)rawliteral";
+
+// Enter OTA update mode: start WiFi AP and web server, handle firmware upload
+void enterOTAMode() {
+  DEBUG_PRINTLN("\n=== Entering OTA Update Mode ===");
+
+  // Shut down BLE to free memory for WiFi
+  DEBUG_PRINTLN("Shutting down BLE...");
+  BLEDevice::deinit(true);
+  delay(500);
+
+  // Start WiFi Access Point
+  DEBUG_PRINTLN("Starting WiFi AP...");
+  WiFi.mode(WIFI_AP);
+  WiFi.softAP(OTA_AP_SSID, OTA_AP_PASSWORD);
+  delay(500);
+  DEBUG_PRINT("AP IP address: ");
+  DEBUG_PRINTLN(WiFi.softAPIP());
+
+  // Create web server on port 80
+  WebServer server(80);
+
+  // Enable CORS for all responses
+  server.enableCORS(true);
+
+  // Serve the upload page
+  server.on("/", HTTP_GET, [&server]() {
+    server.send_P(200, "text/html", OTA_PAGE);
+  });
+
+  // Serve firmware version as JSON
+  server.on("/version", HTTP_GET, [&server]() {
+    char json[64];
+    snprintf(json, sizeof(json), "{\"version\":\"%s\"}", FIRMWARE_VERSION);
+    server.send(200, "application/json", json);
+  });
+
+  // Handle firmware upload
+  server.on("/update", HTTP_POST,
+    // Response handler (called after upload completes)
+    [&server]() {
+      if (Update.hasError()) {
+        server.send(500, "text/plain", "Update failed");
+      } else {
+        server.send(200, "text/plain", "Update successful");
+        delay(1000);
+        ESP.restart();
+      }
+    },
+    // Upload handler (called for each chunk)
+    [&server]() {
+      HTTPUpload& upload = server.upload();
+      if (upload.status == UPLOAD_FILE_START) {
+        DEBUG_PRINT("OTA file: ");
+        DEBUG_PRINTLN(upload.filename.c_str());
+        if (!Update.begin(UPDATE_SIZE_UNKNOWN)) {
+          DEBUG_PRINTLN("Update.begin() failed");
+        }
+      } else if (upload.status == UPLOAD_FILE_WRITE) {
+        if (Update.write(upload.buf, upload.currentSize) != upload.currentSize) {
+          DEBUG_PRINTLN("Update.write() failed");
+        }
+      } else if (upload.status == UPLOAD_FILE_END) {
+        if (Update.end(true)) {
+          DEBUG_PRINT("Update success, total size: ");
+          DEBUG_PRINTLN(upload.totalSize);
+        } else {
+          DEBUG_PRINTLN("Update.end() failed");
+        }
+      }
+    }
+  );
+
+  server.begin();
+  DEBUG_PRINTLN("OTA web server started");
+  DEBUG_PRINT("Connect to WiFi: ");
+  DEBUG_PRINTLN(OTA_AP_SSID);
+  DEBUG_PRINT("Then visit: http://");
+  DEBUG_PRINTLN(WiFi.softAPIP());
+
+  // Rapid LED blink to indicate OTA mode
+  unsigned long lastBlink = 0;
+  bool ledOn = false;
+
+  // Run the server until update completes or device is reset
+  while (true) {
+    server.handleClient();
+
+    // Fast blink LED to indicate OTA mode
+    unsigned long now = millis();
+    if (now - lastBlink >= 200) {
+      lastBlink = now;
+      ledOn = !ledOn;
+      ledcWrite(LED_PWM_CHANNEL, ledOn ? 128 : 0);
+    }
+
+    delay(2);
+  }
+}
+
+// Enter deep sleep mode
 void enterDeepSleep() {
   DEBUG_PRINTLN("\n=== Entering Deep Sleep ===");
-  
+
   // Turn off blue LED before sleep
+  // Must detach from LEDC and drive LOW as regular GPIO, then hold the state,
+  // otherwise the pin floats when the digital domain powers down and the LED stays on.
   ledcWrite(LED_PWM_CHANNEL, 0);
-  
-  // Turn off blue LED before sleep
-  ledcWrite(LED_PWM_CHANNEL, 0);
-  
-  // Put MPU-6050 into low power mode with motion interrupt configured
-  DEBUG_PRINTLN("Configuring MPU for motion wake-up");
-  putMPUToSleep();
-  
-  // Clear any pending interrupt status before sleep
+  ledcDetachPin(BLUE_LED_PIN);
+  pinMode(BLUE_LED_PIN, OUTPUT);
+  digitalWrite(BLUE_LED_PIN, LOW);
+  gpio_hold_en((gpio_num_t)BLUE_LED_PIN);
+  gpio_deep_sleep_hold_en();
+
+  if (wakeOnMovement) {
+    // Put MPU-6050 into low power mode with motion interrupt configured
+    DEBUG_PRINTLN("Configuring MPU for motion wake-up");
+    putMPUToSleep();
+
+    // Clear any pending interrupt status before sleep
     uint8_t intStatus = mpu.getIntStatus();
-  DEBUG_PRINT("MPU interrupt status before sleep: 0x");
-  DEBUG_PRINTF(intStatus, HEX);
-  DEBUG_PRINTLN("");
-  
-  // Wait for MPU-6050 to enter low power mode and interrupt to be ready
-  delay(200);
-  
-  // Check GPIO 18 level before sleep
-  DEBUG_PRINT("GPIO 18 level before sleep: ");
-  DEBUG_PRINTLN(digitalRead(INT_PIN));
-  
+    DEBUG_PRINT("MPU interrupt status before sleep: 0x");
+    DEBUG_PRINTF(intStatus, HEX);
+    DEBUG_PRINTLN("");
+
+    // Wait for MPU-6050 to enter low power mode and interrupt to be ready
+    delay(200);
+
+    // Check GPIO 18 level before sleep
+    DEBUG_PRINT("GPIO 18 level before sleep: ");
+    DEBUG_PRINTLN(digitalRead(INT_PIN));
+  } else {
+    // Put MPU fully to sleep to minimize power consumption
+    DEBUG_PRINTLN("Wake on movement DISABLED - putting MPU to full sleep");
+    mpu.setSleepEnabled(true);
+    delay(100);
+  }
+
   // Disable BLE and wait for clean shutdown
   DEBUG_PRINTLN("Shutting down BLE");
   BLEDevice::deinit(true);
   delay(100);  // Allow time for BLE to fully power down
-  
+
   // Explicitly disable WiFi radio to save power (can consume 20-100mA if left on)
   // Note: These may fail if WiFi was never started, which is expected and harmless
   DEBUG_PRINTLN("Shutting down WiFi (if active)");
@@ -894,44 +1124,47 @@ void enterDeepSleep() {
     DEBUG_PRINT("WiFi stop error: ");
     DEBUG_PRINTLN(wifi_err);
   }
-  
+
   wifi_err = esp_wifi_deinit();
   if (wifi_err != ESP_OK && wifi_err != ESP_ERR_WIFI_NOT_INIT) {
     DEBUG_PRINT("WiFi deinit error: ");
     DEBUG_PRINTLN(wifi_err);
   }
-  
+
   // Wait for all radio shutdowns to complete
   delay(200);
-  
+
   // Disable unused peripherals to minimize power consumption
   DEBUG_PRINTLN("Disabling unused peripherals");
   esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_OFF);
   esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_SLOW_MEM, ESP_PD_OPTION_OFF);
   esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_FAST_MEM, ESP_PD_OPTION_OFF);
-  
-  // Configure GPIO interrupt wake-up on INT_PIN (GPIO 18) for ESP32-S3 deep sleep
-  // Motion interrupt from MPU6050 will wake the ESP32
-  // For deep sleep, ESP32-S3 uses ext1 wakeup for RTC GPIOs
-  
-  // GPIO 18 is RTC_GPIO 18 on ESP32-S3
-  // Use ext1 wakeup with single GPIO and HIGH level trigger
-  uint64_t gpio_mask = (1ULL << INT_PIN);
-  
-  // Enable ext1 wakeup on GPIO 18 with ANY_HIGH mode (wakes when any selected GPIO is HIGH)
-  DEBUG_PRINT("Configuring wake on GPIO ");
-  DEBUG_PRINT(INT_PIN);
-  DEBUG_PRINTLN(" (motion interrupt)");
-  esp_sleep_enable_ext1_wakeup(gpio_mask, ESP_EXT1_WAKEUP_ANY_HIGH);
-  
-  // Configure internal pull-down on the GPIO
-  gpio_pulldown_en((gpio_num_t)INT_PIN);
-  gpio_pullup_dis((gpio_num_t)INT_PIN);
-  
-  DEBUG_PRINTLN("*** ENTERING DEEP SLEEP NOW ***");
-  DEBUG_PRINTLN("Device will wake on motion detection");
+
+  if (wakeOnMovement) {
+    // Configure GPIO interrupt wake-up on INT_PIN (GPIO 18) for ESP32-S3 deep sleep
+    // Motion interrupt from MPU6050 will wake the ESP32
+    uint64_t gpio_mask = (1ULL << INT_PIN);
+
+    // Enable ext1 wakeup on GPIO 18 with ANY_HIGH mode
+    DEBUG_PRINT("Configuring wake on GPIO ");
+    DEBUG_PRINT(INT_PIN);
+    DEBUG_PRINTLN(" (motion interrupt)");
+    esp_sleep_enable_ext1_wakeup(gpio_mask, ESP_EXT1_WAKEUP_ANY_HIGH);
+
+    // Configure internal pull-down on the GPIO
+    gpio_pulldown_en((gpio_num_t)INT_PIN);
+    gpio_pullup_dis((gpio_num_t)INT_PIN);
+
+    DEBUG_PRINTLN("*** ENTERING DEEP SLEEP NOW ***");
+    DEBUG_PRINTLN("Device will wake on motion detection");
+  } else {
+    // No wake source configured - only hardware reset will wake the device
+    DEBUG_PRINTLN("*** ENTERING DEEP SLEEP NOW ***");
+    DEBUG_PRINTLN("Wake on movement DISABLED - only hardware reset will wake device");
+  }
+
   delay(100);  // Ensure serial output completes
-  
+
   // Enter deep sleep
   esp_deep_sleep_start();
 }
@@ -939,6 +1172,9 @@ void enterDeepSleep() {
 void setup() {
   // Initialize battery voltage ADC
   analogReadResolution(12);  // 12-bit resolution (0-4095)
+
+  // Release GPIO hold from deep sleep so LED pin can be reused by LEDC
+  gpio_hold_dis((gpio_num_t)BLUE_LED_PIN);
 
   // Initialize blue LED with LEDC PWM
   ledcSetup(LED_PWM_CHANNEL, LED_PWM_FREQ, LED_PWM_RESOLUTION);
@@ -1110,6 +1346,10 @@ void setup() {
   }
   
 
+  // Load wake-on-movement setting from persistent storage
+  DEBUG_PRINTLN("\n--- Loading Wake on Movement Setting ---");
+  loadWakeOnMovement();
+
   // Reset all state variables (critical after wake from sleep)
   DEBUG_PRINTLN("\n--- Resetting State Variables ---");
   resetStateVariables();
@@ -1142,7 +1382,11 @@ void setup() {
   // Create the BLE Service
   DEBUG_PRINT("Creating BLE service with UUID: ");
   DEBUG_PRINTLN(SERVICE_UUID);
-  BLEService *pService = pServer->createService(SERVICE_UUID);
+  // Allocate enough handles for all characteristics + descriptors
+  // Each characteristic needs 3 handles (declaration + value + BLE2902 descriptor)
+  // 7 characteristics × 3 = 21 handles + 1 service declaration = 22 minimum
+  // Using 30 for headroom
+  BLEService *pService = pServer->createService(BLEUUID(SERVICE_UUID), 30);
 
   // Create a BLE Characteristic for Accelerometer Data
   DEBUG_PRINTLN("Creating Accelerometer characteristic");
@@ -1220,6 +1464,15 @@ void setup() {
   pBatteryCharacteristic->setValue(batteryData);
   DEBUG_PRINTLN("  Battery characteristic configured");
 
+  // Create a BLE Characteristic for Firmware Version (read-only)
+  DEBUG_PRINTLN("Creating Version characteristic");
+  pVersionCharacteristic = pService->createCharacteristic(
+                      VERSION_CHARACTERISTIC_UUID,
+                      BLECharacteristic::PROPERTY_READ
+                    );
+  pVersionCharacteristic->setValue(FIRMWARE_VERSION);
+  DEBUG_PRINTLN("  Version characteristic configured");
+
   // Start the service
   DEBUG_PRINTLN("Starting BLE service");
   pService->start();
@@ -1268,6 +1521,13 @@ void loop() {
     DEBUG_PRINT("Time until sleep: ");
     DEBUG_PRINT((IDLE_TIMEOUT_MS - (currentTime - lastActivityTime)) / 1000);
     DEBUG_PRINTLN(" seconds");
+  }
+  
+  // Check if OTA mode was requested via BLE
+  if (otaRequested) {
+    otaRequested = false;
+    enterOTAMode();
+    // enterOTAMode() never returns (runs server loop until reboot)
   }
   
   // Check for idle timeout and enter deep sleep

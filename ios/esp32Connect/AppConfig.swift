@@ -31,6 +31,7 @@ struct AppConfig {
         static let durationCharacteristic = "7a8e6f9d-3c1b-42a8-9e7f-1234567890ab"  // Duration tracking characteristic
         static let sensitivityCharacteristic = "9c4a7f2e-5d3b-41a9-8f6e-2345678901bc"  // Sensitivity settings characteristic
         static let batteryCharacteristic = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"  // Battery voltage characteristic
+        static let versionCharacteristic = "b2c3d4e5-f6a7-8901-bcde-f12345678901"  // Firmware version characteristic
     }
     
     // UI Configuration

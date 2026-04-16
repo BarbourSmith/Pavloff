@@ -11,10 +11,13 @@ import FamilyControls
 struct SetupView: View {
     @Binding var workoutSettings: WorkoutSettings
     var batteryData: BatteryData? = nil
+    var bleManager: BLEManager? = nil
+    var deviceId: UUID? = nil
     @Environment(\.dismiss) var dismiss
     @StateObject private var screenTimeManager = ScreenTimeManager.shared
     @State private var showingAppPicker = false
     @State private var showingAddExercise = false
+    @State private var showingFirmwareUpdate = false
     @State private var newExerciseName = ""
     @State private var newExerciseReps = 10
     @State private var newExerciseDuration = 60
@@ -211,12 +214,32 @@ struct SetupView: View {
                                     .foregroundColor(.gray)
                                     .padding(.top, 2)
                             }
+
+                            Divider()
+                                .padding(.vertical, 5)
+
+                            // Wake on Movement Toggle
+                            VStack(alignment: .leading, spacing: 8) {
+                                Toggle(isOn: $workoutSettings.wakeOnMovement) {
+                                    Text("Wake on Movement")
+                                        .font(.body)
+                                        .fontWeight(.medium)
+                                }
+                                .tint(.blue)
+
+                                Text(workoutSettings.wakeOnMovement
+                                    ? "Sensor wakes automatically when movement is detected"
+                                    : "Sensor stays asleep until reset button is pressed (saves battery)")
+                                    .font(.caption2)
+                                    .foregroundColor(.gray)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
                         }
                         .padding()
                         .background(Color.white)
                         .cornerRadius(12)
                         .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
-                        
+
                         // Screen Time Controls Section
                         VStack(alignment: .leading, spacing: 15) {
                             Text("Screen Time Controls")
@@ -299,6 +322,56 @@ struct SetupView: View {
                         .background(Color.white)
                         .cornerRadius(12)
                         .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
+
+                        // Firmware Update Section
+                        if bleManager != nil && deviceId != nil {
+                            VStack(alignment: .leading, spacing: 15) {
+                                Text("Firmware Update")
+                                    .font(.headline)
+                                    .fontWeight(.bold)
+                                    .padding(.top, 10)
+
+                                Text("Update the sensor's firmware over the air")
+                                    .font(.subheadline)
+                                    .foregroundColor(.gray)
+                                    .fixedSize(horizontal: false, vertical: true)
+
+                                HStack(spacing: 12) {
+                                    Image(systemName: "cpu")
+                                        .foregroundColor(.blue)
+
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text("Current Version")
+                                            .font(.caption)
+                                            .foregroundColor(.gray)
+                                        Text(bleManager?.firmwareVersion ?? "Unknown")
+                                            .font(.body)
+                                            .fontWeight(.medium)
+                                    }
+
+                                    Spacer()
+                                }
+
+                                Button(action: {
+                                    showingFirmwareUpdate = true
+                                }) {
+                                    HStack {
+                                        Image(systemName: "arrow.down.circle.fill")
+                                        Text("Update Firmware")
+                                    }
+                                    .fontWeight(.semibold)
+                                    .frame(maxWidth: .infinity)
+                                    .padding()
+                                    .background(Color.purple.opacity(0.15))
+                                    .foregroundColor(.purple)
+                                    .cornerRadius(8)
+                                }
+                            }
+                            .padding()
+                            .background(Color.white)
+                            .cornerRadius(12)
+                            .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
+                        }
                     }
                     .padding()
                 }
@@ -321,6 +394,11 @@ struct SetupView: View {
             }
             .navigationBarTitleDisplayMode(.inline)
             .familyActivityPicker(isPresented: $showingAppPicker, selection: $screenTimeManager.selectedApps)
+            .sheet(isPresented: $showingFirmwareUpdate) {
+                if let bleManager = bleManager, let deviceId = deviceId {
+                    FirmwareUpdateView(bleManager: bleManager, deviceId: deviceId)
+                }
+            }
             .sheet(isPresented: $showingAddExercise) {
                 AddExerciseSheet(
                     exerciseName: $newExerciseName,
@@ -353,6 +431,9 @@ struct SetupView: View {
             }
             .onChange(of: workoutSettings.vibrationSensitivity) { _ in
                 // Save settings whenever vibration sensitivity changes
+                workoutSettings.save()
+            }
+            .onChange(of: workoutSettings.wakeOnMovement) { _ in
                 workoutSettings.save()
             }
             .onAppear {

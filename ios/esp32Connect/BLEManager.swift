@@ -16,6 +16,7 @@ class BLEManager: NSObject, ObservableObject {
     @Published var bluetoothState: CBManagerState = .unknown
     @Published var connectionStatuses: [UUID: ConnectionStatus] = [:]
     @Published var deviceDataMap: [UUID: DeviceData] = [:]
+    @Published var firmwareVersion: String?
     
     // MARK: - Private Properties
     private var centralManager: CBCentralManager!
@@ -30,6 +31,7 @@ class BLEManager: NSObject, ObservableObject {
     private let durationCharUUID = CBUUID(string: AppConfig.UUIDs.durationCharacteristic)
     private let sensitivityCharUUID = CBUUID(string: AppConfig.UUIDs.sensitivityCharacteristic)
     private let batteryCharUUID = CBUUID(string: AppConfig.UUIDs.batteryCharacteristic)
+    private let versionCharUUID = CBUUID(string: AppConfig.UUIDs.versionCharacteristic)
     
     // MARK: - Initialization
     override init() {
@@ -134,28 +136,49 @@ class BLEManager: NSObject, ObservableObject {
     }
     
     /// Send sensitivity settings to a connected device
-    func sendSensitivitySettings(for deviceId: UUID, repSensitivity: Double, vibrationSensitivity: Double) {
+    func sendSensitivitySettings(for deviceId: UUID, repSensitivity: Double, vibrationSensitivity: Double, wakeOnMovement: Bool) {
         guard let peripheral = connectedPeripherals[deviceId] else {
             print("[BLE] Cannot send sensitivity - device not found")
             return
         }
-        
+
         // Find the sensitivity characteristic
         guard let service = peripheral.services?.first(where: { $0.uuid == imuServiceUUID }),
               let characteristic = service.characteristics?.first(where: { $0.uuid == sensitivityCharUUID }) else {
             print("[BLE] Cannot find sensitivity characteristic")
             return
         }
-        
-        // Format: "RepSens:value,VibSens:value"
-        let sensitivityString = String(format: "RepSens:%.2f,VibSens:%.2f", repSensitivity, vibrationSensitivity)
+
+        // Format: "RepSens:value,VibSens:value,Wake:0or1"
+        let wakeValue = wakeOnMovement ? 1 : 0
+        let sensitivityString = String(format: "RepSens:%.2f,VibSens:%.2f,Wake:%d", repSensitivity, vibrationSensitivity, wakeValue)
         guard let sensitivityData = sensitivityString.data(using: .utf8) else {
             print("[BLE] Failed to encode sensitivity data")
             return
         }
-        
+
         peripheral.writeValue(sensitivityData, for: characteristic, type: .withResponse)
-        print("[BLE] Sent sensitivity settings to device: \(peripheral.name ?? "Unknown") - Rep: \(repSensitivity), Vib: \(vibrationSensitivity)")
+        print("[BLE] Sent sensitivity settings to device: \(peripheral.name ?? "Unknown") - Rep: \(repSensitivity), Vib: \(vibrationSensitivity), Wake: \(wakeOnMovement)")
+    }
+    
+    /// Send OTA mode request to a connected device
+    /// The device will shut down BLE and start a WiFi AP for firmware upload
+    func requestOTAMode(for deviceId: UUID) {
+        guard let peripheral = connectedPeripherals[deviceId] else {
+            print("[BLE] Cannot request OTA - device not found")
+            return
+        }
+        
+        // Find the rep characteristic (OTA command is sent via rep characteristic)
+        guard let service = peripheral.services?.first(where: { $0.uuid == imuServiceUUID }),
+              let characteristic = service.characteristics?.first(where: { $0.uuid == accelCharUUID }) else {
+            print("[BLE] Cannot find rep characteristic for OTA command")
+            return
+        }
+        
+        let otaData = "OTA".data(using: .utf8)!
+        peripheral.writeValue(otaData, for: characteristic, type: .withResponse)
+        print("[BLE] Sent OTA command to device: \(peripheral.name ?? "Unknown")")
     }
     
     /// Parse sensor data from characteristic value
@@ -358,6 +381,9 @@ extension BLEManager: CBPeripheralDelegate {
             } else if characteristic.uuid == batteryCharUUID {
                 print("[BLE] Found battery characteristic")
                 peripheral.setNotifyValue(true, for: characteristic)
+            } else if characteristic.uuid == versionCharUUID {
+                print("[BLE] Found version characteristic")
+                peripheral.readValue(for: characteristic)
             }
         }
         
@@ -427,6 +453,17 @@ extension BLEManager: CBPeripheralDelegate {
                     deviceData.lastUpdate = Date()
                     self.deviceDataMap[peripheral.identifier] = deviceData
                 }
+            }
+            return
+        }
+
+        // Handle version characteristic
+        if characteristic.uuid == versionCharUUID {
+            if let version = String(data: data, encoding: .utf8) {
+                DispatchQueue.main.async {
+                    self.firmwareVersion = version
+                }
+                print("[BLE] Firmware version: \(version)")
             }
             return
         }
