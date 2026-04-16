@@ -18,6 +18,7 @@ struct SetupView: View {
     @State private var showingAppPicker = false
     @State private var showingAddExercise = false
     @State private var showingFirmwareUpdate = false
+    @State private var showingCalibrationConfirm = false
     @State private var newExerciseName = ""
     @State private var newExerciseReps = 10
     @State private var newExerciseDuration = 60
@@ -371,6 +372,38 @@ struct SetupView: View {
                             .background(Color.white)
                             .cornerRadius(12)
                             .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
+
+                            // Sensor Calibration Section
+                            VStack(alignment: .leading, spacing: 15) {
+                                Text("Sensor Calibration")
+                                    .font(.headline)
+                                    .fontWeight(.bold)
+                                    .padding(.top, 10)
+
+                                Text("Recalibrate the gyroscope for more accurate motion tracking. Keep the sensor perfectly still on a flat surface during calibration.")
+                                    .font(.subheadline)
+                                    .foregroundColor(.gray)
+                                    .fixedSize(horizontal: false, vertical: true)
+
+                                Button(action: {
+                                    showingCalibrationConfirm = true
+                                }) {
+                                    HStack {
+                                        Image(systemName: "gyroscope")
+                                        Text("Calibrate Sensor")
+                                    }
+                                    .fontWeight(.semibold)
+                                    .frame(maxWidth: .infinity)
+                                    .padding()
+                                    .background(Color.orange.opacity(0.15))
+                                    .foregroundColor(.orange)
+                                    .cornerRadius(8)
+                                }
+                            }
+                            .padding()
+                            .background(Color.white)
+                            .cornerRadius(12)
+                            .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
                         }
                     }
                     .padding()
@@ -398,6 +431,16 @@ struct SetupView: View {
                 if let bleManager = bleManager, let deviceId = deviceId {
                     FirmwareUpdateView(bleManager: bleManager, deviceId: deviceId)
                 }
+            }
+            .alert("Calibrate Sensor?", isPresented: $showingCalibrationConfirm) {
+                Button("Cancel", role: .cancel) {}
+                Button("Calibrate") {
+                    if let bleManager = bleManager, let deviceId = deviceId {
+                        bleManager.requestCalibration(for: deviceId)
+                    }
+                }
+            } message: {
+                Text("Place the sensor on a flat, stable surface and keep it perfectly still. The blue LED will flash during calibration (~10 seconds).")
             }
             .sheet(isPresented: $showingAddExercise) {
                 AddExerciseSheet(

@@ -181,6 +181,23 @@ class BLEManager: NSObject, ObservableObject {
         print("[BLE] Sent OTA command to device: \(peripheral.name ?? "Unknown")")
     }
     
+    func requestCalibration(for deviceId: UUID) {
+        guard let peripheral = connectedPeripherals[deviceId] else {
+            print("[BLE] Cannot request calibration - device not found")
+            return
+        }
+        
+        guard let service = peripheral.services?.first(where: { $0.uuid == imuServiceUUID }),
+              let characteristic = service.characteristics?.first(where: { $0.uuid == accelCharUUID }) else {
+            print("[BLE] Cannot find rep characteristic for calibration command")
+            return
+        }
+        
+        let calData = "CALIBRATE".data(using: .utf8)!
+        peripheral.writeValue(calData, for: characteristic, type: .withResponse)
+        print("[BLE] Sent CALIBRATE command to device: \(peripheral.name ?? "Unknown")")
+    }
+    
     /// Parse sensor data from characteristic value
     private func parseSensorData(from data: Data) -> SensorData? {
         guard let dataString = String(data: data, encoding: .utf8) else {

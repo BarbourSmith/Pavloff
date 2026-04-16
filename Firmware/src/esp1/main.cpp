@@ -19,7 +19,7 @@
 
 // Debug configuration
 // Set to 1 to enable serial debug output, 0 to disable
-#define ENABLE_SERIAL_DEBUG 0
+#define ENABLE_SERIAL_DEBUG 1
 
 // Serial debug macros - all serial output can be disabled by setting ENABLE_SERIAL_DEBUG to 0
 #if ENABLE_SERIAL_DEBUG
@@ -161,6 +161,7 @@ bool wakeOnMovement = false;            // When false, deep sleep requires hardw
 #define OTA_AP_SSID "Pavloff-Update"
 #define OTA_AP_PASSWORD "pavloff123"
 bool otaRequested = false;              // Flag set by BLE command to enter OTA mode
+bool calibrationRequested = false;      // Flag set by BLE command to trigger calibration
 
 // Blue LED heartbeat variables
 unsigned long lastLedUpdate = 0;     // Track last LED update time
@@ -195,8 +196,8 @@ void IRAM_ATTR mpuInterruptISR() {
 #define ACCEL_MAX_G 2.0f             // Maximum acceleration clamp (in g's)
 
 // Stationary detection thresholds
-#define ACCEL_STATIONARY_THRESHOLD 0.1f   // Acceleration deviation threshold (g's) for stationary detection
-#define GYRO_STATIONARY_THRESHOLD 0.1f    // Gyroscope threshold (rad/s) for stationary detection
+#define ACCEL_STATIONARY_THRESHOLD 0.3f   // Acceleration deviation from 1g (accommodates MPU6050 offset error)
+#define GYRO_STATIONARY_THRESHOLD 0.15f   // Gyroscope threshold (rad/s) for stationary detection
 
 // Rep detection parameters - now configurable via BLE
 // Default values correspond to medium sensitivity (0.5)
@@ -287,6 +288,14 @@ class RepCharacteristicCallbacks: public BLECharacteristicCallbacks {
           pCharacteristic->setValue("OTA:STARTING");
           pCharacteristic->notify();
           otaRequested = true;
+        }
+        
+        // Check for calibration command
+        if (value == "CALIBRATE" || value == "calibrate") {
+          DEBUG_PRINTLN("Calibration requested via BLE");
+          pCharacteristic->setValue("CAL:STARTING");
+          pCharacteristic->notify();
+          calibrationRequested = true;
         }
       }
     }
@@ -444,6 +453,18 @@ void loadWakeOnMovement() {
 }
 
 // Perform gyro calibration and save results (matches tockn library behavior)
+// Flash blue LED rapidly (for calibration visual feedback)
+void flashLedCalibration() {
+  static unsigned long lastFlash = 0;
+  static bool ledOn = false;
+  unsigned long now = millis();
+  if (now - lastFlash >= 150) {  // Toggle every 150ms
+    lastFlash = now;
+    ledOn = !ledOn;
+    ledcWrite(LED_PWM_CHANNEL, ledOn ? 200 : 0);
+  }
+}
+
 void performCalibration() {
   DEBUG_PRINTLN("\n=== Starting Gyro Calibration ===");
   DEBUG_PRINTLN("Collecting 3000 samples...");
@@ -462,11 +483,17 @@ void performCalibration() {
     }
     mpu.getRotation(&rx, &ry, &rz);
     
+    // Flash LED during calibration
+    flashLedCalibration();
+    
     // Convert to degrees/s and accumulate (matching tockn library)
     x += ((float)rx) * GYRO_SCALE;
     y += ((float)ry) * GYRO_SCALE;
     z += ((float)rz) * GYRO_SCALE;
   }
+  
+  // Turn LED off when done
+  ledcWrite(LED_PWM_CHANNEL, 0);
   
   // Calculate average offsets (in degrees/s)
   gyroXoffset = x / 3000.0f;
@@ -1530,6 +1557,14 @@ void loop() {
     // enterOTAMode() never returns (runs server loop until reboot)
   }
   
+  // Check if calibration was requested via BLE
+  if (calibrationRequested) {
+    calibrationRequested = false;
+    DEBUG_PRINTLN("Starting BLE-requested calibration...");
+    performCalibration();
+    lastActivityTime = millis();  // Reset sleep timer after calibration
+  }
+  
   // Check for idle timeout and enter deep sleep
   if (currentTime - lastActivityTime > IDLE_TIMEOUT_MS) {
     DEBUG_PRINTLN("\n*** IDLE TIMEOUT - ENTERING DEEP SLEEP ***");
@@ -1565,6 +1600,9 @@ void loop() {
   float rawAccelX = ax * ACCEL_SCALE;  // in g's
   float rawAccelY = ay * ACCEL_SCALE;
   float rawAccelZ = az * ACCEL_SCALE;
+  
+  // Compute raw magnitude for stationary detection (before filtering distorts it)
+  float rawAccelMagForSleep = sqrt(rawAccelX*rawAccelX + rawAccelY*rawAccelY + rawAccelZ*rawAccelZ);
   
   // Apply low-pass filter and clamp acceleration
   float filteredX, filteredY, filteredZ;
@@ -1607,9 +1645,26 @@ void loop() {
     rotateVector(rawAccelX, rawAccelY, rawAccelZ, &earthAccelX, &earthAccelY, &earthAccelZ);
 
     // Detect if board is stationary (acceleration magnitude ≈ 1g and gyro ≈ 0)
-    float accelMag = sqrt(earthAccelX*earthAccelX + earthAccelY*earthAccelY + earthAccelZ*earthAccelZ);
+    // Use raw (pre-filter) accel magnitude — the EMA filter starts at 0 and
+    // takes many iterations to converge to 1g, causing false "not stationary"
     float gyroMag = sqrt(rawGyroX*rawGyroX + rawGyroY*rawGyroY + rawGyroZ*rawGyroZ);
-    bool isStationary = (abs(accelMag - 1.0f) < ACCEL_STATIONARY_THRESHOLD) && (gyroMag < GYRO_STATIONARY_THRESHOLD);
+    bool isStationary = (abs(rawAccelMagForSleep - 1.0f) < ACCEL_STATIONARY_THRESHOLD) && (gyroMag < GYRO_STATIONARY_THRESHOLD);
+
+    // Debug: Print stationary detection values every 2 seconds
+    static unsigned long lastStationaryDebug = 0;
+    if (currentTime - lastStationaryDebug >= 2000) {
+      lastStationaryDebug = currentTime;
+      DEBUG_PRINT("SLEEP DEBUG | rawAccelMag=");
+      DEBUG_PRINTF(rawAccelMagForSleep, 4);
+      DEBUG_PRINT(" dev=");
+      DEBUG_PRINTF(abs(rawAccelMagForSleep - 1.0f), 4);
+      DEBUG_PRINT(" gyroMag=");
+      DEBUG_PRINTF(gyroMag, 4);
+      DEBUG_PRINT(" isStationary=");
+      DEBUG_PRINT(isStationary ? "YES" : "NO");
+      DEBUG_PRINT(" calibDone=");
+      DEBUG_PRINTLN(calibrationComplete ? "YES" : "NO");
+    }
 
     // Debug: Print Earth-frame acceleration
     // if (currentTime - lastDebugTime < 10) {
@@ -1702,9 +1757,11 @@ void loop() {
       lastActivityTime = currentTime;
     }
     
-    // Also update activity timer if stationary and waiting for calibration
+    // Also update activity timer if stationary and waiting for initial calibration
     // This prevents sleep while accumulating stillness time for calibration
-    if (isStationary && !calibrationComplete && wasStationary) {
+    // Cap at 60 seconds to avoid blocking sleep indefinitely
+    if (isStationary && !calibrationComplete && wasStationary
+        && (currentTime - lastStillTime < 60000)) {
       lastActivityTime = currentTime;
     }
   }
