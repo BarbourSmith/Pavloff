@@ -18,19 +18,19 @@
 		60D7C94F2EB536510076DBF0 /* DeviceActivity.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 60D7C94E2EB536510076DBF0 /* DeviceActivity.framework */; };
 		60D7C9602EB5382B0076DBF0 /* FamilyControls.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 60D7C95F2EB5382B0076DBF0 /* FamilyControls.framework */; };
 		60D7C9622EB5383B0076DBF0 /* ManagedSettings.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 60D7C9612EB5383B0076DBF0 /* ManagedSettings.framework */; };
+		60D7C96A2EB573000076DBF0 /* DeviceActivityMonitorExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 60D7C94D2EB536510076DBF0 /* DeviceActivityMonitorExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		6C583A8B36864E37BF51FCB3 /* AppConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100ACD91ACB46818A92AA8D /* AppConfig.swift */; };
 		7BB22A351210489DBA13106B /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21CBFCE60C3741839789F448 /* SceneDelegate.swift */; };
 		7E5DB21B30764AC9B4D6263A /* WorkoutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B8414B5B1FB40519788E100 /* WorkoutView.swift */; };
 		88A1DDE97BE64492848FF9F7 /* CongratulationsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0479AA6271854BEEBE11C7E4 /* CongratulationsView.swift */; };
 		8D87DD5133A7AB39F4848C73 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 412FB27218B7A33677308B8E /* PrivacyInfo.xcprivacy */; };
-		AA11BB22CC33DD44EE55FF66 /* FirmwareUpdateManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD11EE22FF33AA44BB55CC66 /* FirmwareUpdateManager.swift */; };
-		AA22BB33CC44DD55EE66FF77 /* FirmwareUpdateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD22EE33FF44AA55BB66CC77 /* FirmwareUpdateView.swift */; };
 		9D8E7F6A1B2C3D4E5F607182 /* ScreenTimeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C7D6E5A0B1C2D3E4F506071 /* ScreenTimeManager.swift */; };
 		A67A45E9B72B4E81B652C831 /* ESP32ConnectApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C8C77A75B98436880BB96D1 /* ESP32ConnectApp.swift */; };
+		AA11BB22CC33DD44EE55FF66 /* FirmwareUpdateManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD11EE22FF33AA44BB55CC66 /* FirmwareUpdateManager.swift */; };
+		AA22BB33CC44DD55EE66FF77 /* FirmwareUpdateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD22EE33FF44AA55BB66CC77 /* FirmwareUpdateView.swift */; };
 		AC01234567890ABCDEF12345 /* AutoConnectDataDisplayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC01234567890ABCDEF12345 /* AutoConnectDataDisplayView.swift */; };
 		E20F79DAFA5042F18286D991 /* ConnectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B700AC7A3B1F495C80E42D88 /* ConnectionView.swift */; };
 		F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11748412D0307B40044C1D9 /* AppDelegate.swift */; };
-		60D7C96A2EB573000076DBF0 /* DeviceActivityMonitorExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 60D7C94D2EB536510076DBF0 /* DeviceActivityMonitorExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -99,12 +99,12 @@
 		AE50CB5574214F99A14202C6 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Models.swift; path = esp32Connect/Models.swift; sourceTree = "<group>"; };
 		B700AC7A3B1F495C80E42D88 /* ConnectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ConnectionView.swift; path = esp32Connect/ConnectionView.swift; sourceTree = "<group>"; };
 		BC01234567890ABCDEF12345 /* AutoConnectDataDisplayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AutoConnectDataDisplayView.swift; path = esp32Connect/AutoConnectDataDisplayView.swift; sourceTree = "<group>"; };
+		DD11EE22FF33AA44BB55CC66 /* FirmwareUpdateManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = FirmwareUpdateManager.swift; path = esp32Connect/FirmwareUpdateManager.swift; sourceTree = "<group>"; };
+		DD22EE33FF44AA55BB66CC77 /* FirmwareUpdateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = FirmwareUpdateView.swift; path = esp32Connect/FirmwareUpdateView.swift; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		F100ACD91ACB46818A92AA8D /* AppConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppConfig.swift; path = esp32Connect/AppConfig.swift; sourceTree = "<group>"; };
 		F11748412D0307B40044C1D9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = esp32Connect/AppDelegate.swift; sourceTree = "<group>"; };
 		F11748442D0722820044C1D9 /* esp32Connect-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "esp32Connect-Bridging-Header.h"; path = "esp32Connect/esp32Connect-Bridging-Header.h"; sourceTree = "<group>"; };
-		DD11EE22FF33AA44BB55CC66 /* FirmwareUpdateManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = FirmwareUpdateManager.swift; path = esp32Connect/FirmwareUpdateManager.swift; sourceTree = "<group>"; };
-		DD22EE33FF44AA55BB66CC77 /* FirmwareUpdateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = FirmwareUpdateView.swift; path = esp32Connect/FirmwareUpdateView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -381,7 +381,7 @@
 				CODE_SIGN_ENTITLEMENTS = esp32Connect/esp32Connect.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 1.1;
 				DEVELOPMENT_TEAM = Y29YA968X5;
 				ENABLE_BITCODE = NO;
 				GCC_PREPROCESSOR_DEFINITIONS = (
@@ -396,7 +396,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.01;
+				MARKETING_VERSION = 1.1;
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-ObjC",
@@ -420,7 +420,7 @@
 				CODE_SIGN_ENTITLEMENTS = esp32Connect/esp32ConnectRelease.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 1.1;
 				DEVELOPMENT_TEAM = Y29YA968X5;
 				INFOPLIST_FILE = esp32Connect/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Pavl-off";
@@ -430,7 +430,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.01;
+				MARKETING_VERSION = 1.1;
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-ObjC",
@@ -460,7 +460,7 @@
 				CODE_SIGN_ENTITLEMENTS = DeviceActivityMonitorExtension/DeviceActivityMonitorExtension.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 1.1;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = Y29YA968X5;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -476,7 +476,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MARKETING_VERSION = 1.01;
+				MARKETING_VERSION = 1.1;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = com.maslowcnc.Tides.DeviceActivityMonitorExtension;
@@ -510,7 +510,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 1.1;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = Y29YA968X5;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -526,7 +526,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MARKETING_VERSION = 1.01;
+				MARKETING_VERSION = 1.1;
 				MTL_FAST_MATH = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = com.maslowcnc.Tides.DeviceActivityMonitorExtension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
