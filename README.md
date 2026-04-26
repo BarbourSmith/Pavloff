@@ -10,7 +10,7 @@ Pavloff Workout is a native Swift iOS application designed for workout tracking 
 
 This is a complete native Swift rewrite of the original React Native application, providing better performance, native iOS UI/UX, and simplified architecture.
 
-## 🆕 Workout Tracking Features
+## Workout Tracking Features
 
 - **🏋️ Multi-Exercise Workouts**: Track progress through multiple exercises in sequence
 - **📊 Real-Time Rep Counting**: Automatic rep detection with large, easy-to-read display
@@ -53,23 +53,27 @@ ios/esp32Connect/
 ├── AppDelegate.swift               # App lifecycle delegate
 ├── SceneDelegate.swift             # Scene lifecycle delegate
 ├── AppConfig.swift                 # Configuration constants
-├── Models.swift                    # Data models (including Exercise & WorkoutSettings)
+├── Models.swift                    # Data models (Exercise, WorkoutSettings, StreakManager)
 ├── BLEManager.swift                # Bluetooth LE manager
-├── WorkoutView.swift               # 🆕 Main workout tracking screen
-├── SetupView.swift                 # 🆕 Exercise configuration screen
-├── CongratulationsView.swift      # 🆕 Workout completion screen
+├── WorkoutView.swift               # Main workout tracking screen
+├── SetupView.swift                 # Exercise configuration screen
+├── CongratulationsView.swift      # Workout completion screen
+├── ScreenTimeManager.swift         # Screen Time API manager
+├── FirmwareUpdateManager.swift     # Firmware OTA update manager
+├── FirmwareUpdateView.swift        # Firmware update UI
+├── HoldToConfirmButton.swift       # Reusable hold-to-confirm button component
 ├── AutoConnectDataDisplayView.swift # Legacy auto-connect view
-├── HomeView.swift                  # Device scanning screen
-├── ConnectionView.swift            # Connection status screen
-└── DataDisplayView.swift           # Data display screen
+├── HomeView.swift                  # Device scanning screen (legacy)
+├── ConnectionView.swift            # Connection status screen (legacy)
+└── DataDisplayView.swift           # Data display screen (legacy)
 ```
 
 ### Key Components
 
-#### 1. **Workout System** 🆕
+#### 1. **Workout System**
 Main workout tracking functionality:
 - **WorkoutView**: Primary screen for workout tracking with auto-progression
-- **SetupView**: Configuration screen for setting exercise targets
+- **SetupView**: Configuration screen for setting exercise targets and sensitivity
 - **CongratulationsView**: Celebration screen on workout completion
 - **Exercise Model**: Represents individual exercises with target reps
 - **WorkoutSettings Model**: Manages workout configuration
@@ -86,6 +90,7 @@ Central manager for all Bluetooth operations:
 - **WorkoutView**: Main workout tracking interface (default screen)
 - **SetupView**: Exercise configuration and target setting
 - **CongratulationsView**: Workout completion celebration
+- **FirmwareUpdateView**: Firmware OTA update interface
 - **HomeView**: Device scanning and selection interface (legacy)
 - **ConnectionView**: Shows connection progress for selected devices (legacy)
 - **DataDisplayView**: Real-time display of IMU sensor data (legacy)
@@ -200,30 +205,6 @@ struct Devices {
 
 For detailed usage guide, see [WORKOUT_FEATURE.md](WORKOUT_FEATURE.md).
 
-### 📱 Legacy Device Management Mode
-
-1. **Launch the app**
-   - Grant Bluetooth permissions when prompted
-
-2. **Scan for devices**
-   - Tap "Scan for Devices" to start discovering ESP32 devices
-   - Scanning will automatically stop after 10 seconds
-
-3. **Select devices**
-   - Tap on 1 or 2 devices to select them
-   - Selected devices are highlighted in blue
-
-4. **Connect**
-   - Tap "Proceed to Connect" to connect to selected devices
-   - Connection progress is shown for each device
-
-5. **View data**
-   - Once connected, tap "Show Data" to see real-time IMU readings
-   - Data updates automatically as it's received from devices
-
-6. **Stop monitoring**
-   - Tap "Stop Monitoring" to disconnect and return to scanning
-
 ## Troubleshooting
 
 ### No devices found
@@ -238,7 +219,7 @@ For detailed usage guide, see [WORKOUT_FEATURE.md](WORKOUT_FEATURE.md).
 
 ### No data displayed
 - Ensure characteristics support notify operations
-- Verify data format: `X:value,Y:value,Z:value`
+- Verify data format: `Count:value,State:value`
 - Check ESP32 logs for transmission errors
 
 ### Bluetooth permission denied
@@ -258,8 +239,11 @@ If your ESP32 uses different UUIDs, update in `AppConfig.swift`:
 ```swift
 struct UUIDs {
     static let imuService = "your-service-uuid"
-    static let accelCharacteristic = "your-accel-uuid"
-    static let gyroCharacteristic = "your-gyro-uuid"
+    static let accelCharacteristic = "your-rep-count-uuid"
+    static let durationCharacteristic = "your-duration-uuid"
+    static let sensitivityCharacteristic = "your-sensitivity-uuid"
+    static let batteryCharacteristic = "your-battery-uuid"
+    static let versionCharacteristic = "your-firmware-version-uuid"
 }
 ```
 
@@ -291,20 +275,20 @@ This app replaces the previous React Native implementation with a native Swift a
 ### Workout Tracking Features
 - **[WORKOUT_FEATURE.md](WORKOUT_FEATURE.md)**: Complete user guide with quick start, tips, and troubleshooting
 - **[STREAK_FEATURE.md](STREAK_FEATURE.md)**: Streak tracking feature guide with logic and milestones
+- **[SENSITIVITY_SETTINGS.md](SENSITIVITY_SETTINGS.md)**: Sensor sensitivity configuration guide
 - **[TEST_PLAN.md](TEST_PLAN.md)**: Comprehensive testing guide with test cases and workflows
 - **[WORKOUT_SCREENS.md](WORKOUT_SCREENS.md)**: Visual mockups and screen flow diagrams
-- **[IMPLEMENTATION_SUMMARY.md](IMPLEMENTATION_SUMMARY.md)**: Technical architecture and implementation details
-- **[FEATURE_SUMMARY.md](FEATURE_SUMMARY.md)**: Executive summary and requirements fulfillment
 
 ### Screen Time & App Blocking
 - **[SCREEN_TIME_FEATURE.md](SCREEN_TIME_FEATURE.md)**: App blocking feature overview
 - **[SCREEN_TIME_DEV_GUIDE.md](SCREEN_TIME_DEV_GUIDE.md)**: Developer guide for Screen Time API
 - **[SCREEN_TIME_UI.md](SCREEN_TIME_UI.md)**: UI design and implementation details
-- **[MIDNIGHT_RELOCK_SETUP.md](MIDNIGHT_RELOCK_SETUP.md)**: 🆕 Setup guide for automatic midnight re-locking
-- **[MIDNIGHT_RELOCK_SOLUTION_SUMMARY.md](MIDNIGHT_RELOCK_SOLUTION_SUMMARY.md)**: 🆕 Technical solution summary
-- **[MIDNIGHT_RELOCK_ARCHITECTURE.md](MIDNIGHT_RELOCK_ARCHITECTURE.md)**: 🆕 Architecture diagrams and data flows
+- **[MIDNIGHT_RELOCK_SETUP.md](MIDNIGHT_RELOCK_SETUP.md)**: Setup guide for automatic midnight re-locking
+- **[MIDNIGHT_RELOCK_SOLUTION_SUMMARY.md](MIDNIGHT_RELOCK_SOLUTION_SUMMARY.md)**: Technical solution summary
+- **[MIDNIGHT_RELOCK_ARCHITECTURE.md](MIDNIGHT_RELOCK_ARCHITECTURE.md)**: Architecture diagrams and data flows
+- **[MIDNIGHT_RELOCK_DEBUG_GUIDE.md](MIDNIGHT_RELOCK_DEBUG_GUIDE.md)**: Debugging guide for midnight re-lock issues
 
-### Original Documentation
+### Legacy Documentation
 - **[SCREEN_LAYOUTS.md](SCREEN_LAYOUTS.md)**: Legacy screen designs for device management mode
 - **Firmware docs**: See `/Firmware` directory for ESP32 implementation guides
 
