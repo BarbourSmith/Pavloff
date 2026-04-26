@@ -64,17 +64,6 @@ var repSensitivity: Double        // Rep detection sensitivity (0.0-1.0)
 var vibrationSensitivity: Double  // Vibration detection sensitivity (0.0-1.0)
 ```
 
-## Technical Details
-
-### Data Model
-
-The `WorkoutSettings` struct in `Models.swift` includes:
-
-```swift
-var repSensitivity: Double        // Rep detection sensitivity (0.0-1.0)
-var vibrationSensitivity: Double  // Vibration detection sensitivity (0.0-1.0)
-```
-
 ### Default Values
 
 ```swift
