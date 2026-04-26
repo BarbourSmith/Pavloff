@@ -194,7 +194,8 @@ void enterDeepSleep() {
 void setup() {
     Serial.begin(115200);
 
-    // On ESP32-S3 with USB CDC, wait briefly for the host to enumerate.
+    // On ESP32-S3 with USB CDC, wait up to 3 s (30 × 100 ms) for the host
+    // to enumerate the port before sending serial output.
 #if ARDUINO_USB_CDC_ON_BOOT
     for (int i = 0; i < 30 && !Serial; i++) {
         delay(100);
