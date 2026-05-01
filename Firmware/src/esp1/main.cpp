@@ -47,7 +47,7 @@ const float BATTERY_DIVIDER_RATIO = BATTERY_R2 / (BATTERY_R1 + BATTERY_R2);
 // LiPo battery voltage thresholds
 #define BATTERY_VOLTAGE_FULL 4.20f    // Fully charged
 #define BATTERY_VOLTAGE_NOMINAL 3.70f // Nominal voltage
-#define BATTERY_VOLTAGE_LOW 3.30f     // Low battery warning
+#define BATTERY_VOLTAGE_LOW 3.25f     // Low battery warning
 #define BATTERY_VOLTAGE_EMPTY 3.00f   // Empty / cutoff
 
 // Battery reading interval (read every 10 seconds to save power)
