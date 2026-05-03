@@ -180,7 +180,7 @@ struct Exercise: Identifiable, Equatable, Codable {
     init(id: UUID = UUID(), name: String, targetReps: Int, targetDuration: Int = 60, activityType: ActivityType = .reps) {
         self.id = id
         self.name = name
-        self.targetReps = targetReps
+        self.targetReps = max(1, targetReps) // Clamp to minimum of 1; 0 or negative reps are invalid
         self.targetDuration = targetDuration
         self.activityType = activityType
     }
