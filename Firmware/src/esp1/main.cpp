@@ -204,6 +204,9 @@ void IRAM_ATTR mpuInterruptISR() {
 // Stationary detection thresholds
 #define ACCEL_STATIONARY_THRESHOLD 0.1f   // Acceleration deviation from 1g (tight — accel is now calibrated)
 #define GYRO_STATIONARY_THRESHOLD 0.15f   // Gyroscope threshold (rad/s) for stationary detection
+// Activity thresholds (used for idle sleep timer updates)
+#define ACCEL_ACTIVITY_THRESHOLD 0.2f     // Acceleration deviation from 1g to count as meaningful movement
+#define GYRO_ACTIVITY_THRESHOLD 0.35f     // Gyroscope magnitude to count as meaningful movement (rad/s)
 
 // Rep detection parameters - now configurable via BLE
 // Default values correspond to medium sensitivity (0.5)
@@ -1791,9 +1794,11 @@ void loop() {
     // Track duration for vibration-based activities (like treadmill)
     trackDuration(linearAccelMag, currentTime);
     
-    // Update activity timer if there's motion (not stationary)
-    // Note: BLE connection state does not prevent sleep - only motion does
-    if (!isStationary) {
+    // Update activity timer only for meaningful motion.
+    // This avoids keeping the device awake from minor sensor noise when stationary.
+    bool meaningfulMotion = (abs(rawAccelMagForSleep - 1.0f) > ACCEL_ACTIVITY_THRESHOLD) ||
+                           (gyroMag > GYRO_ACTIVITY_THRESHOLD);
+    if (meaningfulMotion) {
       lastActivityTime = currentTime;
     }
     
