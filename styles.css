@@ -144,6 +144,13 @@ h2 {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
+.hero-photo {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 10px;
+}
+
 .feature-grid {
   display: grid;
   gap: 16px;
@@ -240,6 +247,18 @@ li + li {
 
 .step {
   text-align: center;
+}
+
+.step-image {
+  width: 100%;
+  max-width: 320px;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  display: block;
+  margin: 0 auto 14px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
 }
 
 .step h3 {
