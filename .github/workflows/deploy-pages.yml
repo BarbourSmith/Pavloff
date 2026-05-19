@@ -8,6 +8,7 @@ on:
       - "guide.html"
       - "styles.css"
       - "icon.png"
+      - "Page Photos/**"
       - ".github/workflows/deploy-pages.yml"
   workflow_dispatch:
 
@@ -31,6 +32,9 @@ jobs:
         run: |
           mkdir -p _site
           cp index.html guide.html styles.css icon.png _site/
+          if [ -d "Page Photos" ]; then
+            cp -r "Page Photos" _site/
+          fi
 
       - name: Upload site artifact
         uses: actions/upload-pages-artifact@v3
