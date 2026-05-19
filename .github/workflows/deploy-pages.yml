@@ -32,7 +32,9 @@ jobs:
         run: |
           mkdir -p _site
           cp index.html guide.html styles.css icon.png _site/
-          cp -r "Page Photos" _site/
+          if [ -d "Page Photos" ]; then
+            cp -r "Page Photos" _site/
+          fi
 
       - name: Upload site artifact
         uses: actions/upload-pages-artifact@v3
