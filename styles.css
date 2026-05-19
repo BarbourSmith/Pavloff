@@ -199,6 +199,17 @@ h2 {
   color: var(--muted);
 }
 
+.guide-screenshot {
+  width: 100%;
+  max-width: 640px;
+  height: auto;
+  display: block;
+  margin: 14px auto 0;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+}
+
 .site-footer {
   border-top: 1px solid var(--line);
   padding: 24px clamp(16px, 3vw, 40px) 32px;
