@@ -272,6 +272,15 @@ This app replaces the previous React Native implementation with a native Swift a
 
 ## Documentation
 
+## GitHub Pages Site
+
+This repository includes a two-page marketing site for GitHub Pages:
+
+- `index.html` — product front page
+- `guide.html` — user guide and onboarding steps
+
+Styling is in `styles.css`, and the deployment workflow is in `.github/workflows/deploy-pages.yml`.
+
 ### Workout Tracking Features
 - **[WORKOUT_FEATURE.md](WORKOUT_FEATURE.md)**: Complete user guide with quick start, tips, and troubleshooting
 - **[STREAK_FEATURE.md](STREAK_FEATURE.md)**: Streak tracking feature guide with logic and milestones
